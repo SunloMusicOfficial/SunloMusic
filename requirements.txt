@@ -1,0 +1,14 @@
+pyrogram
+tgcrypto
+py-tgcalls
+yt-dlp
+ffmpeg-python
+motor
+redis
+fastapi
+uvicorn
+python-dotenv
+aiohttp
+pillow
+psutil
+mutagen
