@@ -1,20 +1,34 @@
 import asyncio
 from core.bot import SunloBot
-from pyrogram import idle
+from core.call import SunloCall
 from utils.logger import LOGGER
+from pyrogram import idle
+
+# Initialize database to trigger connection
+from database.mongodb import db
 
 async def main():
     LOGGER.info("Starting SunloMusic Engine...")
-    bot = SunloBot()
+    
+    # Initialize Bot & Call instances
+    app = SunloBot()
+    call = SunloCall(app)
     
     try:
-        await bot.start()
-        LOGGER.info("Bot is now online and ready to receive commands.")
+        await app.start()
+        await call.start()
+        
+        LOGGER.info("🚀 SunloMusic is now completely ONLINE with Audio Engine!")
+        
+        # Idle block karta hai taaki script band na ho
         await idle()
+    except KeyboardInterrupt:
+        LOGGER.warning("Received stop signal from user.")
     except Exception as e:
-        LOGGER.error(f"Error during bot startup: {e}")
+        LOGGER.error(f"Error during startup: {e}")
     finally:
-        await bot.stop()
+        LOGGER.info("Stopping services...")
+        await app.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
