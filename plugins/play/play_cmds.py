@@ -1,3 +1,5 @@
+from utils.vc_starter import auto_start_vc
+from pytgcalls.exceptions import NoActiveGroupCall
 from utils.anti_spam import is_spam
 import os
 from pyrogram import Client, filters
@@ -78,7 +80,15 @@ async def play_command(client: Client, message: Message):
     
     try:
         chat_filter = get_filter(chat_id)
-        await sunlo_call.play(chat_id, AudioPiped(track_data["stream_url"], ffmpeg_parameters=chat_filter))
+        try:
+            await sunlo_call.play(chat_id, AudioPiped(track_data["stream_url"], ffmpeg_parameters=chat_filter))
+        except NoActiveGroupCall:
+            await status_msg.edit_text("🔄 **Voice Chat is OFF. Auto-starting VC...**")
+            vc_started = await auto_start_vc(client, chat_id)
+            if vc_started:
+                await sunlo_call.play(chat_id, AudioPiped(track_data["stream_url"], ffmpeg_parameters=chat_filter))
+            else:
+                return await status_msg.edit_text("❌ **Could not start VC.** Please turn it on manually.")
         CURRENT_TRACK[chat_id] = track_data
         await db.inc_play_count(message.from_user.id)
         
