@@ -1,8 +1,9 @@
 pyrofork
-pytgcalls
 yt-dlp
 motor
 fastapi
 uvicorn
 aiohttp
 tgcrypto
+pytgcalls>=3.0.0
+ntgcalls
