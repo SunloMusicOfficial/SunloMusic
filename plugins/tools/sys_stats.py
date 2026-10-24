@@ -1,9 +1,14 @@
 import time
-import psutil
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from database.mongodb import db
 from config.vars import Config
+
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
 START_TIME = time.time()
 
@@ -19,15 +24,16 @@ async def ping_cmd(client: Client, message: Message):
 async def stats_cmd(client: Client, message: Message):
     status = await message.reply_text("📊 **Fetching Global Stats...**")
     
-    # DB Counts
     total_users = await db.users.count_documents({})
     total_groups = await db.groups.count_documents({})
     
-    # System Stats
-    cpu = psutil.cpu_percent()
-    ram = psutil.virtual_memory().percent
+    if HAS_PSUTIL:
+        cpu = f"{psutil.cpu_percent()}%"
+        ram = f"{psutil.virtual_memory().percent}%"
+    else:
+        cpu = "N/A (Termux)"
+        ram = "N/A (Termux)"
     
-    # Uptime
     uptime_sec = int(time.time() - START_TIME)
     h, rem = divmod(uptime_sec, 3600)
     m, s = divmod(rem, 60)
@@ -37,8 +43,8 @@ async def stats_cmd(client: Client, message: Message):
         f"📊 **{Config.BOT_NAME} - Global Stats**\n\n"
         f"👥 **Users:** `{total_users}`\n"
         f"🗣 **Groups:** `{total_groups}`\n\n"
-        f"💻 **CPU Usage:** `{cpu}%`\n"
-        f"💾 **RAM Usage:** `{ram}%`\n"
+        f"💻 **CPU Usage:** `{cpu}`\n"
+        f"💾 **RAM Usage:** `{ram}`\n"
         f"⏳ **Uptime:** `{uptime}`"
     )
     await status.edit_text(text)
