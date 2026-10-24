@@ -6,3 +6,4 @@ uvicorn
 aiohttp
 tgcrypto
 py-tgcalls
+dotenv
