@@ -65,6 +65,7 @@ async def play_command(client: Client, message: Message):
     
     try:
         chat_filter = get_filter(chat_id)
+        await db.inc_play_count(message.from_user.id)
         await sunlo_call.play(
             chat_id, 
             AudioPiped(track_data["stream_url"], ffmpeg_parameters=chat_filter)

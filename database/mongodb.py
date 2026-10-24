@@ -17,7 +17,6 @@ class MongoDB:
         else:
             self.client = None
 
-    # --- Group Settings ---
     async def get_group(self, chat_id: int):
         if not self.client: return {"chat_id": chat_id, "strict_mode": False}
         group = await self.groups.find_one({"chat_id": chat_id})
@@ -33,20 +32,49 @@ class MongoDB:
         await self.groups.update_one({"chat_id": chat_id}, {"$set": {"strict_mode": new_status}})
         return new_status
 
-    # --- User Economy ---
     async def get_user(self, user_id: int):
-        if not self.client: return {"user_id": user_id, "coins": 0}
+        if not self.client: return {"user_id": user_id, "coins": 0, "playlist": [], "play_count": 0}
         user = await self.users.find_one({"user_id": user_id})
         if not user:
-            user = {"user_id": user_id, "coins": 100} # Naye users ko 100 coins free
+            user = {"user_id": user_id, "coins": 100, "playlist": [], "play_count": 0}
             await self.users.insert_one(user)
         return user
 
     async def add_coins(self, user_id: int, amount: int):
         if not self.client: return False
         user = await self.get_user(user_id)
-        new_balance = user["coins"] + amount
+        new_balance = user.get("coins", 0) + amount
         await self.users.update_one({"user_id": user_id}, {"$set": {"coins": new_balance}})
         return new_balance
+
+    # --- New: Playlist & Stats ---
+    async def save_to_playlist(self, user_id: int, track_data: dict):
+        if not self.client: return False
+        user = await self.get_user(user_id)
+        playlist = user.get("playlist", [])
+        
+        # Limit playlist to 50 songs per user
+        if len(playlist) >= 50:
+            return "limit_reached"
+            
+        # Avoid duplicates
+        for song in playlist:
+            if song["title"] == track_data["title"]:
+                return "duplicate"
+                
+        playlist.append({"title": track_data["title"], "url": track_data.get("original_url", track_data["title"])})
+        await self.users.update_one({"user_id": user_id}, {"$set": {"playlist": playlist}})
+        return "success"
+        
+    async def inc_play_count(self, user_id: int):
+        if not self.client: return
+        user = await self.get_user(user_id)
+        current = user.get("play_count", 0)
+        await self.users.update_one({"user_id": user_id}, {"$set": {"play_count": current + 1}})
+
+    async def get_top_users(self):
+        if not self.client: return []
+        cursor = self.users.find().sort("play_count", -1).limit(10)
+        return await cursor.to_list(length=10)
 
 db = MongoDB()
