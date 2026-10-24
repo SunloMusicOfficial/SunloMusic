@@ -1,3 +1,4 @@
+from utils.anti_spam import is_spam
 import os
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
@@ -27,6 +28,8 @@ LAST_PLAYING_MSG = {}
 
 @Client.on_message(filters.command(["play", "vplay"]) & filters.group)
 async def play_command(client: Client, message: Message):
+    if await is_spam(message.from_user.id):
+        return await message.reply_text("⚠️ **Spam detected!** Please slow down.")
     if await db.is_maintenance() and message.from_user.id != 123456789: # Replace with your owner ID
         return await message.reply_text("⚙️ **Bot is under maintenance.**")
         

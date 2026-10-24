@@ -1,3 +1,4 @@
+from core.auto_leave import auto_leave_monitor
 import asyncio
 import uvicorn
 from core.bot import SunloBot
@@ -24,6 +25,7 @@ async def main():
         
         # Start web dashboard in background
         asyncio.create_task(start_web_server())
+        asyncio.create_task(auto_leave_monitor())
         
         LOGGER.info("🚀 SunloMusic is ONLINE! Web Dashboard running on port 8080")
         await idle()
