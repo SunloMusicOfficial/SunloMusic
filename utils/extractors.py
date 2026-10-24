@@ -50,3 +50,17 @@ async def fetch_audio_url(query: str):
         set_cache(query, result) # Save to cache for next time
         return result
     return None
+
+async def fetch_playlist(url: str):
+    def extract():
+        try:
+            with yt_dlp.YoutubeDL({"extract_flat": True, "quiet": True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if "entries" in info:
+                    return [{"title": entry.get("title"), "original_url": entry.get("url")} for entry in info["entries"][:50]]
+        except Exception as e:
+            LOGGER.error(f"Playlist Fetch Error: {e}")
+        return None
+        
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, extract)
