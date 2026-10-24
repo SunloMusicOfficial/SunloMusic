@@ -1,3 +1,4 @@
+from utils.startup_log import send_startup_log
 from core.auto_leave import auto_leave_monitor
 import asyncio
 import uvicorn
@@ -32,7 +33,8 @@ async def main():
         asyncio.create_task(auto_leave_monitor())
         
         LOGGER.info("🚀 SunloMusic is ONLINE! Web Dashboard running on port 8080")
-        await idle()
+        await await send_startup_log(app) # Assuming app is your pyrogram client
+    idle()
     except Exception as e:
         LOGGER.error(f"Error during startup: {e}")
     finally:
