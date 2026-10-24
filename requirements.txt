@@ -1,14 +1,9 @@
 pyrogram
-tgcrypto
-py-tgcalls
+pytgcalls
 yt-dlp
-ffmpeg-python
 motor
-redis
+psutil
 fastapi
 uvicorn
-python-dotenv
 aiohttp
-pillow
-psutil
-mutagen
+tgcrypto
