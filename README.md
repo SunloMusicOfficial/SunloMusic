@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="https://telegra.ph/file/c5952793fa720b08db669.jpg" alt="Premium Banner" width="100%">
-</p>
-
-<h2 align="center">✦ SUNLO MUSIC PREMIUM ✦</h2>
+<h1 align="center">🎧 SUNLO MUSIC PREMIUM 🎧</h1>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.9%2B-black?style=for-the-badge&logo=python&logoColor=yellow" alt="Python">
