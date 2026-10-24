@@ -9,6 +9,8 @@ from utils.logger import LOGGER
 from pyrogram import idle
 from database.mongodb import db
 from web.app import app as web_app
+import shutil
+import os
 
 async def start_web_server():
     config = uvicorn.Config(web_app, host="0.0.0.0", port=8080, log_level="error")
@@ -16,27 +18,29 @@ async def start_web_server():
     await server.serve()
 
 async def main():
-    import shutil, os
     if os.path.exists("cache"):
         shutil.rmtree("cache", ignore_errors=True)
     os.makedirs("cache", exist_ok=True)
     LOGGER.info("Starting SunloMusic Engine & Web Dashboard...")
-    
+
     app = SunloBot()
-    sunlo_call._app = app 
-    
+    sunlo_call._app = app
+
     try:
         await app.start()
         await CallManager.start()
         
-        # Start web dashboard in background
+        # Start background tasks
         asyncio.create_task(start_web_server())
         asyncio.create_task(auto_leave_monitor())
+        asyncio.create_task(ping_render_and_log(app))
         
         LOGGER.info("🚀 SunloMusic is ONLINE! Web Dashboard running on port 8080")
-        await asyncio.create_task(ping_render_and_log(app))
-    await send_startup_log(app) # Assuming app is your pyrogram client
-    idle()
+        await send_startup_log(app)
+        
+        # Keep bot running
+        await idle()
+        
     except Exception as e:
         LOGGER.error(f"Error during startup: {e}")
     finally:
