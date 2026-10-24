@@ -1,9 +1,23 @@
+import os
 from pyrogram import Client, filters
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls.types import AudioPiped
 from utils.extractors import fetch_audio_url
+from utils.thumbnail import gen_thumb
 from core.call import sunlo_call
 from core.player import add_to_queue
+
+# Premium Inline Keyboard Buttons
+PLAY_BOARD = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton("⏸ Pause", callback_data="pause_cb"),
+        InlineKeyboardButton("▶️ Resume", callback_data="resume_cb"),
+        InlineKeyboardButton("⏭ Skip", callback_data="skip_cb")
+    ],
+    [
+        InlineKeyboardButton("⏹ Stop VC", callback_data="stop_cb")
+    ]
+])
 
 @Client.on_message(filters.command(["play", "vplay"]) & filters.group)
 async def play_command(client: Client, message: Message):
@@ -11,28 +25,40 @@ async def play_command(client: Client, message: Message):
         return await message.reply_text("⚠️ **Usage:** ")
         
     query = message.text.split(None, 1)[1]
-    status_msg = await message.reply_text("🔍 **Searching for your song...**")
+    status_msg = await message.reply_text("🔍 **Searching & Generating Thumbnail...**")
     
     track_data = await fetch_audio_url(query)
     if not track_data or not track_data["stream_url"]:
-        return await status_msg.edit_text("❌ **Song not found or region restricted!**")
+        return await status_msg.edit_text("❌ **Song not found or restricted!**")
         
     chat_id = message.chat.id
+    title = track_data["title"]
+    thumb_path = await gen_thumb(title, track_data["thumbnail"])
     
-    # Check if bot is already playing in the call
     try:
         active_call = await sunlo_call.get_call(chat_id)
         if active_call:
             position = add_to_queue(chat_id, track_data)
-            return await status_msg.edit_text(f"📝 **Added to Queue at position #{position}**\n🎵 **{track_data['title']}**")
+            await status_msg.delete()
+            return await message.reply_photo(
+                photo=thumb_path if thumb_path else "https://via.placeholder.com/1280x720.png?text=SunloMusic",
+                caption=f"📝 **Added to Queue at #{position}**\n🎵 **{title}**",
+                reply_markup=PLAY_BOARD
+            )
     except:
-        pass # Bot call me nahi hai, direct play karega
+        pass 
     
     try:
-        await sunlo_call.play(
-            chat_id,
-            AudioPiped(track_data["stream_url"])
+        await sunlo_call.play(chat_id, AudioPiped(track_data["stream_url"]))
+        await status_msg.delete()
+        await message.reply_photo(
+            photo=thumb_path if thumb_path else "https://via.placeholder.com/1280x720.png?text=SunloMusic",
+            caption=f"▶️ **Now Playing:**\n🎵 **{title}**\n👤 **Requested by:** {message.from_user.mention}",
+            reply_markup=PLAY_BOARD
         )
-        await status_msg.edit_text(f"▶️ **Started Playing:**\n🎵 **{track_data['title']}**")
     except Exception as e:
-        await status_msg.edit_text(f"❌ **Failed to join Voice Chat!**\nMake sure VC is ON.\nError: `{e}`")
+        await status_msg.edit_text(f"❌ **Failed to join VC!**\nError: `{e}`")
+        
+    # Delete thumb to save space
+    if thumb_path and os.path.exists(thumb_path):
+        os.remove(thumb_path)
