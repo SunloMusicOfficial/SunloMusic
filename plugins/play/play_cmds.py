@@ -1,3 +1,5 @@
+from database.mongodb import db
+from config.vars import Config
 from utils.fsub import check_fsub
 import os
 from pyrogram import Client, filters
@@ -30,8 +32,15 @@ async def fl_menu_cb(client, cq):
 
 @Client.on_message(filters.command(["play", "vplay"]) & filters.group)
 async def play_command(client: Client, message: Message):
+    if await db.is_maintenance() and message.from_user.id != Config.OWNER_ID:
+        return await message.reply_text("⚙️ **Bot is under maintenance.** Please try again later.")
+    if await db.is_blacklisted(message.from_user.id):
+        return await message.reply_text("🚫 **You are blacklisted from using this bot.**")
+    from utils.telegram_logger import log_play
+
     if not await check_fsub(client, message): return
     status_msg = await message.reply_text("🔍 **Processing...**")
+    await log_play(client, message, message.text)
     
     # 1. Telegram File Support
     if message.reply_to_message and (message.reply_to_message.audio or message.reply_to_message.voice):

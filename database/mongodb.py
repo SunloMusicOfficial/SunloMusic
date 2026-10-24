@@ -78,3 +78,22 @@ class MongoDB:
         return await cursor.to_list(length=10)
 
 db = MongoDB()
+
+    # --- Blacklist & Maintenance ---
+    async def is_maintenance(self):
+        if not self.client: return False
+        config = await self.db.config.find_one({"_id": "maintenance"})
+        return config["status"] if config else False
+
+    async def set_maintenance(self, status: bool):
+        if not self.client: return
+        await self.db.config.update_one({"_id": "maintenance"}, {"$set": {"status": status}}, upsert=True)
+
+    async def is_blacklisted(self, user_id: int):
+        if not self.client: return False
+        user = await self.users.find_one({"user_id": user_id})
+        return user.get("blacklisted", False) if user else False
+
+    async def blacklist_user(self, user_id: int, status: bool):
+        if not self.client: return
+        await self.users.update_one({"user_id": user_id}, {"$set": {"blacklisted": status}}, upsert=True)
