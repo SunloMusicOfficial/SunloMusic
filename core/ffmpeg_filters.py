@@ -5,13 +5,13 @@ FFMPEG_FILTERS = {
     "nightcore": "-af asetrate=48000*1.25,aresample=48000,atempo=1.25",
     "8d": "-af apulsator=hz=0.125",
     "speedup": "-af atempo=1.5",
-    "slowed": "-af atempo=0.8"
+    "slowed": "-af atempo=0.8",
+    "karaoke": "-af pan=stereo|c0=c0-c1|c1=c0-c1" # Vocal isolation (Center channel cancellation)
 }
 
 ACTIVE_FILTERS = {}
 
 def get_filter(chat_id: int) -> str:
-    # Default 'clear' audio normalizer rahega
     return ACTIVE_FILTERS.get(chat_id, FFMPEG_FILTERS["clear"])
 
 def set_filter(chat_id: int, filter_name: str) -> str:
