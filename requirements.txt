@@ -1,4 +1,4 @@
-pyrogram
+pyrogram @ git+https://github.com/KuramDas/pyrogram.git
 pytgcalls
 yt-dlp
 motor
