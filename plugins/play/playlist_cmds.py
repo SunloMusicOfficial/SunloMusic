@@ -60,3 +60,16 @@ async def playall_cmd(client: Client, message: Message):
         added_count += 1
         
     await status.edit_text(f"✅ **{added_count} songs added to the Queue!**\nIf bot is not playing, use  to start your playlist.")
+
+@Client.on_message(filters.command(["delplaylist", "rmplaylist"]))
+async def delplaylist_cmd(client: Client, message: Message):
+    user_id = message.from_user.id
+    user = await db.get_user(user_id)
+    playlist = user.get("playlist", [])
+    
+    if not playlist:
+        return await message.reply_text("☁️ Your playlist is already empty.")
+        
+    # Clearing the entire playlist for simplicity, can be expanded to remove specific indexes
+    await db.users.update_one({"user_id": user_id}, {"$set": {"playlist": []}})
+    await message.reply_text("🗑 **Playlist Cleared Successfully!**")
