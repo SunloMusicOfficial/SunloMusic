@@ -62,3 +62,15 @@ async def stop_logic(client, chat_id, update_obj):
         else: await update_obj.message.reply_text(msg); await update_obj.answer("Stopped!")
     except:
         pass
+
+from core.player import toggle_autoplay
+
+@Client.on_message(filters.command("autoplay") & filters.group)
+async def autoplay_cmd(client: Client, message: Message):
+    chat_id = message.chat.id
+    new_status = toggle_autoplay(chat_id)
+    
+    if new_status:
+        await message.reply_text("🤖 **AI Auto-Play ENABLED!**\nAb queue khatam hone par bot khud related gaane play karega.")
+    else:
+        await message.reply_text("🛑 **AI Auto-Play DISABLED!**\nQueue khatam hone par bot VC chhod dega.")
