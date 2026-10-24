@@ -1,7 +1,7 @@
 from typing import Dict, List
 
-# Har group ki queue track karne ke liye dictionary
 QUEUE: Dict[int, List[dict]] = {}
+CURRENT_TRACK: Dict[int, dict] = {}  # Naya tracker chalte hue gaane ke liye
 
 def add_to_queue(chat_id: int, track_data: dict):
     if chat_id not in QUEUE:
@@ -17,3 +17,5 @@ def get_next_track(chat_id: int):
 def clear_queue(chat_id: int):
     if chat_id in QUEUE:
         QUEUE[chat_id].clear()
+    if chat_id in CURRENT_TRACK:
+        del CURRENT_TRACK[chat_id]

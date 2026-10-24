@@ -5,9 +5,9 @@ from pytgcalls.types import AudioPiped
 from utils.extractors import fetch_audio_url
 from utils.thumbnail import gen_thumb
 from core.call import sunlo_call
-from core.player import add_to_queue
+from core.player import add_to_queue, CURRENT_TRACK
+from core.ffmpeg_filters import get_filter
 
-# Premium Inline Keyboard Buttons
 PLAY_BOARD = InlineKeyboardMarkup([
     [
         InlineKeyboardButton("⏸ Pause", callback_data="pause_cb"),
@@ -15,9 +15,15 @@ PLAY_BOARD = InlineKeyboardMarkup([
         InlineKeyboardButton("⏭ Skip", callback_data="skip_cb")
     ],
     [
-        InlineKeyboardButton("⏹ Stop VC", callback_data="stop_cb")
+        InlineKeyboardButton("⏹ Stop VC", callback_data="stop_cb"),
+        InlineKeyboardButton("🎛 Filters", callback_data="fl_menu") # Naya button
     ]
 ])
+
+@Client.on_callback_query(filters.regex("^fl_menu$"))
+async def fl_menu_cb(client, cq):
+    from plugins.play.filters_cmds import FILTER_BOARD
+    await cq.message.reply_text("🎛 **Select an Audio Filter:**", reply_markup=FILTER_BOARD)
 
 @Client.on_message(filters.command(["play", "vplay"]) & filters.group)
 async def play_command(client: Client, message: Message):
@@ -49,7 +55,17 @@ async def play_command(client: Client, message: Message):
         pass 
     
     try:
-        await sunlo_call.play(chat_id, AudioPiped(track_data["stream_url"]))
+        # Get active filter for this group
+        chat_filter = get_filter(chat_id)
+        
+        await sunlo_call.play(
+            chat_id, 
+            AudioPiped(track_data["stream_url"], ffmpeg_parameters=chat_filter)
+        )
+        
+        # Current track save karna
+        CURRENT_TRACK[chat_id] = track_data
+        
         await status_msg.delete()
         await message.reply_photo(
             photo=thumb_path if thumb_path else "https://via.placeholder.com/1280x720.png?text=SunloMusic",
@@ -59,6 +75,5 @@ async def play_command(client: Client, message: Message):
     except Exception as e:
         await status_msg.edit_text(f"❌ **Failed to join VC!**\nError: `{e}`")
         
-    # Delete thumb to save space
     if thumb_path and os.path.exists(thumb_path):
         os.remove(thumb_path)
