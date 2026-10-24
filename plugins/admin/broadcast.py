@@ -40,3 +40,25 @@ async def gcast_play_cmd(client: Client, message: Message):
             pass
             
     await status_msg.edit_text(f"✅ **Global Broadcast Successful!**\n🎵 **Track:** {title}\n📡 **Streamed in:** {success_count} groups.")
+
+@Client.on_message(filters.command(["broadcast", "gcast"]) & filters.user(Config.OWNER_ID))
+async def text_broadcast_cmd(client: Client, message: Message):
+    if not message.reply_to_message:
+        return await message.reply_text("⚠️ **Reply to a message to broadcast it.**")
+        
+    status = await message.reply_text("📡 **Starting Text Broadcast...**")
+    from database.mongodb import db
+    
+    users = await db.users.find({}).to_list(length=None)
+    success = 0
+    failed = 0
+    
+    for user in users:
+        try:
+            await message.reply_to_message.copy(user["user_id"])
+            success += 1
+            await asyncio.sleep(0.1) # Prevent FloodWait
+        except:
+            failed += 1
+            
+    await status.edit_text(f"✅ **Broadcast Completed!**\n\n👤 **Sent:** `{success}`\n❌ **Failed:** `{failed}`")
