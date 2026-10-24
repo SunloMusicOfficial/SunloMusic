@@ -2,48 +2,43 @@ import time
 import psutil
 from pyrogram import Client, filters
 from pyrogram.types import Message
+from database.mongodb import db
 from config.vars import Config
 
-# Bot ka start time record karne ke liye
 START_TIME = time.time()
 
-def get_readable_time(seconds: int) -> str:
-    count = 0
-    ping_time = ""
-    time_list = []
-    time_suffix_list = ["s", "m", "h", "days"]
+@Client.on_message(filters.command("ping"))
+async def ping_cmd(client: Client, message: Message):
+    start = time.time()
+    msg = await message.reply_text("🏓 **Pinging...**")
+    end = time.time()
+    ping_time = round((end - start) * 1000, 2)
+    await msg.edit_text(f"🏓 **Pong!**\n⚡ **Latency:** `{ping_time} ms`\n⚙️ **Engine:** SunloMusic Premium")
 
-    while count < 4:
-        count += 1
-        remainder, result = divmod(seconds, 60) if count < 3 else divmod(seconds, 24)
-        if seconds == 0 and remainder == 0:
-            break
-        time_list.append(int(result))
-        seconds = int(remainder)
-
-    for x in range(len(time_list)):
-        time_list[x] = str(time_list[x]) + time_suffix_list[x]
-    if len(time_list) == 4:
-        ping_time += time_list.pop() + ", "
-
-    time_list.reverse()
-    ping_time += ":".join(time_list)
-    return ping_time
-
-@Client.on_message(filters.command(["stats", "sysinfo"]))
+@Client.on_message(filters.command("stats"))
 async def stats_cmd(client: Client, message: Message):
-    uptime = get_readable_time((time.time() - START_TIME))
-    cpu = psutil.cpu_percent(interval=0.5)
+    status = await message.reply_text("📊 **Fetching Global Stats...**")
+    
+    # DB Counts
+    total_users = await db.users.count_documents({})
+    total_groups = await db.groups.count_documents({})
+    
+    # System Stats
+    cpu = psutil.cpu_percent()
     ram = psutil.virtual_memory().percent
-    disk = psutil.disk_usage("/").percent
     
-    stats_text = (
-        f"📊 **SunloMusic System Stats**\n\n"
-        f"⏱ **Uptime:** `{uptime}`\n"
-        f"🖥 **CPU Usage:** `{cpu}%`\n"
+    # Uptime
+    uptime_sec = int(time.time() - START_TIME)
+    h, rem = divmod(uptime_sec, 3600)
+    m, s = divmod(rem, 60)
+    uptime = f"{h}h {m}m {s}s"
+    
+    text = (
+        f"📊 **{Config.BOT_NAME} - Global Stats**\n\n"
+        f"👥 **Users:** `{total_users}`\n"
+        f"🗣 **Groups:** `{total_groups}`\n\n"
+        f"💻 **CPU Usage:** `{cpu}%`\n"
         f"💾 **RAM Usage:** `{ram}%`\n"
-        f"💿 **Disk Usage:** `{disk}%`\n\n"
-        f"👑 **Powered By:** {Config.BOT_NAME} Engine"
+        f"⏳ **Uptime:** `{uptime}`"
     )
-    
-    await message.reply_text(stats_text)
+    await status.edit_text(text)

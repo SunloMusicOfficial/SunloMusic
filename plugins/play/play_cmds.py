@@ -96,6 +96,11 @@ async def play_command(client: Client, message: Message):
             caption=f"▶️ **Now Playing:**\n🎵 **{title}**\n👤 **Requested by:** {message.from_user.mention}",
             reply_markup=PLAY_BOARD
         )
+        if chat_id in LAST_PLAYING_MSG:
+            try:
+                await LAST_PLAYING_MSG[chat_id].edit_reply_markup(reply_markup=None)
+            except:
+                pass
         LAST_PLAYING_MSG[chat_id] = msg
         
     except Exception as e:
