@@ -14,6 +14,10 @@ async def start_web_server():
     await server.serve()
 
 async def main():
+    import shutil, os
+    if os.path.exists("cache"):
+        shutil.rmtree("cache", ignore_errors=True)
+    os.makedirs("cache", exist_ok=True)
     LOGGER.info("Starting SunloMusic Engine & Web Dashboard...")
     
     app = SunloBot()
