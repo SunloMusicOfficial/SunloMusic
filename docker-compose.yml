@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  sunlomusic:
+    build: .
+    container_name: sunlomusic_bot
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
