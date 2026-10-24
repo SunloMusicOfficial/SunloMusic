@@ -3,6 +3,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pytgcalls.types import AudioPiped
 from utils.extractors import fetch_audio_url
+from utils.metadata import get_url_metadata
 from utils.thumbnail import gen_thumb
 from core.call import sunlo_call
 from core.player import add_to_queue, CURRENT_TRACK
@@ -16,7 +17,7 @@ PLAY_BOARD = InlineKeyboardMarkup([
     ],
     [
         InlineKeyboardButton("⏹ Stop VC", callback_data="stop_cb"),
-        InlineKeyboardButton("🎛 Filters", callback_data="fl_menu") # Naya button
+        InlineKeyboardButton("🎛 Filters", callback_data="fl_menu")
     ]
 ])
 
@@ -31,7 +32,15 @@ async def play_command(client: Client, message: Message):
         return await message.reply_text("⚠️ **Usage:** ")
         
     query = message.text.split(None, 1)[1]
-    status_msg = await message.reply_text("🔍 **Searching & Generating Thumbnail...**")
+    status_msg = await message.reply_text("🔍 **Processing your request...**")
+    
+    # ⚡ SMART LINK DETECTION (Spotify, Apple, Saavn, etc.)
+    if "http" in query and ("spotify.com" in query or "apple.com" in query or "jiosaavn.com" in query):
+        await status_msg.edit_text("🔄 **Extracting metadata from platform...**")
+        meta_title = await get_url_metadata(query)
+        if meta_title:
+            query = meta_title # Link ko song name me convert kar diya!
+            await status_msg.edit_text(f"🔍 **Found:** `{query}`\nDownloading from source...")
     
     track_data = await fetch_audio_url(query)
     if not track_data or not track_data["stream_url"]:
@@ -48,22 +57,18 @@ async def play_command(client: Client, message: Message):
             await status_msg.delete()
             return await message.reply_photo(
                 photo=thumb_path if thumb_path else "https://via.placeholder.com/1280x720.png?text=SunloMusic",
-                caption=f"📝 **Added to Queue at #{position}**\n🎵 **{title}**",
+                caption=f"📝 **Added to Queue at #{position}**\n🎵 **{title}**\n🔗 **Source:** Premium Network",
                 reply_markup=PLAY_BOARD
             )
     except:
         pass 
     
     try:
-        # Get active filter for this group
         chat_filter = get_filter(chat_id)
-        
         await sunlo_call.play(
             chat_id, 
             AudioPiped(track_data["stream_url"], ffmpeg_parameters=chat_filter)
         )
-        
-        # Current track save karna
         CURRENT_TRACK[chat_id] = track_data
         
         await status_msg.delete()
