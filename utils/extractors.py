@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 import yt_dlp
+import urllib.parse
 from utils.cache import get_cache, set_cache
 from config.vars import Config
 from utils.logger import LOGGER
@@ -12,26 +13,41 @@ async def fetch_audio_url(query: str):
     cached_data = get_cache(query)
     if cached_data: return cached_data
 
-    # Use External API if provided in .env (Bypasses YouTube IP Block)
+    safe_query = urllib.parse.quote(query)
+    
+    # Universal API Logic (Works with any custom API provider)
     if Config.STREAM_API_URL:
+        base_url = Config.STREAM_API_URL.rstrip('/')
+        api_url = f"{base_url}/extract?query={safe_query}"
+        
+        headers = {}
+        if Config.STREAM_API_KEY:
+            # API key ko URL aur Headers dono me inject kar diya (Universal Support)
+            api_url += f"&key={Config.STREAM_API_KEY}&apikey={Config.STREAM_API_KEY}"
+            headers["Authorization"] = f"Bearer {Config.STREAM_API_KEY}"
+            headers["x-api-key"] = Config.STREAM_API_KEY
+            
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"{Config.STREAM_API_URL}/extract?query={query}") as resp:
+                async with session.get(api_url, headers=headers) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        result = {
-                            "title": data.get("title", "Unknown"),
-                            "duration": data.get("duration", 0),
-                            "stream_url": data.get("stream_url"),
-                            "thumbnail": data.get("thumbnail"),
-                            "original_url": data.get("url", query)
-                        }
-                        set_cache(query, result)
-                        return result
+                        stream_url = data.get("stream_url") or data.get("url") or (data.get("data", {}).get("url"))
+                        
+                        if stream_url:
+                            result = {
+                                "title": data.get("title") or data.get("data", {}).get("title") or "Unknown Title",
+                                "duration": int(data.get("duration") or data.get("data", {}).get("duration") or 0),
+                                "stream_url": stream_url,
+                                "thumbnail": data.get("thumbnail") or data.get("thumb") or data.get("data", {}).get("thumbnail"),
+                                "original_url": data.get("original_url") or query
+                            }
+                            set_cache(query, result)
+                            return result
         except Exception as e:
-            LOGGER.error(f"API Extraction Error: {e}")
+            LOGGER.error(f"External API Error: {e}")
 
-    # Fallback to local yt-dlp if API fails or is missing
+    # Fallback to local yt-dlp
     def extract():
         ydl_opts = {"format": "bestaudio/best", "noplaylist": True, "quiet": True}
         try:
@@ -57,5 +73,4 @@ async def fetch_audio_url(query: str):
     return None
 
 async def fetch_playlist(url: str):
-    # Same logic can be applied here for playlist API
     pass
