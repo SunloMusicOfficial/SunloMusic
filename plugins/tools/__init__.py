@@ -7,3 +7,4 @@ from .download import *
 from .extra_utils import *
 from .inline import *
 from .string_gen import *
+from .basic_cmds import *
