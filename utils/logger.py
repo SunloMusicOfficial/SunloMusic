@@ -1,5 +1,9 @@
 import logging
 from logging.handlers import RotatingFileHandler
+import os
+
+# Folder automatically create karega agar nahi bana hoga
+os.makedirs("scripts", exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -11,4 +15,4 @@ logging.basicConfig(
     ]
 )
 
-LOGGER = logging.getLogger("SunloMusic")
+LOGGER = logging.getLogger(__name__)
