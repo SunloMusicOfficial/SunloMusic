@@ -7,3 +7,4 @@ aiohttp
 tgcrypto
 py-tgcalls
 dotenv
+pillow
