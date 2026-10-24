@@ -1,14 +1,14 @@
-<h1 align="center">
-  <img src="https://telegra.ph/file/b811802a46e1c15f9d254.gif" alt="Premium Banner" width="100%">
-</h1>
+<p align="center">
+  <img src="https://telegra.ph/file/c5952793fa720b08db669.jpg" alt="Premium Banner" width="100%">
+</p>
 
 <h2 align="center">✦ SUNLO MUSIC PREMIUM ✦</h2>
 
 <p align="center">
-  <a href="https://github.com/python/cpython"><img src="https://img.shields.io/badge/Python-3.9%2B-black?style=for-the-badge&logo=python&logoColor=yellow"></a>
-  <a href="https://github.com/KuramDas/pyrofork"><img src="https://img.shields.io/badge/Pyrofork-v2.3-black?style=for-the-badge&logo=telegram&logoColor=blue"></a>
-  <a href="https://github.com/pytgcalls/pytgcalls"><img src="https://img.shields.io/badge/PyTgCalls-v2.1-black?style=for-the-badge&logo=webrtc&logoColor=red"></a>
-  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-Server-black?style=for-the-badge&logo=fastapi&logoColor=009688"></a>
+  <img src="https://img.shields.io/badge/Python-3.9%2B-black?style=for-the-badge&logo=python&logoColor=yellow" alt="Python">
+  <img src="https://img.shields.io/badge/Pyrofork-v2.3-black?style=for-the-badge&logo=telegram&logoColor=blue" alt="Pyrofork">
+  <img src="https://img.shields.io/badge/PyTgCalls-v2.1-black?style=for-the-badge&logo=webrtc&logoColor=red" alt="PyTgCalls">
+  <img src="https://img.shields.io/badge/FastAPI-Server-black?style=for-the-badge&logo=fastapi&logoColor=009688" alt="FastAPI">
 </p>
 
 <p align="center">
@@ -16,21 +16,21 @@
   <i>Designed for ultimate speed, flawless audio quality, and zero YouTube IP bans.</i>
 </p>
 
-<hr>
+---
 
 ### 🚀 **Why Choose SunloMusic?**
 
-🌟 **Anti-429 Engine:** Seamlessly bypasses YouTube IP bans using dynamic API routing (OneGrab/Saavn).
-⚡ **24/7 Uninterrupted:** Built-in web server and Keep-Alive pinger ensures Render/VPS never sleeps.
-🛡️ **Smart Storage:** Auto-cleans cache on startup to prevent disk space overflow.
-🔔 **Premium Logging:** Beautiful visual logs with inline buttons sent directly to your control group.
-📈 **Fully Asynchronous:** Handled by Pyrogram v2 & FastAPI for handling massive server loads.
+* 🌟 **Anti-429 Engine:** Seamlessly bypasses YouTube IP bans using dynamic API routing (OneGrab/Saavn).
+* ⚡ **24/7 Uninterrupted:** Built-in web server and Keep-Alive pinger ensures Render/VPS never sleeps.
+* 🛡️ **Smart Storage:** Auto-cleans cache on startup to prevent disk space overflow.
+* 🔔 **Premium Logging:** Beautiful visual logs with inline buttons sent directly to your control group.
+* 📈 **Fully Asynchronous:** Handled by Pyrogram v2 & FastAPI for handling massive server loads.
 
-<hr>
+---
 
 ### ⚙️ **Configuring Variables (.env)**
 
-Rename <code>sample.env</code> to <code>.env</code> and fill in your details:
+Rename `sample.env` to `.env` and fill in your details:
 
 | Variable | Description |
 | :--- | :--- |
@@ -44,7 +44,7 @@ Rename <code>sample.env</code> to <code>.env</code> and fill in your details:
 | `STREAM_API_URL` | Optional: Your API URL (e.g., `https://api.onegrab.fun`) |
 | `WEB_URL` | Optional: Render/Server Web URL for 24/7 Keep-Alive |
 
-<hr>
+---
 
 ### 🌐 **One-Click Deployment**
 
@@ -72,11 +72,10 @@ cd YOUR_REPO_NAME
 pip3 install -U -r requirements.txt
 cp sample.env .env
 nano .env # Fill your variables
-python3 main.py
-</code></pre>
+python3 main.py</code></pre>
 </details>
 
-<hr>
+---
 
 ### 📋 **Core Commands**
 
@@ -86,7 +85,7 @@ python3 main.py
 * `/join` - Force assistant to join the group.
 * `/reboot` - Restart the bot remotely.
 
-<hr>
+---
 <p align="center">
   <b>Developed & Maintained by <a href="https://t.me/YO_UR_OFFICIAL_CRUSH">@YO_UR_OFFICIAL_CRUSH</a></b><br>
   <i>Open Source & Proudly Developed for the Community 🎵</i>
