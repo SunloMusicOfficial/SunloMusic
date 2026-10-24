@@ -1,6 +1,6 @@
 import os
 from pytgcalls import PyTgCalls
-from pytgcalls.types import Update, AudioPiped
+from pytgcalls.types import Update, MediaStream
 from core.bot import SunloBot
 from core.player import get_next_track, clear_queue, CURRENT_TRACK, is_autoplay_enabled
 from core.ffmpeg_filters import get_filter
@@ -28,7 +28,7 @@ async def on_stream_end(client: PyTgCalls, update: Update):
     if next_track:
         # 1. Play next track from queue
         try:
-            await client.play(chat_id, AudioPiped(next_track["stream_url"], ffmpeg_parameters=chat_filter))
+            await client.play(chat_id, MediaStream(next_track["stream_url"], ffmpeg_parameters=chat_filter))
             CURRENT_TRACK[chat_id] = next_track
             await send_now_playing(chat_id, next_track, "⏭ **Next in Queue:**")
         except Exception as e:
@@ -41,7 +41,7 @@ async def on_stream_end(client: PyTgCalls, update: Update):
         
         if auto_track:
             try:
-                await client.play(chat_id, AudioPiped(auto_track["stream_url"], ffmpeg_parameters=chat_filter))
+                await client.play(chat_id, MediaStream(auto_track["stream_url"], ffmpeg_parameters=chat_filter))
                 CURRENT_TRACK[chat_id] = auto_track
                 await send_now_playing(chat_id, auto_track, "🤖 **Auto-Play Triggered:**")
             except Exception as e:
