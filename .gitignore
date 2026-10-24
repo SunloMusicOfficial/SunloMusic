@@ -1,7 +1,26 @@
+# Security (Never push .env!)
+.env
+
+# Python Virtual Environments & Cache
+venv/
+env/
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+
+# Bot Cache & Downloaded Files
 cache/
+downloads/
+cookies.txt
+
+# Session Files (Pyrogram auto-generated files)
 *.session
 *.session-journal
-node_modules/
+
+# Log Files
+*.log
+
+# OS Generated Files
+.DS_Store
+Thumbs.db
