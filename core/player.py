@@ -29,3 +29,20 @@ def toggle_autoplay(chat_id: int) -> bool:
     current_status = is_autoplay_enabled(chat_id)
     AUTOPLAY[chat_id] = not current_status
     return AUTOPLAY[chat_id]
+
+def bump_track(chat_id: int, user_id: int) -> bool:
+    # Ye function check karega ki kya user ne last me koi gaana add kiya tha
+    if chat_id not in QUEUE or len(QUEUE[chat_id]) < 2:
+        return False # Queue me kam se kam 2 gaane hone chahiye bump karne ke liye
+        
+    user_track_index = -1
+    for i in range(len(QUEUE[chat_id]) - 1, -1, -1):
+        if QUEUE[chat_id][i].get("requested_by") == user_id:
+            user_track_index = i
+            break
+            
+    if user_track_index > 0: # Agar gaana pehle se No.1 par nahi hai
+        track = QUEUE[chat_id].pop(user_track_index)
+        QUEUE[chat_id].insert(0, track) # Sabse aage daal diya
+        return True
+    return False
