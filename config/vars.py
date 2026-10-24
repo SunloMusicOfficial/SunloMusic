@@ -19,3 +19,4 @@ class Config:
     MAX_QUEUE_SIZE = 500
     AUTO_LEAVE_TIME = 120 # Seconds me
     BOT_NAME = "SunloMusic"
+CUSTOM_FOOTER = "✨ Powered by SunloMusic"

@@ -71,7 +71,7 @@ async def play_command(client: Client, message: Message):
             return await message.reply_photo(
                 photo=thumb_path if thumb_path else "https://via.placeholder.com/1280x720.png?text=SunloMusic",
                 caption=f"📝 **Added to Queue at #{position}**\n🎵 **{title}**",
-                reply_markup=PLAY_BOARD
+                reply_markup=PLAY_BOARD, caption=f"▶️ **Now Playing:**\n🎵 **{title}**\n👤 **Requested by:** {message.from_user.mention}\n\n{Config.CUSTOM_FOOTER}"
             )
     except:
         pass 
@@ -94,7 +94,7 @@ async def play_command(client: Client, message: Message):
         msg = await message.reply_photo(
             photo=thumb_path if thumb_path else "https://via.placeholder.com/1280x720.png?text=SunloMusic",
             caption=f"▶️ **Now Playing:**\n🎵 **{title}**\n👤 **Requested by:** {message.from_user.mention}",
-            reply_markup=PLAY_BOARD
+            reply_markup=PLAY_BOARD, caption=f"▶️ **Now Playing:**\n🎵 **{title}**\n👤 **Requested by:** {message.from_user.mention}\n\n{Config.CUSTOM_FOOTER}"
         )
         if chat_id in LAST_PLAYING_MSG:
             try:
