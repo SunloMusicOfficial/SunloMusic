@@ -1,3 +1,4 @@
+from utils.decorators import check_strict_mode
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 from pytgcalls.types import AudioPiped
@@ -7,15 +8,18 @@ from core.player import get_next_track, clear_queue
 # --- TEXT COMMANDS ---
 @Client.on_message(filters.command("skip") & filters.group)
 async def skip_cmd(client: Client, message: Message):
+    if not await check_strict_mode(client, message): return
     await skip_logic(client, message.chat.id, message)
 
 @Client.on_message(filters.command("stop") & filters.group)
 async def stop_cmd(client: Client, message: Message):
+    if not await check_strict_mode(client, message): return
     await stop_logic(client, message.chat.id, message)
 
 # --- CALLBACK QUERIES (BUTTON CLICKS) ---
 @Client.on_callback_query(filters.regex("^pause_cb$"))
 async def pause_cb(client: Client, cq: CallbackQuery):
+    if not await check_strict_mode(client, cq): return
     try:
         await sunlo_call.pause_stream(cq.message.chat.id)
         await cq.answer("⏸ Stream paused!", show_alert=True)
@@ -24,6 +28,7 @@ async def pause_cb(client: Client, cq: CallbackQuery):
 
 @Client.on_callback_query(filters.regex("^resume_cb$"))
 async def resume_cb(client: Client, cq: CallbackQuery):
+    if not await check_strict_mode(client, cq): return
     try:
         await sunlo_call.resume_stream(cq.message.chat.id)
         await cq.answer("▶️ Stream resumed!", show_alert=True)
@@ -32,10 +37,12 @@ async def resume_cb(client: Client, cq: CallbackQuery):
 
 @Client.on_callback_query(filters.regex("^skip_cb$"))
 async def skip_cb_func(client: Client, cq: CallbackQuery):
+    if not await check_strict_mode(client, cq): return
     await skip_logic(client, cq.message.chat.id, cq)
 
 @Client.on_callback_query(filters.regex("^stop_cb$"))
 async def stop_cb_func(client: Client, cq: CallbackQuery):
+    if not await check_strict_mode(client, cq): return
     await stop_logic(client, cq.message.chat.id, cq)
 
 # --- CORE LOGIC FUNCTIONS ---

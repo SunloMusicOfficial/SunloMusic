@@ -19,11 +19,18 @@ class MongoDB:
             LOGGER.warning("⚠️ MONGO_URI not found in .env! Database features disabled.")
 
     async def get_group(self, chat_id: int):
-        if not self.client: return None
+        if not self.client: return {"chat_id": chat_id, "strict_mode": False}
         group = await self.groups.find_one({"chat_id": chat_id})
         if not group:
             group = {"chat_id": chat_id, "lang": "en", "strict_mode": False}
             await self.groups.insert_one(group)
         return group
+
+    async def toggle_strict_mode(self, chat_id: int):
+        if not self.client: return False
+        group = await self.get_group(chat_id)
+        new_status = not group.get("strict_mode", False)
+        await self.groups.update_one({"chat_id": chat_id}, {"$set": {"strict_mode": new_status}})
+        return new_status
 
 db = MongoDB()
