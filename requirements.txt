@@ -5,5 +5,5 @@ fastapi
 uvicorn
 aiohttp
 tgcrypto
-pytgcalls>=3.0.0
 ntgcalls
+pytgcalls==3.0.0.dev24
