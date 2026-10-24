@@ -19,21 +19,20 @@ async def fetch_audio_url(query: str):
     if Config.STREAM_API_URL:
         base_url = Config.STREAM_API_URL.rstrip('/')
         api_url = f"{base_url}/extract?query={safe_query}"
-        
+
         headers = {}
         if Config.STREAM_API_KEY:
-            # API key ko URL aur Headers dono me inject kar diya (Universal Support)
             api_url += f"&key={Config.STREAM_API_KEY}&apikey={Config.STREAM_API_KEY}"
             headers["Authorization"] = f"Bearer {Config.STREAM_API_KEY}"
             headers["x-api-key"] = Config.STREAM_API_KEY
-            
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(api_url, headers=headers) as resp:
                     if resp.status == 200:
                         data = await resp.json()
                         stream_url = data.get("stream_url") or data.get("url") or (data.get("data", {}).get("url"))
-                        
+
                         if stream_url:
                             result = {
                                 "title": data.get("title") or data.get("data", {}).get("title") or "Unknown Title",
@@ -56,10 +55,10 @@ async def fetch_audio_url(query: str):
                 return info["entries"][0] if "entries" in info else info
         except Exception:
             return None
-            
+
     loop = asyncio.get_event_loop()
     data = await loop.run_in_executor(executor, extract)
-    
+
     if data:
         result = {
             "title": data.get("title"),
@@ -74,3 +73,7 @@ async def fetch_audio_url(query: str):
 
 async def fetch_playlist(url: str):
     pass
+
+# AutoPlay feature ke liye dummy function taaki import crash na ho
+async def fetch_related_track(*args, **kwargs):
+    return None
