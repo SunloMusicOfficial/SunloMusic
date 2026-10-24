@@ -1,3 +1,4 @@
+from utils.fsub import check_fsub
 import os
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
@@ -29,6 +30,7 @@ async def fl_menu_cb(client, cq):
 
 @Client.on_message(filters.command(["play", "vplay"]) & filters.group)
 async def play_command(client: Client, message: Message):
+    if not await check_fsub(client, message): return
     status_msg = await message.reply_text("🔍 **Processing...**")
     
     # 1. Telegram File Support
