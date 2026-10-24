@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://telegra.ph/file/c5952793fa720b08db669.jpg" alt="Banner" width="100%">
+  <img src="https://telegra.ph/file/b811802a46e1c15f9d254.gif" alt="Premium Banner" width="100%">
 </h1>
 
 <h2 align="center">✦ SUNLO MUSIC PREMIUM ✦</h2>
@@ -8,9 +8,7 @@
   <a href="https://github.com/python/cpython"><img src="https://img.shields.io/badge/Python-3.9%2B-black?style=for-the-badge&logo=python&logoColor=yellow"></a>
   <a href="https://github.com/KuramDas/pyrofork"><img src="https://img.shields.io/badge/Pyrofork-v2.3-black?style=for-the-badge&logo=telegram&logoColor=blue"></a>
   <a href="https://github.com/pytgcalls/pytgcalls"><img src="https://img.shields.io/badge/PyTgCalls-v2.1-black?style=for-the-badge&logo=webrtc&logoColor=red"></a>
-  <br>
-  <img src="https://img.shields.io/github/repo-size/YOUR_USERNAME/YOUR_REPO_NAME?color=black&logo=github&style=for-the-badge">
-  <img src="https://img.shields.io/github/contributors/YOUR_USERNAME/YOUR_REPO_NAME?color=black&logo=github&style=for-the-badge">
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-Server-black?style=for-the-badge&logo=fastapi&logoColor=009688"></a>
 </p>
 
 <p align="center">
@@ -22,11 +20,11 @@
 
 ### 🚀 **Why Choose SunloMusic?**
 
-⿡ **Anti-429 Engine:** Seamlessly bypasses YouTube IP bans using dynamic API routing (OneGrab/Saavn).
-⿢ **24/7 Uninterrupted:** Built-in web server and Keep-Alive pinger ensures Render/VPS never sleeps.
-⿣ **Smart Storage:** Auto-cleans cache on startup to prevent disk space overflow.
-⿤ **Premium Logging:** Beautiful visual logs with inline buttons sent directly to your control group.
-⿥ **Fully Asynchronous:** Handled by Pyrogram v2 & FastAPI for handling massive server loads.
+🌟 **Anti-429 Engine:** Seamlessly bypasses YouTube IP bans using dynamic API routing (OneGrab/Saavn).
+⚡ **24/7 Uninterrupted:** Built-in web server and Keep-Alive pinger ensures Render/VPS never sleeps.
+🛡️ **Smart Storage:** Auto-cleans cache on startup to prevent disk space overflow.
+🔔 **Premium Logging:** Beautiful visual logs with inline buttons sent directly to your control group.
+📈 **Fully Asynchronous:** Handled by Pyrogram v2 & FastAPI for handling massive server loads.
 
 <hr>
 
@@ -90,5 +88,6 @@ python3 main.py
 
 <hr>
 <p align="center">
+  <b>Developed & Maintained by <a href="https://t.me/YO_UR_OFFICIAL_CRUSH">@YO_UR_OFFICIAL_CRUSH</a></b><br>
   <i>Open Source & Proudly Developed for the Community 🎵</i>
 </p>
