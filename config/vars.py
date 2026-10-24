@@ -14,6 +14,7 @@ class Config:
     
     OWNER_ID = int(os.getenv("OWNER_ID", 0))
     LOG_GROUP_ID = int(os.getenv("LOG_GROUP_ID", 0))
+    WEB_URL = os.getenv("WEB_URL", "")
     STREAM_API_URL = os.getenv("STREAM_API_URL", "https://api.onegrab.fun")
     STREAM_API_KEY = os.getenv("STREAM_API_KEY", "")
     
