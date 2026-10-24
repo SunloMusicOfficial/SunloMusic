@@ -1,83 +1,25 @@
-from utils.decorators import check_strict_mode
 from pyrogram import Client, filters
-from pyrogram.types import Message, CallbackQuery
-from pytgcalls.types import AudioPiped
-from core.call import sunlo_call
-from core.player import get_next_track, clear_queue
+from pyrogram.types import Message
+from core.player import QUEUE, CURRENT_TRACK
 
-# --- TEXT COMMANDS ---
-@Client.on_message(filters.command("skip") & filters.group)
-async def skip_cmd(client: Client, message: Message):
-    if not await check_strict_mode(client, message): return
-    await skip_logic(client, message.chat.id, message)
-
-@Client.on_message(filters.command("stop") & filters.group)
-async def stop_cmd(client: Client, message: Message):
-    if not await check_strict_mode(client, message): return
-    await stop_logic(client, message.chat.id, message)
-
-# --- CALLBACK QUERIES (BUTTON CLICKS) ---
-@Client.on_callback_query(filters.regex("^pause_cb$"))
-async def pause_cb(client: Client, cq: CallbackQuery):
-    if not await check_strict_mode(client, cq): return
-    try:
-        await sunlo_call.pause_stream(cq.message.chat.id)
-        await cq.answer("⏸ Stream paused!", show_alert=True)
-    except:
-        await cq.answer("Nothing is playing!", show_alert=True)
-
-@Client.on_callback_query(filters.regex("^resume_cb$"))
-async def resume_cb(client: Client, cq: CallbackQuery):
-    if not await check_strict_mode(client, cq): return
-    try:
-        await sunlo_call.resume_stream(cq.message.chat.id)
-        await cq.answer("▶️ Stream resumed!", show_alert=True)
-    except:
-        await cq.answer("Nothing is paused!", show_alert=True)
-
-@Client.on_callback_query(filters.regex("^skip_cb$"))
-async def skip_cb_func(client: Client, cq: CallbackQuery):
-    if not await check_strict_mode(client, cq): return
-    await skip_logic(client, cq.message.chat.id, cq)
-
-@Client.on_callback_query(filters.regex("^stop_cb$"))
-async def stop_cb_func(client: Client, cq: CallbackQuery):
-    if not await check_strict_mode(client, cq): return
-    await stop_logic(client, cq.message.chat.id, cq)
-
-# --- CORE LOGIC FUNCTIONS ---
-async def skip_logic(client, chat_id, update_obj):
-    next_track = get_next_track(chat_id)
-    if next_track:
-        await sunlo_call.play(chat_id, AudioPiped(next_track["stream_url"]))
-        msg = f"⏭ **Skipped! Playing next:**\n🎵 **{next_track['title']}**"
-        if isinstance(update_obj, Message): await update_obj.reply_text(msg)
-        else: await update_obj.message.reply_text(msg); await update_obj.answer("Skipped!")
-    else:
-        await sunlo_call.leave_call(chat_id)
-        clear_queue(chat_id)
-        msg = "⏭ **Skipped! Queue is empty, leaving VC.**"
-        if isinstance(update_obj, Message): await update_obj.reply_text(msg)
-        else: await update_obj.message.reply_text(msg); await update_obj.answer("Queue Empty, Left VC!")
-
-async def stop_logic(client, chat_id, update_obj):
-    try:
-        await sunlo_call.leave_call(chat_id)
-        clear_queue(chat_id)
-        msg = "⏹ **Stream stopped and queue cleared!**"
-        if isinstance(update_obj, Message): await update_obj.reply_text(msg)
-        else: await update_obj.message.reply_text(msg); await update_obj.answer("Stopped!")
-    except:
-        pass
-
-from core.player import toggle_autoplay
-
-@Client.on_message(filters.command("autoplay") & filters.group)
-async def autoplay_cmd(client: Client, message: Message):
+@Client.on_message(filters.command("queue") & filters.group)
+async def queue_cmd(client: Client, message: Message):
     chat_id = message.chat.id
-    new_status = toggle_autoplay(chat_id)
     
-    if new_status:
-        await message.reply_text("🤖 **AI Auto-Play ENABLED!**\nAb queue khatam hone par bot khud related gaane play karega.")
-    else:
-        await message.reply_text("🛑 **AI Auto-Play DISABLED!**\nQueue khatam hone par bot VC chhod dega.")
+    if chat_id not in CURRENT_TRACK and (chat_id not in QUEUE or not QUEUE[chat_id]):
+        return await message.reply_text("📭 **Queue is completely empty!**")
+        
+    text = "📋 **Current Queue List**\n\n"
+    
+    if chat_id in CURRENT_TRACK:
+        text += f"▶️ **Now Playing:** {CURRENT_TRACK[chat_id]['title']}\n\n"
+        
+    if chat_id in QUEUE and QUEUE[chat_id]:
+        text += "⏳ **Up Next:**\n"
+        for i, track in enumerate(QUEUE[chat_id][:10], 1): # Show max 10 songs
+            text += f"**{i}.** {track['title']}\n"
+            
+        if len(QUEUE[chat_id]) > 10:
+            text += f"\n*...and {len(QUEUE[chat_id]) - 10} more tracks.*"
+            
+    await message.reply_text(text)

@@ -7,3 +7,4 @@ from .group_admin import *
 from .security import *
 from .language import *
 from .assistant import *
+from .join import *
