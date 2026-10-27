@@ -20,7 +20,7 @@ async def stream_end_handler(client, update: StreamEnded):
         nxt = q.queue.pop(0)
         q.now_playing = nxt
         if await play_stream(chat_id, nxt.url, nxt.video):
-            try: await bot_module.bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n<b>{nxt.title}</b>\n👤 {nxt.requester}")
+            try: await bot_module.bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n<b>{nxt.title}</b>\n👤 <a href="tg://user?id={nxt.requester_id}">{nxt.requester}</a>")
             except: pass
     else:
         clear_queue(chat_id)

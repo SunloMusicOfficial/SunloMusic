@@ -13,11 +13,17 @@ from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard
 
-async def update_live_timer(chat_id):
+def make_progress_bar(current: int, total: int, length: int = 10) -> str:
+    if not total: return "─" * length
+    pos = int(length * current / total)
+    pos = min(max(pos, 0), length - 1)
+    return "─" * pos + "🎵" + "─" * (length - pos - 1)
+
+async def update_live_timer(chat_id, msg_id):
     while True:
         await asyncio.sleep(5)
         q = get_queue(chat_id)
-        if not q.now_playing or not q.playing_message_id:
+        if not q.now_playing or q.playing_message_id != msg_id:
             break
         if q.paused:
             continue
@@ -27,11 +33,31 @@ async def update_live_timer(chat_id):
             break
             
         try:
-            await bot.edit_message_reply_markup(
-                chat_id=chat_id,
-                message_id=q.playing_message_id,
-                reply_markup=player_keyboard(q, elapsed)
+            dur_str = format_duration(q.now_playing.duration)
+            elapsed_str = format_duration(elapsed)
+            progress = make_progress_bar(elapsed, q.now_playing.duration)
+            
+            b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
+            title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+            
+            caption = (
+                f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
+                f"🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n"
+                f"⏱ <b>Duration:</b> {dur_str}\n"
+                f"👤 <b>Request:</b> <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n\n"
+                f"<code>{elapsed_str}</code> 🎵 {progress} <code>{dur_str}</code>"
             )
+            
+            try:
+                await bot.edit_message_caption(
+                    chat_id=chat_id, message_id=msg_id,
+                    caption=caption, reply_markup=player_keyboard(q)
+                )
+            except Exception:
+                await bot.edit_message_text(
+                    chat_id=chat_id, message_id=msg_id,
+                    text=caption, reply_markup=player_keyboard(q)
+                )
         except Exception:
             pass
 
@@ -53,7 +79,7 @@ async def play_cmd(_, m):
     
     video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)
-    track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, video)
+    track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
     if q.now_playing:
         q.queue.append(track)
@@ -70,27 +96,30 @@ async def play_cmd(_, m):
     q.total_paused = 0
     q.paused = False
     
-    # Generate clickable download link
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
+    dur_str = format_duration(track.duration)
+    progress = make_progress_bar(0, track.duration)
+    
     caption = (
         f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
         f"🎵 <a href='{title_link}'>{track.title}</a>\n"
-        f"⏱ <b>Duration:</b> {format_duration(track.duration)}\n"
-        f"👤 <b>Request:</b> {track.requester}\n"
+        f"⏱ <b>Duration:</b> {dur_str}\n"
+        f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n\n"
+        f"<code>00:00</code> 🎵 {progress} <code>{dur_str}</code>"
     )
     
     if thumb:
         await status.delete()
-        sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+        sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q))
     else:
-        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q, 0))
+        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q))
         
     q.playing_message_id = sent_msg.id
     
     if q.timer_task:
         q.timer_task.cancel()
-    q.timer_task = asyncio.create_task(update_live_timer(m.chat.id))
+    q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))

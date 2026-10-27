@@ -50,22 +50,18 @@ async def controls_cb(_, cq: CallbackQuery):
         if action == "cb_pause":
             if q.now_playing:
                 if q.paused:
-                    # Resume
                     await resume_stream(chat_id)
                     q.paused = False
                     q.total_paused += time.time() - q.paused_at
                     await cq.answer("▶️ Resumed")
                 else:
-                    # Pause
                     await pause_stream(chat_id)
                     q.paused = True
                     q.paused_at = time.time()
                     await cq.answer("⏸ Paused")
                 
-                # Instantly update button text
-                elapsed = int(time.time() - q.start_time - q.total_paused)
                 try:
-                    await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
+                    await cq.message.edit_reply_markup(reply_markup=player_keyboard(q))
                 except: pass
             else:
                 await cq.answer("Nothing playing", show_alert=True)
@@ -92,8 +88,9 @@ async def controls_cb(_, cq: CallbackQuery):
             
         elif action == "cb_loop":
             q.loop = (q.loop + 1) % 3
-            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
-            await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
+            try:
+                await cq.message.edit_reply_markup(reply_markup=player_keyboard(q))
+            except: pass
             modes = {0: "Off", 1: "One", 2: "All"}
             await cq.answer(f"🔁 Loop: {modes[q.loop]}")
             
@@ -105,9 +102,6 @@ async def controls_cb(_, cq: CallbackQuery):
                 f"🔊 <b>Volume:</b> Coming Soon"
             )
             await cq.answer(text, show_alert=True)
-            
-        elif action == "cb_timer":
-            await cq.answer("⏱ Timer is running live!")
             
         elif action == "cb_close":
             await cq.message.delete()

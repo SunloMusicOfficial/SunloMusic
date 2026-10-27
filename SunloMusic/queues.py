@@ -10,6 +10,7 @@ class Track:
     duration: int
     thumbnail: str
     requester: str
+    requester_id: int
     video: bool = False
 
 @dataclass
