@@ -27,16 +27,13 @@ async def extract_audio(query: str) -> dict | None:
         LOGGER.error("❌ ONEGRAB_API_KEY is missing in .env")
         return None
 
-    # Agar pehle se hi direct media URL hai (m4a/mp4/mp3)
+    # Agar pehle se hi direct media URL hai
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
-        return {
-            "title": query.split("/")[-1] or "Unknown Track",
-            "url": query, "duration": 0, "thumbnail": "", "webpage_url": query
-        }
+        return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
 
     webpage_url = query
 
-    # 1. Agar URL nahi hai, toh pehle OneGrab Search API se webpage_url nikaalo
+    # 1. Search API
     if not query.startswith("http"):
         search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
         if not search_data or not search_data.get("results"):
@@ -47,19 +44,37 @@ async def extract_audio(query: str) -> dict | None:
         if not webpage_url:
             return None
 
-    # 2. Get Direct Stream URL from OneGrab
-    track_data = await _api_request("/api/get_url", {"url": webpage_url})
-    if not track_data or not track_data.get("results"):
-        LOGGER.error(f"❌ Get URL failed for: {webpage_url}")
+    # 2. Get Stream URL API
+    # Type=audio parameter add kiya taaki API ko pata chale audio chahiye
+    track_data = await _api_request("/api/get_url", {"url": webpage_url, "type": "audio"})
+    
+    if not track_data:
+        LOGGER.error("❌ API returned empty response for get_url")
+        return None
+
+    # 🔍 DEBUG LOG: Render logs me pura JSON print karega
+    LOGGER.info(f"🔍 OneGrab GetURL Response: {track_data}")
+
+    if not track_data.get("results"):
+        LOGGER.error("❌ API response has no 'results' key")
         return None
 
     result = track_data["results"][0]
     
-    # Direct stream link extract karo (cdnurl / url / download_url)
-    direct_url = result.get("cdnurl") or result.get("url") or result.get("download_url")
+    # 3. Smart Direct URL Extractor
+    # API alag-alag keys use kar sakti hai, hum sab check kar rahe hain
+    direct_url = None
+    possible_keys = ["cdnurl", "audio_url", "video_url", "download_url", "audio", "video", "url"]
     
-    if not direct_url or "youtube.com" in direct_url or "youtu.be" in direct_url:
-        LOGGER.error(f"❌ OneGrab returned non-direct URL: {direct_url}")
+    for key in possible_keys:
+        val = result.get(key)
+        # Check karo ki link youtube.com toh nahi hai aur direct media lag raha hai
+        if val and isinstance(val, str) and "youtube.com" not in val and "youtu.be" not in val:
+            direct_url = val
+            break
+
+    if not direct_url:
+        LOGGER.error(f"❌ API ne direct link nahi diya. Available keys: {list(result.keys())}")
         return None
 
     return {
