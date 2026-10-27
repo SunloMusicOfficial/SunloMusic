@@ -9,6 +9,9 @@ class Config(BaseSettings):
     SESSION_STRING: str
     MONGO_URL: str
 
+    ONEGRAB_API_KEY: str = "" # ✅ OneGrab API Key
+    ONEGRAB_API_URL: str = "https://api.onegrab.fun"
+
     OWNER_ID: int = 0
     LOGGER_ID: int = 0
     SUDO_USERS: str = ""
