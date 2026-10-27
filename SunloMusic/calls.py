@@ -1,7 +1,7 @@
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
-from pytgcalls.exceptions import NoActiveGroupCall, UnMuteNeeded
+from pytgcalls.exceptions import NoActiveGroupCall
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
@@ -56,7 +56,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
             video_parameters=VideoQuality.HD_720p,
         )
     else:
-        # ✅ FIX: video_flags=IGNORE zaroori hai taaki audio stream crash na ho
         stream = MediaStream(
             media_path=url,
             audio_parameters=AudioQuality.HIGH,
@@ -64,25 +63,26 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         )
         
     try:
-        # Ghost session cleanup (agar pehle se koi stream atka hai)
         try: await call.leave_call(chat_id)
         except: pass
         
         await call.play(chat_id, stream, auto_start=True)
         return True
-    except UnMuteNeeded:
-        LOGGER.warning("⚠️ Assistant muted. Trying to unmute...")
-        try:
-            await call.unmute(chat_id)
-            await call.play(chat_id, stream, auto_start=True)
-            return True
-        except Exception as e:
-            LOGGER.error(f"❌ Unmute failed: {e}")
-            return False
     except NoActiveGroupCall:
         LOGGER.error("❌ No active Voice Chat found (Supergroup required).")
         return False
     except Exception as e:
+        error_msg = str(e).lower()
+        # ✅ Agar error mute se related hai toh unmute try karo
+        if "mute" in error_msg or "unmute" in error_msg:
+            LOGGER.warning(f"⚠️ Mute-related error detected: {e}. Trying to unmute...")
+            try:
+                await call.unmute(chat_id)
+                await call.play(chat_id, stream, auto_start=True)
+                return True
+            except Exception as e2:
+                LOGGER.error(f"❌ Unmute failed: {e2}")
+                return False
         LOGGER.error(f"❌ PyTgCalls Error: {type(e).__name__} - {e}")
         return False
 
