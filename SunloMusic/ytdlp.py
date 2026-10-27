@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import yt_dlp
 import os
+import re
 from urllib.parse import urlparse
 from SunloMusic.config import config
 from SunloMusic.logger import LOGGER
@@ -15,6 +16,7 @@ API_HEADERS = {
 DOWNLOAD_DIR = "cache/downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# ✅ Step 1: Search using yt-dlp with multiple results
 YDL_SEARCH_OPTS = {
     "quiet": True,
     "no_warnings": True,
@@ -23,13 +25,77 @@ YDL_SEARCH_OPTS = {
     "nocheckcertificate": True,
 }
 
+# ✅ Step 2: Filter and rank results
+def _filter_and_rank_results(entries: list, query: str):
+    query_lower = query.lower()
+    query_words = set(re.findall(r'\w+', query_lower))
+    
+    # Keywords that indicate a music video
+    music_keywords = {"song", "audio", "lyrics", "official", "music", "video"}
+    
+    scored_entries = []
+    for entry in entries:
+        if not entry:
+            continue
+            
+        title = entry.get("title", "").lower()
+        duration = entry.get("duration", 0)
+        view_count = entry.get("view_count", 0) or 0
+        
+        score = 0
+        
+        # 1. Title word match (most important)
+        title_words = set(re.findall(r'\w+', title))
+        match_count = len(query_words.intersection(title_words))
+        if match_count > 0:
+            score += match_count * 10
+            
+        # 2. Music keywords boost
+        if any(kw in title for kw in music_keywords):
+            score += 5
+            
+        # 3. Duration filter (songs are usually 1-10 mins, avoid 2-hour podcasts)
+        if 60 <= duration <= 600:  # 1 min to 10 mins
+            score += 10
+        elif duration > 1200:  # Longer than 20 mins (likely podcast/lecture)
+            score -= 20
+            
+        # 4. View count (popularity)
+        if view_count > 10_000_000:
+            score += 10
+        elif view_count > 1_000_000:
+            score += 5
+            
+        scored_entries.append((score, entry))
+        
+    # Sort by score descending
+    scored_entries.sort(key=lambda x: x[0], reverse=True)
+    return [entry for score, entry in scored_entries]
+
 def _search_ytdlp_sync(query: str):
-    """Uses yt-dlp to find the most relevant YouTube link (like Aliya Robot)"""
+    """Uses yt-dlp to find the most relevant YouTube link"""
     try:
+        # Enhance query for music
+        search_query = query
+        if not any(kw in query.lower() for kw in ["official", "lyrics", "audio", "video"]):
+            search_query = f"{query} official audio"
+            
+        LOGGER.info(f"🔎 Searching yt-dlp: {search_query}")
+        
+        # Get top 5 results
         with yt_dlp.YoutubeDL(YDL_SEARCH_OPTS) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            info = ydl.extract_info(f"ytsearch5:{search_query}", download=False)
+            if not info or "entries" not in info or len(info["entries"]) == 0:
+                # Fallback to plain search
+                info = ydl.extract_info(f"ytsearch5:{query}", download=False)
+                
             if info and "entries" in info and len(info["entries"]) > 0:
-                return info["entries"][0]
+                # Filter and rank
+                ranked = _filter_and_rank_results(info["entries"], query)
+                if ranked:
+                    best = ranked[0]
+                    LOGGER.info(f"✅ Best match: {best.get('title')} (score: {ranked[0]})")
+                    return best
     except Exception as e:
         LOGGER.error(f"yt-dlp search error: {e}")
     return None
@@ -77,9 +143,8 @@ async def extract_audio(query: str) -> dict | None:
     webpage_url = query
     fallback_meta = {}
 
-    # ✅ STEP 1: Search using yt-dlp (Fixes the wrong song issue)
+    # ✅ STEP 1: Smart Search using yt-dlp (Fixes wrong song issue)
     if not query.startswith("http"):
-        LOGGER.info(f"🔎 Searching via yt-dlp for: {query}")
         loop = asyncio.get_running_loop()
         ytdlp_info = await loop.run_in_executor(None, _search_ytdlp_sync, query)
         
@@ -90,7 +155,7 @@ async def extract_audio(query: str) -> dict | None:
                 "duration": ytdlp_info.get("duration", 0),
                 "thumbnail": ytdlp_info.get("thumbnails", [{}])[-1].get("url", "") if ytdlp_info.get("thumbnails") else ""
             }
-            LOGGER.info(f"✅ Found correct URL: {webpage_url}")
+            LOGGER.info(f"✅ Selected URL: {webpage_url}")
         else:
             # Fallback to OneGrab search if yt-dlp fails
             LOGGER.warning("⚠️ yt-dlp search failed, falling back to OneGrab search")
