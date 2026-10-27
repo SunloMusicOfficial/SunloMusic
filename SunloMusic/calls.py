@@ -60,7 +60,6 @@ async def start_next_song(chat_id, q):
         q.timer_task.cancel()
         q.timer_task = None
     
-    # ✅ Delete old playing card
     if q.playing_message_id:
         try: await bot_module.bot.delete_messages(chat_id, q.playing_message_id)
         except: pass
@@ -71,7 +70,6 @@ async def start_next_song(chat_id, q):
         nxt = q.queue.pop(0)
         q.now_playing = nxt
         
-        # ✅ Delete the queue card of the song that is about to play
         if nxt.message_id:
             try: await bot_module.bot.delete_messages(chat_id, nxt.message_id)
             except: pass
@@ -106,7 +104,6 @@ async def start_next_song(chat_id, q):
             await bot_module.bot.send_message(chat_id, "❌ <b>Failed to play next song. Skipping...</b>")
             await start_next_song(chat_id, q)
     else:
-        # ✅ Queue empty, leave VC
         try:
             if call: await call.leave_call(chat_id)
         except Exception: pass
@@ -148,7 +145,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         LOGGER.error("❌ PyTgCalls call object is None")
         return False
     
-    LOGGER.info(f"🎵 Attempting to play URL: {url[:80]}... in {chat_id}")
+    LOGGER.info(f"🎵 Streaming: {url[:80]}... in {chat_id}")
     
     if video:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p)
@@ -156,8 +153,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
         
     try:
-        try: await call.leave_call(chat_id)
-        except: pass
+        # ✅ Removed leave_call! PyTgCalls play() handles stream replacement smoothly
         await call.play(chat_id, stream, config=GroupCallConfig(auto_start=True))
         return True
     except NoActiveGroupCall:
