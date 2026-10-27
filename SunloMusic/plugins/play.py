@@ -12,21 +12,18 @@ from SunloMusic.keyboards import controls_keyboard
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @admin_only
 async def play_cmd(_, m):
-    # ✅ SUPERGROUP CHECK
     if m.chat.type != enums.ChatType.SUPERGROUP:
-        return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>\n\nGroup ko Supergroup me upgrade karein (Group Settings ➔ Manage Group ➔ Convert to Supergroup).")
+        return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>")
 
     await add_user(m.from_user.id, m.from_user.first_name)
+    query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
+    if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
     
-    query = None
-    if len(m.command) > 1: query = " ".join(m.command[1:])
-    elif m.reply_to_message: query = m.reply_to_message.text or m.reply_to_message.caption
-        
-    if not query: return await m.reply_text("❌ <b>Give a song name, link, or reply to a text.</b>")
-    
-    status = await m.reply_text("🔎 <b>Searching...</b>")
+    status = await m.reply_text("🔎 <b>Fetching from OneGrab API...</b>")
     info = await extract_audio(query)
-    if not info: return await status.edit_text("❌ <b>Not found or invalid link.</b>")
+    
+    if not info:
+        return await status.edit_text("❌ <b>Failed to fetch direct stream link.</b>\n\nCheck if ONEGRAB_API_KEY is valid in Render Environment Variables.")
     
     video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)
@@ -40,7 +37,7 @@ async def play_cmd(_, m):
     success = await play_stream(m.chat.id, track.url, track.video)
     
     if not success:
-        return await status.edit_text("❌ <b>Failed to join VC.</b>\n\nCheck Render logs for exact error. Make sure Assistant is in group and VC is active.")
+        return await status.edit_text("❌ <b>Failed to join VC.</b>\n\nCheck Render logs for exact PyTgCalls error.")
         
     q.now_playing = track
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
