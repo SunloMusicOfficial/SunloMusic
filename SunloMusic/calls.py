@@ -1,9 +1,8 @@
-from pytgcalls import PyTgCalls
-from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamType
+from pytgcalls import PyTgCalls, filters as fl
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamType, Update
 from SunloMusic.bot import assistant
 from SunloMusic.logger import LOGGER
 
-# Voice Chat Engine
 call = PyTgCalls(assistant, cache_duration=100)
 
 async def start_call():
@@ -37,3 +36,18 @@ async def resume_stream(chat_id: int):
 
 async def stop_stream(chat_id: int):
     await call.leave_call(chat_id)
+
+# ⭐ Auto-Play Next Song Handler
+@call.on_update(fl.stream_end())
+async def stream_end_handler(client, update: Update):
+    from SunloMusic.queue import get_queue, clear_queue
+    chat_id = update.chat_id
+    q = get_queue(chat_id)
+    
+    q.now_playing = None
+    if q.queue:
+        nxt = q.queue.pop(0)
+        q.now_playing = nxt
+        await play_stream(chat_id, nxt.url, nxt.video)
+    else:
+        clear_queue(chat_id)

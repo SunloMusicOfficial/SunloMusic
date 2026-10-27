@@ -32,3 +32,5 @@ async def get_stats() -> dict:
 
 async def get_all_chats() -> list:
     return [c["chat_id"] async for c in chats_col.find({}, {"chat_id": 1})]
+
+LOGGER.info("✅ MongoDB connected successfully")
