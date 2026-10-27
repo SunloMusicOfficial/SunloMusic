@@ -30,17 +30,21 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    # ✅ Fetching Message (Part 1 - Option 8)
-    status = await m.reply_text("⏳ <b>Wait a sec, getting the beats...</b>")
-    info = await extract_audio(query)
+    video = "vplay" in m.command[0].lower()
+    
+    if video:
+        status = await m.reply_text("🎬 <b>Downloading Video, please wait...</b>")
+    else:
+        status = await m.reply_text("⏳ <b>Wait a sec, getting the beats...</b>")
+        
+    info = await extract_audio(query, video=video)
     
     if not info:
-        return await status.edit_text("❌ <b>Failed to fetch stream link. Try another song.</b>")
+        return await status.edit_text("❌ <b>Failed to fetch media. Try another song.</b>")
     
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
     
-    video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
@@ -69,7 +73,6 @@ async def play_cmd(_, m):
         track.message_id = sent_msg.id
         return
     
-    # ✅ Joining VC Message (Part 2 - Option 6)
     await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
     

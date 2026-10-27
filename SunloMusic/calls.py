@@ -1,6 +1,7 @@
 import asyncio
 import time
 import base64
+import os
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
@@ -14,6 +15,12 @@ from SunloMusic.keyboards import player_keyboard
 
 call = None
 
+def cleanup_file(url: str):
+    """Deletes downloaded video files to save disk space"""
+    if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a')):
+        try: os.remove(url)
+        except: pass
+
 async def update_live_timer(chat_id, msg_id):
     from SunloMusic.queues import get_queue
     while True:
@@ -21,8 +28,7 @@ async def update_live_timer(chat_id, msg_id):
         q = get_queue(chat_id)
         if not q.now_playing or q.playing_message_id != msg_id:
             break
-        if q.paused:
-            continue
+        if q.paused: continue
             
         elapsed = int(time.time() - q.start_time - q.total_paused)
         if elapsed >= q.now_playing.duration and q.now_playing.duration > 0:
@@ -68,6 +74,10 @@ async def start_next_song(chat_id, q):
         try: await bot_module.bot.delete_messages(chat_id, q.playing_message_id)
         except: pass
         q.playing_message_id = 0
+
+    # ✅ Cleanup old file
+    if q.now_playing:
+        cleanup_file(q.now_playing.url)
 
     q.now_playing = None
     if q.queue:
@@ -149,8 +159,7 @@ async def start_call():
         LOGGER.info("✅ PyTgCalls engine started")
 
 async def play_stream(chat_id: int, url: str, video: bool = False):
-    if not call: 
-        return False
+    if not call: return False
     
     LOGGER.info(f"🎵 Streaming: {url[:80]}... in {chat_id} (Video: {video})")
     
@@ -160,29 +169,10 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
         
     try:
-        # ✅ Try playing (Video or Audio)
-        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
+        # 60 sec timeout for Video downloads
+        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=60.0)
         return True
     except Exception as e:
-        error_msg = str(e).lower()
-        # ✅ Fallback: Agar Video fail ho jaye, toh Audio me try karo
-        if video:
-            LOGGER.warning(f"⚠️ Video play failed, trying Audio fallback: {e}")
-            try:
-                audio_stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
-                await asyncio.wait_for(call.play(chat_id, audio_stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
-                return True
-            except Exception as e2:
-                LOGGER.error(f"❌ Audio Fallback failed: {e2}")
-                return False
-                
-        if "mute" in error_msg or "unmute" in error_msg:
-            try:
-                await call.unmute(chat_id)
-                await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
-                return True
-            except Exception as e3:
-                return False
         LOGGER.error(f"❌ PyTgCalls Error: {type(e).__name__} - {e}")
         return False
 
