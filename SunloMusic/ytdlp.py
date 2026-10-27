@@ -1,12 +1,17 @@
 import aiohttp
-from urllib.parse import quote
+import os
+from urllib.parse import urlparse
 from SunloMusic.config import config
 from SunloMusic.logger import LOGGER
+import SunloMusic.bot as bot_module
 
 API_HEADERS = {
     "X-API-Key": config.ONEGRAB_API_KEY,
     "Accept": "application/json"
 }
+
+DOWNLOAD_DIR = "cache/downloads"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
@@ -22,18 +27,47 @@ async def _api_request(endpoint: str, params: dict) -> dict | None:
         LOGGER.error(f"❌ OneGrab API Exception: {e}")
         return None
 
+async def _download_telegram_cdn(cdnurl: str) -> str | None:
+    """Download media from a Telegram CDN link using Pyrogram Assistant."""
+    if not bot_module.assistant:
+        LOGGER.error("❌ Assistant client not initialized, cannot download Telegram CDN.")
+        return None
+
+    link = urlparse(cdnurl)
+    parts = link.path.strip("/").split("/")
+    if len(parts) != 2 or not parts[1].isdigit():
+        LOGGER.error(f"❌ Invalid Telegram CDN link: {cdnurl}")
+        return None
+
+    channel, message_id = parts[0], int(parts[1])
+    try:
+        LOGGER.info(f"📥 Downloading Telegram CDN: {cdnurl}")
+        message = await bot_module.assistant.get_messages(channel, message_id)
+        if not message or not message.media:
+            LOGGER.error(f"❌ Telegram message has no media: {cdnurl}")
+            return None
+
+        file_path = await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
+        if not file_path:
+            LOGGER.error(f"❌ Failed to download media from Telegram CDN: {cdnurl}")
+            return None
+        return file_path
+    except Exception as e:
+        LOGGER.error(f"❌ Telegram CDN download error: {e}")
+        return None
+
 async def extract_audio(query: str) -> dict | None:
     if not config.ONEGRAB_API_KEY:
         LOGGER.error("❌ ONEGRAB_API_KEY is missing in .env")
         return None
 
-    # Agar pehle se hi direct media URL hai
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
         return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
 
     webpage_url = query
+    fallback_meta = {}
 
-    # 1. Search API
+    # 1. Search API (Agar text query hai)
     if not query.startswith("http"):
         search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
         if not search_data or not search_data.get("results"):
@@ -41,46 +75,52 @@ async def extract_audio(query: str) -> dict | None:
             return None
         track = search_data["results"][0]
         webpage_url = track.get("webpage_url") or track.get("url")
+        fallback_meta = track
         if not webpage_url:
             return None
 
-    # 2. Get Stream URL API
-    # Type=audio parameter add kiya taaki API ko pata chale audio chahiye
-    track_data = await _api_request("/api/get_url", {"url": webpage_url, "type": "audio"})
+    # 2. Official Docs: /api/track returns 'cdnurl'
+    track_data = await _api_request("/api/track", {"url": webpage_url})
     
-    if not track_data:
-        LOGGER.error("❌ API returned empty response for get_url")
-        return None
+    if track_data:
+        result = track_data
+        if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
+            result = track_data["results"][0]
 
-    # 🔍 DEBUG LOG: Render logs me pura JSON print karega
-    LOGGER.info(f"🔍 OneGrab GetURL Response: {track_data}")
+        # Check for various possible direct link keys
+        cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url")
 
-    if not track_data.get("results"):
-        LOGGER.error("❌ API response has no 'results' key")
-        return None
+        if cdnurl:
+            # Agar cdnurl Telegram link hai
+            if "t.me" in cdnurl or "telegram.me" in cdnurl:
+                local_path = await _download_telegram_cdn(cdnurl)
+                if local_path:
+                    return {
+                        "title": result.get("title", fallback_meta.get("title", "Unknown")),
+                        "url": local_path, # Local file path
+                        "duration": int(result.get("duration") or fallback_meta.get("duration") or 0),
+                        "thumbnail": result.get("thumbnail", fallback_meta.get("thumbnail", "")),
+                        "webpage_url": webpage_url
+                    }
+            else:
+                # Direct HTTP Link (e.g. .m4a file)
+                return {
+                    "title": result.get("title", fallback_meta.get("title", "Unknown")),
+                    "url": cdnurl,
+                    "duration": int(result.get("duration") or fallback_meta.get("duration") or 0),
+                    "thumbnail": result.get("thumbnail", fallback_meta.get("thumbnail", "")),
+                    "webpage_url": webpage_url
+                }
+        else:
+            LOGGER.warning("⚠️ OneGrab /api/track did not return a cdnurl. Falling back to yt-dlp.")
 
-    result = track_data["results"][0]
-    
-    # 3. Smart Direct URL Extractor
-    # API alag-alag keys use kar sakti hai, hum sab check kar rahe hain
-    direct_url = None
-    possible_keys = ["cdnurl", "audio_url", "video_url", "download_url", "audio", "video", "url"]
-    
-    for key in possible_keys:
-        val = result.get(key)
-        # Check karo ki link youtube.com toh nahi hai aur direct media lag raha hai
-        if val and isinstance(val, str) and "youtube.com" not in val and "youtu.be" not in val:
-            direct_url = val
-            break
-
-    if not direct_url:
-        LOGGER.error(f"❌ API ne direct link nahi diya. Available keys: {list(result.keys())}")
-        return None
-
+    # 3. Fallback: Agar API fail ho jaye, toh yt-dlp ko normal YouTube link do
+    # (Isliye humne yt-dlp ko requirements se nahi hataya)
+    LOGGER.info(f"🔄 Using yt-dlp fallback for: {webpage_url}")
     return {
-        "title": result.get("title", "Unknown Track"),
-        "url": direct_url,
-        "duration": int(result.get("duration") or 0),
-        "thumbnail": result.get("thumbnail", ""),
+        "title": fallback_meta.get("title", "Unknown Track"),
+        "url": webpage_url, # PyTgCalls will use internal yt-dlp for this
+        "duration": int(fallback_meta.get("duration") or 0),
+        "thumbnail": fallback_meta.get("thumbnail", ""),
         "webpage_url": webpage_url
     }
