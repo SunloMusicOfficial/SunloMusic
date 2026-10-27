@@ -9,6 +9,13 @@ call = None
 
 async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue, clear_queue
+    from SunloMusic.keyboards import player_keyboard
+    from SunloMusic.formatters import format_duration
+    from SunloMusic.thumbnails import generate_thumbnail
+    from SunloMusic.plugins.play import update_live_timer, make_progress_bar
+    import time
+    import asyncio
+    
     chat_id = update.chat_id
     q = get_queue(chat_id)
     
@@ -23,15 +30,36 @@ async def stream_end_handler(client, update: StreamEnded):
         nxt = q.queue.pop(0)
         q.now_playing = nxt
         success = await play_stream(chat_id, nxt.url, nxt.video)
+        
         if success:
             try:
-                # ✅ Fixed Syntax Error (Single quotes for href)
-                text = (
-                    f"🎶 <b>Now Playing:</b>\n"
-                    f"<b>{nxt.title}</b>\n"
-                    f"👤 <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>"
+                q.start_time = time.time()
+                q.total_paused = 0
+                q.paused = False
+                
+                thumb = await generate_thumbnail(nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
+                dur_str = format_duration(nxt.duration)
+                progress = make_progress_bar(0, nxt.duration)
+                
+                caption = (
+                    f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
+                    f"🎵 <b>{nxt.title}</b>\n"
+                    f"⏱ <b>Duration:</b> {dur_str}\n"
+                    f"👤 <b>Request:</b> <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n\n"
+                    f"<code>00:00</code> 🎵 {progress} <code>{dur_str}</code>"
                 )
-                await bot_module.bot.send_message(chat_id, text)
+                
+                if thumb:
+                    sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q))
+                else:
+                    sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q))
+                    
+                q.playing_message_id = sent_msg.id
+                
+                if q.timer_task:
+                    q.timer_task.cancel()
+                q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
+                
             except Exception as e:
                 LOGGER.error(f"Error sending auto-play message: {e}")
     else:

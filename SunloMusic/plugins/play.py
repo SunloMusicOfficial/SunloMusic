@@ -81,9 +81,22 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
+    # ✅ Thumbnail ke sath Queue me add karo
     if q.now_playing:
         q.queue.append(track)
-        return await status.edit_text(f"➕ <b>Added to queue:</b>\n{track.title}")
+        thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
+        caption = (
+            f"➕ <b>Added to queue (Position: {len(q.queue)})</b>\n\n"
+            f"🎵 <b>{track.title}</b>\n"
+            f"⏱ <b>Duration:</b> {format_duration(track.duration)}\n"
+            f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
+        )
+        if thumb:
+            await status.delete()
+            await m.reply_photo(thumb, caption=caption)
+        else:
+            await status.edit_text(caption)
+        return
     
     await status.edit_text("⏳ <b>Joining Voice Chat...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
