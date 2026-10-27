@@ -1,13 +1,13 @@
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
+from pytgcalls.exceptions import UnMuteNeeded, NoActiveGroupCall
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
 call = None
 
 async def stream_end_handler(client, update: StreamEnded):
-    """Auto-play & Loop handler (Official PyTgCalls syntax)"""
     from SunloMusic.queues import get_queue, clear_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
@@ -35,7 +35,6 @@ def init_calls():
     global call
     if assistant:
         call = PyTgCalls(assistant, cache_duration=100)
-        # ✅ Official syntax se event register karo
         call.on_update(fl.stream_end())(stream_end_handler)
 
 async def start_call():
@@ -44,16 +43,33 @@ async def start_call():
         LOGGER.info("✅ PyTgCalls engine started")
 
 async def play_stream(chat_id: int, url: str, video: bool = False):
-    if not call: return False
+    if not call: 
+        LOGGER.error("❌ PyTgCalls call object is None (Assistant not started)")
+        return False
+    
     if video:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p)
     else:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH)
+    
     try:
-        await call.play(chat_id, stream)
+        # auto_start=True se agar VC active nahi hai toh khud start karega
+        await call.play(chat_id, stream, auto_start=True)
         return True
+    except UnMuteNeeded:
+        LOGGER.warning("⚠️ Assistant is muted. Trying to unmute...")
+        try:
+            await call.unmute(chat_id)
+            await call.play(chat_id, stream, auto_start=True)
+            return True
+        except Exception as e:
+            LOGGER.error(f"Unmute failed: {e}")
+            return False
+    except NoActiveGroupCall:
+        LOGGER.error("❌ No active Voice Chat found and auto_start failed.")
+        return False
     except Exception as e:
-        LOGGER.error(f"VC Error: {e}")
+        LOGGER.error(f"❌ VC Error: {type(e).__name__} - {e}")
         return False
 
 async def pause_stream(chat_id: int):
