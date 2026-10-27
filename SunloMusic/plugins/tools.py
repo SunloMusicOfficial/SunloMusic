@@ -1,10 +1,11 @@
 from pyrogram import filters
 from SunloMusic.bot import bot
 from SunloMusic.ytdlp import extract_audio
-from SunloMusic.formatters import format_duration # ✅ Added missing import
+from SunloMusic.formatters import format_duration
+from SunloMusic.decorators import catch_errors # ✅ Added missing import
 
-@catch_errors
 @bot.on_message(filters.command("song"))
+@catch_errors
 async def song_cmd(_, m):
     if len(m.command) < 2:
         return await m.reply_text("❌ <b>Give a song name.</b>")
