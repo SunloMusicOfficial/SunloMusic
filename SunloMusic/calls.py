@@ -33,18 +33,16 @@ async def update_live_timer(chat_id, msg_id):
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
-            # ✅ 3. Live Timer Premium UI (Lines added)
+            # ✅ 3. Live Timer Exact UI
             caption = (
-                f"━━━━━━━━━━━━━━━━━━\n"
                 f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"<b>🎵 <a href='{title_link}'>{q.now_playing.title}</a></b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"<b>⏱ Duration:</b> {dur_str}\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"━━━━━━━━━━━━━━━━━━"
+                f"━━━━━━━━━━━━━\n"
+                f"🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n"
+                f"━━━━━━━━━━━━━\n"
+                f"⏱ Duration: {dur_str}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n"
+                f"━━━━━━━━━━━━━"
             )
             
             try:
@@ -93,18 +91,16 @@ async def start_next_song(chat_id, q):
             b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
-            # ✅ 4. Auto-play Premium UI (Lines added)
+            # ✅ 4. Auto-play Exact UI
             caption = (
-                f"━━━━━━━━━━━━━━━━━━\n"
                 f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"<b>🎵 <a href='{title_link}'>{nxt.title}</a></b>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"<b>⏱ Duration:</b> {dur_str}\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n"
-                f"━━━━━━━━━━━━━━━━━━\n"
-                f"━━━━━━━━━━━━━━━━━━"
+                f"━━━━━━━━━━━━━\n"
+                f"🎵 <a href='{title_link}'>{nxt.title}</a>\n"
+                f"━━━━━━━━━━━━━\n"
+                f"⏱ Duration: {dur_str}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n"
+                f"━━━━━━━━━━━━━"
             )
             
             if thumb:

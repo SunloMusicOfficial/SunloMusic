@@ -37,7 +37,7 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
-    # ✅ 1. Queue me add karne ka Premium UI
+    # ✅ 1. Queue me add karne ka Exact UI
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
@@ -46,17 +46,16 @@ async def play_cmd(_, m):
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         
         caption = (
-            f"━━━━━━━━━━━━━━━━━━\n"
             f"<b>📥 Added to Queue 📥</b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"<b>🎵 <a href='{title_link}'>{track.title}</a></b>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"<b>⏱ Duration:</b> {format_duration(track.duration)}\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n"
-            f"━━━━━━━━━━━━━━━━━━\n"
-            f"<b>📌 Position:</b> {len(q.queue)}\n"
-            f"━━━━━━━━━━━━━━━━━━"
+            f"━━━━━━━━━━━━━\n"
+            f"🎵 <a href='{title_link}'>{track.title}</a>\n"
+            f"━━━━━━━━━━━━━\n"
+            f"⏱ Duration: {format_duration(track.duration)}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n"
+            f"━━━━━━━━━━━━━\n"
+            f"📌 Position: {len(q.queue)}\n"
+            f"━━━━━━━━━━━━━"
         )
         
         if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
@@ -77,18 +76,16 @@ async def play_cmd(_, m):
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
-    # ✅ 2. Initial Play Premium UI
+    # ✅ 2. Initial Play Exact UI
     caption = (
-        f"━━━━━━━━━━━━━━━━━━\n"
         f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"<b>🎵 <a href='{title_link}'>{track.title}</a></b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"<b>⏱ Duration:</b> {format_duration(track.duration)}\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
-        f"━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━━━\n"
+        f"🎵 <a href='{title_link}'>{track.title}</a>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"⏱ Duration: {format_duration(track.duration)}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n"
+        f"━━━━━━━━━━━━━"
     )
     
     if thumb:
