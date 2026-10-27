@@ -1,8 +1,8 @@
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
-from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
 from pytgcalls.exceptions import NoActiveGroupCall
-import SunloMusic.bot as bot_module # ✅ Module import kiya (Direct variable nahi)
+import SunloMusic.bot as bot_module
 from SunloMusic.logger import LOGGER
 
 call = None
@@ -33,7 +33,6 @@ async def stream_end_handler(client, update: StreamEnded):
 
 def init_calls():
     global call
-    # ✅ Yahaan bot_module.assistant use kiya taaki updated value mile
     if bot_module.assistant:
         call = PyTgCalls(bot_module.assistant, cache_duration=100)
         call.on_update(fl.stream_end())(stream_end_handler)
@@ -69,7 +68,8 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         try: await call.leave_call(chat_id)
         except: pass
         
-        await call.play(chat_id, stream, auto_start=True)
+        # ✅ PyTgCalls v3.0.0 ke liye sahi syntax
+        await call.play(chat_id, stream, config=GroupCallConfig(auto_start=True))
         return True
     except NoActiveGroupCall:
         LOGGER.error("❌ No active Voice Chat found (Supergroup required).")
@@ -80,7 +80,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
             LOGGER.warning(f"⚠️ Mute-related error detected: {e}. Trying to unmute...")
             try:
                 await call.unmute(chat_id)
-                await call.play(chat_id, stream, auto_start=True)
+                await call.play(chat_id, stream, config=GroupCallConfig(auto_start=True))
                 return True
             except Exception as e2:
                 LOGGER.error(f"❌ Unmute failed: {e2}")
