@@ -2,7 +2,7 @@ import asyncio, yt_dlp
 from SunloMusic.logger import LOGGER
 
 YDL_OPTS = {
-    "format": "bestaudio/best",
+    "format": "m4a/bestaudio/best", # ✅ M4A fallback for better compatibility
     "quiet": True,
     "no_warnings": True,
     "noplaylist": True,
@@ -33,6 +33,5 @@ def _extract_sync(query: str):
         return None
 
 async def extract_audio(query: str):
-    # ✅ Python 3.12 fix: get_running_loop() use karo
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_running_loop() # ✅ Python 3.12 fix
     return await loop.run_in_executor(None, _extract_sync, query)
