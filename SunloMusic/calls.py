@@ -150,10 +150,9 @@ async def start_call():
 
 async def play_stream(chat_id: int, url: str, video: bool = False):
     if not call: 
-        LOGGER.error("❌ PyTgCalls call object is None")
         return False
     
-    LOGGER.info(f"🎵 Streaming: {url[:80]}... in {chat_id}")
+    LOGGER.info(f"🎵 Streaming: {url[:80]}... in {chat_id} (Video: {video})")
     
     if video:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p)
@@ -161,24 +160,28 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
         
     try:
-        # ✅ Timeout added (15 seconds) to prevent hanging
+        # ✅ Try playing (Video or Audio)
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
         return True
-    except asyncio.TimeoutError:
-        LOGGER.error("❌ PyTgCalls play timed out")
-        return False
-    except NoActiveGroupCall:
-        LOGGER.error("❌ No active Voice Chat found.")
-        return False
     except Exception as e:
         error_msg = str(e).lower()
+        # ✅ Fallback: Agar Video fail ho jaye, toh Audio me try karo
+        if video:
+            LOGGER.warning(f"⚠️ Video play failed, trying Audio fallback: {e}")
+            try:
+                audio_stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
+                await asyncio.wait_for(call.play(chat_id, audio_stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
+                return True
+            except Exception as e2:
+                LOGGER.error(f"❌ Audio Fallback failed: {e2}")
+                return False
+                
         if "mute" in error_msg or "unmute" in error_msg:
             try:
                 await call.unmute(chat_id)
                 await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
                 return True
-            except Exception as e2:
-                LOGGER.error(f"❌ Unmute failed: {e2}")
+            except Exception as e3:
                 return False
         LOGGER.error(f"❌ PyTgCalls Error: {type(e).__name__} - {e}")
         return False
