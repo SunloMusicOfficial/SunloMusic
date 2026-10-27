@@ -1,3 +1,5 @@
+import time
+import asyncio
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -17,6 +19,11 @@ class ChatQueue:
     queue: list[Track] = field(default_factory=list)
     loop: int = 0
     paused: bool = False
+    start_time: float = 0.0
+    paused_at: float = 0.0
+    total_paused: float = 0.0
+    playing_message_id: int = 0
+    timer_task: Optional[asyncio.Task] = None
 
 _queues: dict[int, ChatQueue] = {}
 

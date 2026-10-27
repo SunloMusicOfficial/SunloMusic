@@ -1,5 +1,9 @@
+import asyncio
+import time
+import base64
 from pyrogram import filters, enums
 from SunloMusic.bot import bot
+from SunloMusic.config import config
 from SunloMusic.calls import play_stream
 from SunloMusic.decorators import admin_only
 from SunloMusic.database import add_user
@@ -7,13 +11,29 @@ from SunloMusic.queues import get_queue, Track
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
-from SunloMusic.keyboards import controls_keyboard
+from SunloMusic.keyboards import player_keyboard
 
-def make_progress_bar(current: int, total: int, length: int = 15) -> str:
-    if not total: return "🔘" + "─" * (length - 1)
-    pos = int(length * current / total)
-    pos = min(max(pos, 0), length - 1)
-    return "─" * pos + "🔘" + "─" * (length - pos - 1)
+async def update_live_timer(chat_id):
+    while True:
+        await asyncio.sleep(5)
+        q = get_queue(chat_id)
+        if not q.now_playing or not q.playing_message_id:
+            break
+        if q.paused:
+            continue
+            
+        elapsed = int(time.time() - q.start_time - q.total_paused)
+        if elapsed >= q.now_playing.duration and q.now_playing.duration > 0:
+            break
+            
+        try:
+            await bot.edit_message_reply_markup(
+                chat_id=chat_id,
+                message_id=q.playing_message_id,
+                reply_markup=player_keyboard(q, elapsed)
+            )
+        except Exception:
+            pass
 
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @admin_only
@@ -46,21 +66,31 @@ async def play_cmd(_, m):
         return await status.edit_text("❌ <b>Failed to join VC.</b>\nCheck Render logs.")
         
     q.now_playing = track
+    q.start_time = time.time()
+    q.total_paused = 0
+    q.paused = False
+    
+    # Generate clickable download link
+    b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
+    title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+    
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
-    # Premium Caption Format (Like Image 2)
-    dur_str = format_duration(track.duration)
-    progress = make_progress_bar(0, track.duration)
     caption = (
         f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
-        f"🎵 <b>{track.title}</b>\n"
-        f"⏱ <b>Duration:</b> {dur_str}\n"
-        f"👤 <b>Request:</b> {track.requester}\n\n"
-        f"<code>00:00</code> {progress} <code>{dur_str}</code>"
+        f"🎵 <a href='{title_link}'>{track.title}</a>\n"
+        f"⏱ <b>Duration:</b> {format_duration(track.duration)}\n"
+        f"👤 <b>Request:</b> {track.requester}\n"
     )
     
     if thumb:
         await status.delete()
-        await m.reply_photo(thumb, caption=caption, reply_markup=controls_keyboard(q.loop))
+        sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
     else:
-        await status.edit_text(caption, reply_markup=controls_keyboard(q.loop))
+        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q, 0))
+        
+    q.playing_message_id = sent_msg.id
+    
+    if q.timer_task:
+        q.timer_task.cancel()
+    q.timer_task = asyncio.create_task(update_live_timer(m.chat.id))

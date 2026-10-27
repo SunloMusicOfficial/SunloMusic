@@ -1,5 +1,6 @@
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from SunloMusic.config import config
+from SunloMusic.formatters import format_duration
 
 def start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
@@ -17,18 +18,27 @@ def help_main_keyboard() -> InlineKeyboardMarkup:
 def help_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Help", callback_data="help_menu")]])
 
-def controls_keyboard(loop_status: int = 0) -> InlineKeyboardMarkup:
-    loop_text = "🔁 AUTO OFF" if loop_status == 0 else ("🔂 AUTO ONE" if loop_status == 1 else "🔁 AUTO ALL")
+def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
+    dur = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
+    elapsed_str = format_duration(elapsed)
+    
+    # Live Timer Button
+    timer_btn = InlineKeyboardButton(f"⏱ {elapsed_str} / {dur}", callback_data="cb_timer")
+    
+    # Pause/Resume Toggle
+    pause_btn = InlineKeyboardButton("▶️ RESUME" if q.paused else "⏸ PAUSE", callback_data="cb_pause")
+    skip_btn = InlineKeyboardButton("⏭ SKIP", callback_data="cb_skip")
+    
+    # Loop Toggle
+    loop_text = "🔁 LOOP OFF" if q.loop == 0 else ("🔂 LOOP ONE" if q.loop == 1 else "🔁 LOOP ALL")
+    loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop")
+    stop_btn = InlineKeyboardButton("⏹ STOP", callback_data="cb_stop")
+    
+    more_btn = InlineKeyboardButton("🎵 MORE", callback_data="cb_more")
+    
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("⏸ PAUSE", callback_data="cb_pause"),
-            InlineKeyboardButton("⏭ SKIP", callback_data="cb_skip")
-        ],
-        [
-            InlineKeyboardButton(loop_text, callback_data="cb_loop"),
-            InlineKeyboardButton("⏹ STOP", callback_data="cb_stop")
-        ],
-        [
-            InlineKeyboardButton("🎵 MORE", callback_data="cb_more")
-        ]
+        [timer_btn],
+        [pause_btn, skip_btn],
+        [loop_btn, stop_btn],
+        [more_btn]
     ])
