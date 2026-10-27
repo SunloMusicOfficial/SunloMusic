@@ -1,3 +1,8 @@
+import sys
+import os
+# Path fix: taaki direct "python SunloMusic" chalane par imports work karein
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import asyncio
 from SunloMusic.logger import LOGGER, print_banner
 from SunloMusic.bot import start_bot
@@ -11,7 +16,7 @@ async def main():
     
     await start_bot()
     await start_call()
-    await start_keep_alive() # ✅ Start web server & pinger
+    await start_keep_alive() # Start web server & pinger
     
     load_plugins()
     LOGGER.info("✅ Bot is live and ready!")

@@ -4,4 +4,4 @@ if ! command -v ffmpeg &> /dev/null; then
     echo "⚠️ ffmpeg not found. Installing..."
     pkg install ffmpeg -y
 fi
-python -m SunloMusic
+python SunloMusic
