@@ -28,8 +28,6 @@ async def update_live_timer(chat_id, msg_id):
             
         try:
             dur_str = format_duration(q.now_playing.duration)
-            elapsed_str = format_duration(elapsed)
-            
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
@@ -63,7 +61,6 @@ async def play_cmd(_, m):
     query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
     if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
     
-    # ✅ Delete Command Message
     try: await m.delete()
     except: pass
 
@@ -77,14 +74,18 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
-    # ✅ Add to queue with Remove Button
+    # ✅ Queue logic with Clickable Title
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
         thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
+        
+        b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
+        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+        
         caption = (
             f"➕ <b>Added to queue (Position: {len(q.queue)})</b>\n\n"
-            f"🎵 <b>{track.title}</b>\n"
+            f"🎵 <a href='{title_link}'>{track.title}</a>\n"
             f"⏱ <b>Duration:</b> {format_duration(track.duration)}\n"
             f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
         )

@@ -1,6 +1,6 @@
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from SunloMusic.config import config
-from SunloMusic.formatters import format_duration
+from SunloMusic.formatters import format_duration, make_progress_bar
 
 def start_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
@@ -22,8 +22,9 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
     
-    # ✅ Live Timer inside Button
-    timer_btn = InlineKeyboardButton(f"⏱ {elapsed_str} ──🎵── {dur_str}", callback_data="cb_timer")
+    # ✅ Live Moving Emoji Timer
+    bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "─" * 8
+    timer_btn = InlineKeyboardButton(f"{elapsed_str} {bar} {dur_str}", callback_data="cb_timer")
     
     pause_btn = InlineKeyboardButton("▶️ RESUME" if q.paused else "⏸ PAUSE", callback_data="cb_pause")
     skip_btn = InlineKeyboardButton("⏭ SKIP", callback_data="cb_skip")

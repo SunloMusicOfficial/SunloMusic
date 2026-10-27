@@ -4,6 +4,7 @@ from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
 from pytgcalls.exceptions import NoActiveGroupCall
 import SunloMusic.bot as bot_module
 from SunloMusic.logger import LOGGER
+import base64
 
 call = None
 
@@ -12,26 +13,22 @@ async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.keyboards import player_keyboard
     from SunloMusic.formatters import format_duration
     from SunloMusic.thumbnails import generate_thumbnail
-    from SunloMusic.plugins.play import update_live_timer, make_progress_bar
+    from SunloMusic.plugins.play import update_live_timer
+    from SunloMusic.config import config
     import time
     import asyncio
     
     chat_id = update.chat_id
     q = get_queue(chat_id)
     
-    # 1. Loop Logic (Track Loop)
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         return
-        
-    # 2. Loop Logic (Queue Loop)
     if q.loop == 2 and q.now_playing:
         q.queue.append(q.now_playing)
 
     q.now_playing = None
-    
     if q.queue:
-        # 3. Play Next Song
         nxt = q.queue.pop(0)
         q.now_playing = nxt
         success = await play_stream(chat_id, nxt.url, nxt.video)
@@ -44,20 +41,21 @@ async def stream_end_handler(client, update: StreamEnded):
                 
                 thumb = await generate_thumbnail(nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
                 dur_str = format_duration(nxt.duration)
-                progress = make_progress_bar(0, nxt.duration)
+                
+                b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
+                title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
                 
                 caption = (
                     f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
-                    f"🎵 <b>{nxt.title}</b>\n"
+                    f"🎵 <a href='{title_link}'>{nxt.title}</a>\n"
                     f"⏱ <b>Duration:</b> {dur_str}\n"
-                    f"👤 <b>Request:</b> <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n\n"
-                    f"<code>00:00</code> 🎵 {progress} <code>{dur_str}</code>"
+                    f"👤 <b>Request:</b> <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>"
                 )
                 
                 if thumb:
-                    sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q))
+                    sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
                 else:
-                    sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q))
+                    sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0))
                     
                 q.playing_message_id = sent_msg.id
                 
@@ -68,19 +66,14 @@ async def stream_end_handler(client, update: StreamEnded):
             except Exception as e:
                 LOGGER.error(f"Error sending auto-play message: {e}")
     else:
-        # 4. No more songs & Loop is off -> Leave VC Immediately
         if q.timer_task:
             q.timer_task.cancel()
-            
         try:
-            # ✅ VC leave karne ka actual command
-            if call:
-                await call.leave_call(chat_id)
+            if call: await call.leave_call(chat_id)
         except Exception as e:
             LOGGER.error(f"Error leaving VC: {e}")
             
         clear_queue(chat_id)
-        
         try: 
             await bot_module.bot.send_message(chat_id, "⏹ <b>Queue khatam. Assistant ne VC leave kar diya.</b>")
         except: 
