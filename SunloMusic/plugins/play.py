@@ -15,6 +15,11 @@ from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
 @catch_errors
 @admin_only
 async def play_cmd(_, m):
+    if m.reply_to_message and m.reply_to_message.from_user and m.reply_to_message.from_user.is_bot:
+        if m.reply_to_message.from_user.id != bot.me.id: return
+    if m.text and m.text.startswith("/") and "@" in m.text.split()[0]:
+        if bot.me.username not in m.text.split()[0]: return
+
     if m.chat.type != enums.ChatType.SUPERGROUP:
         return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>")
 
@@ -32,13 +37,28 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
+    # ✅ 1. Queue me add karne ka Premium UI
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
         thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-        caption = f"➕ <b>Added to queue (Position: {len(q.queue)})</b>\n\n🎵 <a href='{title_link}'>{track.title}</a>\n⏱ <b>Duration:</b> {format_duration(track.duration)}\n👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
+        
+        caption = (
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"<b>📥 Added to Queue 📥</b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"<b>🎵 <a href='{title_link}'>{track.title}</a></b>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"<b>⏱ Duration:</b> {format_duration(track.duration)}\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n"
+            f"━━━━━━━━━━━━━━━━━━\n"
+            f"<b>📌 Position:</b> {len(q.queue)}\n"
+            f"━━━━━━━━━━━━━━━━━━"
+        )
+        
         if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
         else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
         track.message_id = sent_msg.id
@@ -57,7 +77,19 @@ async def play_cmd(_, m):
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
-    caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n🎵 <a href='{title_link}'>{track.title}</a>\n⏱ <b>Duration:</b> {format_duration(track.duration)}\n👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
+    # ✅ 2. Initial Play Premium UI
+    caption = (
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"<b>🎵 <a href='{title_link}'>{track.title}</a></b>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"<b>⏱ Duration:</b> {format_duration(track.duration)}\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━━━━━━"
+    )
     
     if thumb:
         await status.delete()

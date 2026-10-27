@@ -33,11 +33,18 @@ async def update_live_timer(chat_id, msg_id):
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
+            # ✅ 3. Live Timer Premium UI (Lines added)
             caption = (
-                f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
-                f"🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n"
-                f"⏱ <b>Duration:</b> {dur_str}\n"
-                f"👤 <b>Request:</b> <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>🎵 <a href='{title_link}'>{q.now_playing.title}</a></b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>⏱ Duration:</b> {dur_str}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"━━━━━━━━━━━━━━━━━━"
             )
             
             try:
@@ -86,11 +93,18 @@ async def start_next_song(chat_id, q):
             b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
+            # ✅ 4. Auto-play Premium UI (Lines added)
             caption = (
-                f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
-                f"🎵 <a href='{title_link}'>{nxt.title}</a>\n"
-                f"⏱ <b>Duration:</b> {dur_str}\n"
-                f"👤 <b>Request:</b> <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>🎵 <a href='{title_link}'>{nxt.title}</a></b>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>⏱ Duration:</b> {dur_str}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"<b>🙋‍♂️ Request:</b> <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"━━━━━━━━━━━━━━━━━━"
             )
             
             if thumb:
@@ -153,7 +167,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
         
     try:
-        # ✅ Removed leave_call! PyTgCalls play() handles stream replacement smoothly
         await call.play(chat_id, stream, config=GroupCallConfig(auto_start=True))
         return True
     except NoActiveGroupCall:
