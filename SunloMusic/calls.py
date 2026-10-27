@@ -17,30 +17,24 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
     else:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH)
     try:
+        # ✅ play() hi use karo - ye reliable hai
         await call.play(chat_id, stream)
         return True
-    except Exception:
-        try:
-            await call.change_stream(chat_id, stream)
-            return True
-        except Exception as e:
-            LOGGER.error(f"VC Error: {e}")
-            return False
+    except Exception as e:
+        LOGGER.error(f"VC Error: {e}")
+        return False
 
 async def pause_stream(chat_id: int):
-    if call: 
-        await call.pause(chat_id)  # ✅ Official v2+ method
+    if call: await call.pause(chat_id)
 
 async def resume_stream(chat_id: int):
-    if call: 
-        await call.resume(chat_id) # ✅ Official v2+ method
+    if call: await call.resume(chat_id)
 
 async def stop_stream(chat_id: int):
-    if call: 
-        await call.leave_call(chat_id)
+    if call: await call.leave_call(chat_id)
 
 @(call.on_update(filters.stream_end()) if call else (lambda x: x))
-async def stream_end_handler(client, update: StreamEnded): # ✅ Correct Type Hint
+async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue, clear_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)

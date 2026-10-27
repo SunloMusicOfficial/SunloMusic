@@ -33,4 +33,6 @@ def _extract_sync(query: str):
         return None
 
 async def extract_audio(query: str):
-    return await asyncio.get_event_loop().run_in_executor(None, _extract_sync, query)
+    # ✅ Python 3.12 fix: get_running_loop() use karo
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _extract_sync, query)
