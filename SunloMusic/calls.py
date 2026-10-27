@@ -3,7 +3,12 @@ from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
-call = PyTgCalls(assistant, cache_duration=100) if assistant else None
+call = None
+
+def init_calls():
+    global call
+    if assistant:
+        call = PyTgCalls(assistant, cache_duration=100)
 
 async def start_call():
     if call:
@@ -17,7 +22,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
     else:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH)
     try:
-        # ✅ play() hi use karo - ye reliable hai
         await call.play(chat_id, stream)
         return True
     except Exception as e:
@@ -33,7 +37,7 @@ async def resume_stream(chat_id: int):
 async def stop_stream(chat_id: int):
     if call: await call.leave_call(chat_id)
 
-@(call.on_update(filters.stream_end()) if call else (lambda x: x))
+@filters.stream_end()
 async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue, clear_queue
     chat_id = update.chat_id
@@ -42,7 +46,6 @@ async def stream_end_handler(client, update: StreamEnded):
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         return
-
     if q.loop == 2 and q.now_playing:
         q.queue.append(q.now_playing)
 
