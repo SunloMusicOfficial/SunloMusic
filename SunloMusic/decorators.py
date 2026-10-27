@@ -19,18 +19,20 @@ def admin_only(func):
     async def wrapper(client, message: Message, *args, **kwargs):
         if not message.from_user:
             return
+        try:
+            if await is_sudo(message.from_user.id):
+                return await func(client, message, *args, **kwargs)
+        except: pass
+            
         if message.chat.type != enums.ChatType.PRIVATE:
             try:
                 member = await message.chat.get_member(message.from_user.id)
                 if member.privileges:
-                    # ✅ Future-proof: Dono attributes check kiye
                     can_manage = getattr(member.privileges, "can_manage_video_chats", False) or \
                                  getattr(member.privileges, "can_manage_voice_chats", False) or \
                                  member.privileges.can_manage_chat
                     if can_manage:
                         return await func(client, message, *args, **kwargs)
-                elif await is_sudo(message.from_user.id):
-                    return await func(client, message, *args, **kwargs)
             except Exception:
                 pass
         await message.reply_text(NO_ADMIN_TEXT)

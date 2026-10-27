@@ -11,13 +11,7 @@ from SunloMusic.queues import get_queue, Track
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
-from SunloMusic.keyboards import player_keyboard
-
-def make_progress_bar(current: int, total: int, length: int = 10) -> str:
-    if not total: return "─" * length
-    pos = int(length * current / total)
-    pos = min(max(pos, 0), length - 1)
-    return "─" * pos + "🎵" + "─" * (length - pos - 1)
+from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
 
 async def update_live_timer(chat_id, msg_id):
     while True:
@@ -35,7 +29,6 @@ async def update_live_timer(chat_id, msg_id):
         try:
             dur_str = format_duration(q.now_playing.duration)
             elapsed_str = format_duration(elapsed)
-            progress = make_progress_bar(elapsed, q.now_playing.duration)
             
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
@@ -44,19 +37,18 @@ async def update_live_timer(chat_id, msg_id):
                 f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
                 f"🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n"
                 f"⏱ <b>Duration:</b> {dur_str}\n"
-                f"👤 <b>Request:</b> <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n\n"
-                f"<code>{elapsed_str}</code> 🎵 {progress} <code>{dur_str}</code>"
+                f"👤 <b>Request:</b> <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>"
             )
             
             try:
                 await bot.edit_message_caption(
                     chat_id=chat_id, message_id=msg_id,
-                    caption=caption, reply_markup=player_keyboard(q)
+                    caption=caption, reply_markup=player_keyboard(q, elapsed)
                 )
             except Exception:
                 await bot.edit_message_text(
                     chat_id=chat_id, message_id=msg_id,
-                    text=caption, reply_markup=player_keyboard(q)
+                    text=caption, reply_markup=player_keyboard(q, elapsed)
                 )
         except Exception:
             pass
@@ -71,6 +63,10 @@ async def play_cmd(_, m):
     query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
     if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
     
+    # ✅ Delete Command Message
+    try: await m.delete()
+    except: pass
+
     status = await m.reply_text("🔎 <b>Fetching...</b>")
     info = await extract_audio(query)
     
@@ -81,9 +77,10 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
-    # ✅ Thumbnail ke sath Queue me add karo
+    # ✅ Add to queue with Remove Button
     if q.now_playing:
         q.queue.append(track)
+        track_hash = str(abs(hash(track.url)))
         thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
         caption = (
             f"➕ <b>Added to queue (Position: {len(q.queue)})</b>\n\n"
@@ -93,9 +90,9 @@ async def play_cmd(_, m):
         )
         if thumb:
             await status.delete()
-            await m.reply_photo(thumb, caption=caption)
+            await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
         else:
-            await status.edit_text(caption)
+            await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
         return
     
     await status.edit_text("⏳ <b>Joining Voice Chat...</b>")
@@ -113,23 +110,20 @@ async def play_cmd(_, m):
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
-    
     dur_str = format_duration(track.duration)
-    progress = make_progress_bar(0, track.duration)
     
     caption = (
         f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
         f"🎵 <a href='{title_link}'>{track.title}</a>\n"
         f"⏱ <b>Duration:</b> {dur_str}\n"
-        f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n\n"
-        f"<code>00:00</code> 🎵 {progress} <code>{dur_str}</code>"
+        f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
     )
     
     if thumb:
         await status.delete()
-        sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q))
+        sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
     else:
-        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q))
+        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q, 0))
         
     q.playing_message_id = sent_msg.id
     

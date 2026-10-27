@@ -27,6 +27,61 @@ async def resume_cmd(_, m):
         await m.reply_text("▶️ <b>Resumed</b>")
     else: await m.reply_text(NOT_PLAYING_TEXT)
 
+@bot.on_message(filters.command(["skip", "next"]) & filters.group)
+@admin_only
+async def skip_cmd(_, m):
+    try: await m.delete()
+    except: pass
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text(NOT_PLAYING_TEXT)
+    if q.timer_task: q.timer_task.cancel()
+    
+    q.now_playing = None
+    if q.queue:
+        nxt = q.queue.pop(0); q.now_playing = nxt
+        await play_stream(m.chat.id, nxt.url, nxt.video)
+        await m.reply_text(f"⏭ <b>Skipped to:</b> {nxt.title}")
+    else:
+        await stop_stream(m.chat.id); clear_queue(m.chat.id)
+        await m.reply_text("⏭ <b>Skipped. Queue is now empty.</b>")
+
+@bot.on_message(filters.command(["stop", "end"]) & filters.group)
+@admin_only
+async def stop_cmd(_, m):
+    try: await m.delete()
+    except: pass
+    q = get_queue(m.chat.id)
+    if q.timer_task: q.timer_task.cancel()
+    await stop_stream(m.chat.id); clear_queue(m.chat.id)
+    await m.reply_text("⏹ <b>Stopped and left VC.</b>")
+
+@bot.on_callback_query(filters.regex("^cb_del_"))
+async def del_queue_cb(_, cq: CallbackQuery):
+    chat_id = cq.message.chat.id
+    user = cq.from_user
+    is_admin = False
+    if await is_sudo(user.id): is_admin = True
+    else:
+        try:
+            member = await cq.message.chat.get_member(user.id)
+            if member.privileges and (member.privileges.can_manage_voice_chats or member.privileges.can_manage_chat): is_admin = True
+        except: pass
+    if not is_admin:
+        return await cq.answer("🚫 Sirf Admin hi ye buttons use kar sakte hain!", show_alert=True)
+
+    track_hash = cq.data.replace("cb_del_", "")
+    q = get_queue(chat_id)
+    found = False
+    for i, t in enumerate(q.queue):
+        if str(abs(hash(t.url))) == track_hash:
+            q.queue.pop(i); found = True; break
+            
+    if found:
+        await cq.message.delete()
+        await cq.answer("❌ Removed from queue!")
+    else:
+        await cq.answer("❌ Song already played or removed.", show_alert=True)
+
 @bot.on_callback_query(filters.regex("^cb_"))
 async def controls_cb(_, cq: CallbackQuery):
     action = cq.data
@@ -49,22 +104,16 @@ async def controls_cb(_, cq: CallbackQuery):
         
         if action == "cb_pause":
             if q.now_playing:
+                elapsed = int(time.time() - q.start_time - q.total_paused)
                 if q.paused:
-                    await resume_stream(chat_id)
-                    q.paused = False
-                    q.total_paused += time.time() - q.paused_at
+                    await resume_stream(chat_id); q.paused = False; q.total_paused += time.time() - q.paused_at
                     await cq.answer("▶️ Resumed")
                 else:
-                    await pause_stream(chat_id)
-                    q.paused = True
-                    q.paused_at = time.time()
+                    await pause_stream(chat_id); q.paused = True; q.paused_at = time.time()
                     await cq.answer("⏸ Paused")
-                
-                try:
-                    await cq.message.edit_reply_markup(reply_markup=player_keyboard(q))
+                try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
                 except: pass
-            else:
-                await cq.answer("Nothing playing", show_alert=True)
+            else: await cq.answer("Nothing playing", show_alert=True)
                 
         elif action == "cb_skip":
             if q.timer_task: q.timer_task.cancel()
@@ -88,8 +137,8 @@ async def controls_cb(_, cq: CallbackQuery):
             
         elif action == "cb_loop":
             q.loop = (q.loop + 1) % 3
-            try:
-                await cq.message.edit_reply_markup(reply_markup=player_keyboard(q))
+            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
+            try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
             except: pass
             modes = {0: "Off", 1: "One", 2: "All"}
             await cq.answer(f"🔁 Loop: {modes[q.loop]}")
