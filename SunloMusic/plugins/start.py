@@ -19,6 +19,12 @@ START_CAPTION = (
     "📢 <b>Updates:</b> <a href='{channel}'>Vip Sakil Bio</a>"
 )
 
+# ✅ Added missing HELP_MENU_CAPTION
+HELP_MENU_CAPTION = (
+    "<b>🎧 SunloMusic — Help & Guide</b>\n\n"
+    "<blockquote>Explore the commands below to master the bot. Choose a category to view detailed guides.</blockquote>"
+)
+
 @bot.on_message(filters.command("start") & filters.private)
 async def start_cmd(_, m):
     await add_user(m.from_user.id, m.from_user.first_name)
@@ -56,6 +62,33 @@ async def ping_help_cmd(_, m):
         if config.START_IMG: await m.reply_photo(config.START_IMG, caption=HELP_MENU_CAPTION, reply_markup=help_main_keyboard())
         else: raise Exception()
     except Exception: await m.reply_text(HELP_MENU_CAPTION, reply_markup=help_main_keyboard())
+
+@bot.on_callback_query(filters.regex("^help_"))
+async def help_callbacks(_, cq: CallbackQuery):
+    data = cq.data
+    if data == "help_menu":
+        text, kb = HELP_MENU_CAPTION, help_main_keyboard()
+    elif data == "help_music":
+        text, kb = "<b>🎵 Music Commands</b>\n\n• <code>/play [song]</code>\n• <code>/vplay [song]</code>\n• <code>/song [song]</code>", help_back_keyboard()
+    elif data == "help_controls":
+        text, kb = "<b>⏯ Playback Controls</b>\n\n• <code>/pause</code>, <code>/resume</code>\n• <code>/skip</code>\n• <code>/stop</code>\n• <code>/queue</code>\n• <code>/loop</code>", help_back_keyboard()
+    elif data == "help_admin":
+        text, kb = "<b>🛡 Admin Commands</b>\n\n• <code>/auth</code>\n• <code>/broadcast</code>\n• <code>/stats</code>", help_back_keyboard()
+    
+    try:
+        if cq.message.photo: await cq.message.edit_caption(caption=text, reply_markup=kb)
+        else: await cq.message.edit_text(text=text, reply_markup=kb)
+    except: pass
+    await cq.answer()
+
+@bot.on_callback_query(filters.regex("^back_start"))
+async def back_start_cb(_, cq: CallbackQuery):
+    caption = START_CAPTION.format(bot_name=config.BOT_NAME, channel=config.UPDATES_CHANNEL)
+    try:
+        if cq.message.photo: await cq.message.edit_caption(caption=caption, reply_markup=start_keyboard())
+        else: await cq.message.edit_text(text=caption, reply_markup=start_keyboard())
+    except: pass
+    await cq.answer("Returned to main menu.")
 
 @bot.on_callback_query(filters.regex("^dl[av]_"))
 async def dl_callback(_, cq: CallbackQuery):
