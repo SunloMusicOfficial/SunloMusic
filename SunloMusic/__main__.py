@@ -3,12 +3,16 @@ from SunloMusic.logger import LOGGER, print_banner
 from SunloMusic.bot import start_bot
 from SunloMusic.calls import start_call
 from SunloMusic.plugins import load_plugins
+from SunloMusic.keep_alive import start_keep_alive
 
 async def main():
     print_banner()
     LOGGER.info("🚀 Starting SunloMusic...")
+    
     await start_bot()
     await start_call()
+    await start_keep_alive() # ✅ Start web server & pinger
+    
     load_plugins()
     LOGGER.info("✅ Bot is live and ready!")
     await asyncio.Event().wait()
