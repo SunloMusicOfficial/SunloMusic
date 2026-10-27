@@ -19,14 +19,19 @@ async def stream_end_handler(client, update: StreamEnded):
     chat_id = update.chat_id
     q = get_queue(chat_id)
     
+    # 1. Loop Logic (Track Loop)
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         return
+        
+    # 2. Loop Logic (Queue Loop)
     if q.loop == 2 and q.now_playing:
         q.queue.append(q.now_playing)
 
     q.now_playing = None
+    
     if q.queue:
+        # 3. Play Next Song
         nxt = q.queue.pop(0)
         q.now_playing = nxt
         success = await play_stream(chat_id, nxt.url, nxt.video)
@@ -63,9 +68,21 @@ async def stream_end_handler(client, update: StreamEnded):
             except Exception as e:
                 LOGGER.error(f"Error sending auto-play message: {e}")
     else:
+        # 4. No more songs & Loop is off -> Leave VC Immediately
+        if q.timer_task:
+            q.timer_task.cancel()
+            
+        try:
+            # ✅ VC leave karne ka actual command
+            if call:
+                await call.leave_call(chat_id)
+        except Exception as e:
+            LOGGER.error(f"Error leaving VC: {e}")
+            
         clear_queue(chat_id)
+        
         try: 
-            await bot_module.bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
+            await bot_module.bot.send_message(chat_id, "⏹ <b>Queue khatam. Assistant ne VC leave kar diya.</b>")
         except: 
             pass
 
