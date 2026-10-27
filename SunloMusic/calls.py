@@ -1,4 +1,4 @@
-from pytgcalls import PyTgCalls, filters as fl
+from pytgcalls import PyTgCalls, filters
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamType, Update
 from SunloMusic.bot import assistant
 from SunloMusic.logger import LOGGER
@@ -11,18 +11,9 @@ async def start_call():
 
 async def play_stream(chat_id: int, url: str, video: bool = False):
     if video:
-        stream = MediaStream(
-            url,
-            video_parameters=VideoQuality.HD_720p,
-            audio_parameters=AudioQuality.HIGH,
-            stream_type=StreamType().pulse_stream,
-        )
+        stream = MediaStream(url, video_parameters=VideoQuality.HD_720p, audio_parameters=AudioQuality.HIGH, stream_type=StreamType().pulse_stream)
     else:
-        stream = MediaStream(
-            url,
-            audio_parameters=AudioQuality.HIGH,
-            stream_type=StreamType().pulse_stream,
-        )
+        stream = MediaStream(url, audio_parameters=AudioQuality.HIGH, stream_type=StreamType().pulse_stream)
     try:
         await call.play(chat_id, stream)
     except Exception:
@@ -37,13 +28,11 @@ async def resume_stream(chat_id: int):
 async def stop_stream(chat_id: int):
     await call.leave_call(chat_id)
 
-# ⭐ Auto-Play Next Song Handler
-@call.on_update(fl.stream_end())
+@call.on_update(filters.stream_end())
 async def stream_end_handler(client, update: Update):
     from SunloMusic.queue import get_queue, clear_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
-    
     q.now_playing = None
     if q.queue:
         nxt = q.queue.pop(0)
