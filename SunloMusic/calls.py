@@ -1,7 +1,7 @@
 from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
-from pytgcalls.exceptions import UnMuteNeeded, NoActiveGroupCall
+from pytgcalls.exceptions import NoActiveGroupCall, UnMuteNeeded
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
@@ -44,32 +44,46 @@ async def start_call():
 
 async def play_stream(chat_id: int, url: str, video: bool = False):
     if not call: 
-        LOGGER.error("❌ PyTgCalls call object is None (Assistant not started)")
+        LOGGER.error("❌ PyTgCalls call object is None")
         return False
     
-    if video:
-        stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p)
-    else:
-        stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH)
+    LOGGER.info(f"🎵 Attempting to play URL: {url[:80]}... in {chat_id}")
     
+    if video:
+        stream = MediaStream(
+            media_path=url,
+            audio_parameters=AudioQuality.HIGH,
+            video_parameters=VideoQuality.HD_720p,
+        )
+    else:
+        # ✅ FIX: video_flags=IGNORE zaroori hai taaki audio stream crash na ho
+        stream = MediaStream(
+            media_path=url,
+            audio_parameters=AudioQuality.HIGH,
+            video_flags=MediaStream.Flags.IGNORE,
+        )
+        
     try:
-        # auto_start=True se agar VC active nahi hai toh khud start karega
+        # Ghost session cleanup (agar pehle se koi stream atka hai)
+        try: await call.leave_call(chat_id)
+        except: pass
+        
         await call.play(chat_id, stream, auto_start=True)
         return True
     except UnMuteNeeded:
-        LOGGER.warning("⚠️ Assistant is muted. Trying to unmute...")
+        LOGGER.warning("⚠️ Assistant muted. Trying to unmute...")
         try:
             await call.unmute(chat_id)
             await call.play(chat_id, stream, auto_start=True)
             return True
         except Exception as e:
-            LOGGER.error(f"Unmute failed: {e}")
+            LOGGER.error(f"❌ Unmute failed: {e}")
             return False
     except NoActiveGroupCall:
-        LOGGER.error("❌ No active Voice Chat found and auto_start failed.")
+        LOGGER.error("❌ No active Voice Chat found (Supergroup required).")
         return False
     except Exception as e:
-        LOGGER.error(f"❌ VC Error: {type(e).__name__} - {e}")
+        LOGGER.error(f"❌ PyTgCalls Error: {type(e).__name__} - {e}")
         return False
 
 async def pause_stream(chat_id: int):

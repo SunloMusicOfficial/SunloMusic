@@ -1,4 +1,4 @@
-from pyrogram import filters
+from pyrogram import filters, enums
 from SunloMusic.bot import bot
 from SunloMusic.calls import play_stream
 from SunloMusic.decorators import admin_only
@@ -12,6 +12,10 @@ from SunloMusic.keyboards import controls_keyboard
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @admin_only
 async def play_cmd(_, m):
+    # ✅ SUPERGROUP CHECK
+    if m.chat.type != enums.ChatType.SUPERGROUP:
+        return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>\n\nGroup ko Supergroup me upgrade karein (Group Settings ➔ Manage Group ➔ Convert to Supergroup).")
+
     await add_user(m.from_user.id, m.from_user.first_name)
     
     query = None
@@ -32,9 +36,11 @@ async def play_cmd(_, m):
         q.queue.append(track)
         return await status.edit_text(f"➕ <b>Added to queue:</b>\n{track.title}")
     
+    await status.edit_text("⏳ <b>Joining Voice Chat...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
+    
     if not success:
-        return await status.edit_text("❌ <b>Failed to join VC. Make sure Voice Chat is active and Assistant is in group.</b>")
+        return await status.edit_text("❌ <b>Failed to join VC.</b>\n\nCheck Render logs for exact error. Make sure Assistant is in group and VC is active.")
         
     q.now_playing = track
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
