@@ -1,5 +1,5 @@
 from pytgcalls import PyTgCalls, filters
-from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamType, Update
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, Update
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
@@ -10,10 +10,18 @@ async def start_call():
     LOGGER.info("✅ PyTgCalls engine started")
 
 async def play_stream(chat_id: int, url: str, video: bool = False):
+    # PyTgCalls v2+ Correct Syntax
     if video:
-        stream = MediaStream(url, video_parameters=VideoQuality.HD_720p, audio_parameters=AudioQuality.HIGH, stream_type=StreamType().pulse_stream)
+        stream = MediaStream(
+            media_path=url,
+            audio_parameters=AudioQuality.HIGH,
+            video_parameters=VideoQuality.HD_720p
+        )
     else:
-        stream = MediaStream(url, audio_parameters=AudioQuality.HIGH, stream_type=StreamType().pulse_stream)
+        stream = MediaStream(
+            media_path=url,
+            audio_parameters=AudioQuality.HIGH
+        )
     try:
         await call.play(chat_id, stream)
     except Exception:
@@ -34,7 +42,6 @@ async def stream_end_handler(client, update: Update):
     chat_id = update.chat_id
     q = get_queue(chat_id)
     
-    # Loop Logic (Agar Loop On hai toh same gaana repeat hoga)
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         await bot.send_message(chat_id, f"🔁 <b>Looping:</b> {q.now_playing.title}")
@@ -45,7 +52,6 @@ async def stream_end_handler(client, update: Update):
         nxt = q.queue.pop(0)
         q.now_playing = nxt
         await play_stream(chat_id, nxt.url, nxt.video)
-        # Group me message jayega next song ka
         await bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n{nxt.title}")
     else:
         clear_queue(chat_id)

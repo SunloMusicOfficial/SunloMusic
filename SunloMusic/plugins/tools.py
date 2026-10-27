@@ -1,7 +1,7 @@
 from pyrogram import filters
 from SunloMusic.bot import bot
 from SunloMusic.ytdlp import extract_audio
-from SunloMusic.formatters import format_duration
+from SunloMusic.formatters import format_duration # ✅ Added missing import
 
 @bot.on_message(filters.command("song"))
 async def song_cmd(_, m):
