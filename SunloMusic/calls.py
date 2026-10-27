@@ -159,6 +159,11 @@ async def start_call():
 async def play_stream(chat_id: int, url: str, video: bool = False):
     if not call: return False
     
+    # ✅ Smart Check: Agar API ne video ke liye .m4a diya hai, toh audio mode me switch karo
+    if video and (url.endswith('.m4a') or url.endswith('.mp3')):
+        LOGGER.warning("⚠️ API returned audio for Video request. Switching to Audio mode.")
+        video = False
+        
     LOGGER.info(f"🎵 Streaming: {url[:80]}... in {chat_id} (Video: {video})")
     
     if video:
@@ -167,7 +172,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
         
     try:
-        # Timeout 30s
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
         return True
     except Exception as e:

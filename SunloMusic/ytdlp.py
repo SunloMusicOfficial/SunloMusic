@@ -1,6 +1,6 @@
 import aiohttp
 import asyncio
-import yt_dlp # Only for search, not for download
+import yt_dlp # Only for search metadata
 import os
 from urllib.parse import urlparse
 from SunloMusic.config import config
@@ -69,7 +69,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     webpage_url = query
     fallback_meta = {}
 
-    # ✅ Search using yt-dlp (Sirf metadata ke liye)
+    # Search Metadata
     if not query.startswith("http"):
         loop = asyncio.get_running_loop()
         try:
@@ -93,9 +93,9 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
-    # ✅ OneGrab API se Video ya Audio Link fetch karna
+    # ✅ 100% OneGrab API Approach
     req_type = "video" if video else "audio"
-    LOGGER.info(f"🎬 Fetching {req_type} stream via OneGrab API for: {webpage_url}")
+    LOGGER.info(f"🌐 Fetching {req_type} via OneGrab API: {webpage_url}")
     
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
     
@@ -104,12 +104,12 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
         if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
             result = track_data["results"][0]
 
-        # Video ya Audio ka link dhoondhna
-        cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
+        # Try to get the best available link
+        cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("video_url") or result.get("audio_url")
         
         if cdnurl:
+            # Check if it's a Telegram CDN link
             if "t.me" in cdnurl or "telegram.me" in cdnurl:
-                # Agar Telegram CDN link hai toh download karo
                 local_path = await _download_telegram_cdn(cdnurl)
                 if local_path:
                     return {
@@ -120,7 +120,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                         "webpage_url": webpage_url
                     }
             else:
-                # Agar direct HTTP link hai toh wahi return karo
+                # Direct HTTP link
                 return {
                     "title": result.get("title", fallback_meta.get("title", "Unknown")),
                     "url": cdnurl,
@@ -129,13 +129,5 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                     "webpage_url": webpage_url
                 }
 
-    LOGGER.warning(f"⚠️ OneGrab API ne {req_type} link nahi diya. Fallback to default URL.")
-    
-    # Fallback (Audio ke liye toh chalega, Video ke liye API fail hui toh error dega)
-    return {
-        "title": fallback_meta.get("title", "Unknown Track"),
-        "url": webpage_url,
-        "duration": int(fallback_meta.get("duration") or 0),
-        "thumbnail": fallback_meta.get("thumbnail", ""),
-        "webpage_url": webpage_url
-    }
+    # Agar API kuch na de, toh None return karo taaki user ko error mile
+    return None
