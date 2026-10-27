@@ -11,21 +11,35 @@ async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue, clear_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
+    
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         return
-    if q.loop == 2 and q.now_playing: q.queue.append(q.now_playing)
+    if q.loop == 2 and q.now_playing:
+        q.queue.append(q.now_playing)
+
     q.now_playing = None
     if q.queue:
         nxt = q.queue.pop(0)
         q.now_playing = nxt
-        if await play_stream(chat_id, nxt.url, nxt.video):
-            try: await bot_module.bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n<b>{nxt.title}</b>\n👤 <a href="tg://user?id={nxt.requester_id}">{nxt.requester}</a>")
-            except: pass
+        success = await play_stream(chat_id, nxt.url, nxt.video)
+        if success:
+            try:
+                # ✅ Fixed Syntax Error (Single quotes for href)
+                text = (
+                    f"🎶 <b>Now Playing:</b>\n"
+                    f"<b>{nxt.title}</b>\n"
+                    f"👤 <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>"
+                )
+                await bot_module.bot.send_message(chat_id, text)
+            except Exception as e:
+                LOGGER.error(f"Error sending auto-play message: {e}")
     else:
         clear_queue(chat_id)
-        try: await bot_module.bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
-        except: pass
+        try: 
+            await bot_module.bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
+        except: 
+            pass
 
 def init_calls():
     global call
@@ -45,7 +59,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         LOGGER.error("❌ PyTgCalls call object is None")
         return False
     
-    LOGGER.info(f"🎵 Streaming Direct URL: {url[:100]}... in {chat_id}")
+    LOGGER.info(f"🎵 Attempting to play URL: {url[:80]}... in {chat_id}")
     
     if video:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p)
