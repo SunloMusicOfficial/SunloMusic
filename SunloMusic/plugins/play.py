@@ -30,11 +30,11 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    status = await m.reply_text("🔎 <b>Fetching...</b>")
+    # ✅ Fetching Message (Part 1 - Option 8)
+    status = await m.reply_text("⏳ <b>Wait a sec, getting the beats...</b>")
     info = await extract_audio(query)
     
     if not info:
-        # ✅ Agar fetch fail ho jaye toh message delete karke error do
         return await status.edit_text("❌ <b>Failed to fetch stream link. Try another song.</b>")
     
     raw_title = info["title"]
@@ -69,11 +69,11 @@ async def play_cmd(_, m):
         track.message_id = sent_msg.id
         return
     
-    await status.edit_text("⏳ <b>Joining Voice Chat...</b>")
+    # ✅ Joining VC Message (Part 2 - Option 6)
+    await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
     
     if not success:
-        # ✅ Agar VC join fail ho jaye toh message edit karke error do
         return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active & Assistant is admin.")
         
     q.now_playing = track
