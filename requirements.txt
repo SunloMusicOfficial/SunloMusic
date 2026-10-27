@@ -1,0 +1,10 @@
+kurigram
+py-tgcalls
+yt-dlp
+motor
+pydantic
+pydantic-settings
+aiohttp
+Pillow
+pyfiglet
+pytz

@@ -1,0 +1,6 @@
+__version__ = "1.0.0"
+__author__ = "Sakil"
+__github__ = "https://github.com/SunloMusicOfficial"
+__channel__ = "https://t.me/Vip_Sakil_Bio"
+__support__ = "https://t.me/YO_UR_OFFICIAL_CRUSH"
+__bot_name__ = "🎶 SunloMusic"
