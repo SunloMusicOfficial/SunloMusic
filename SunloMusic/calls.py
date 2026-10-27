@@ -1,5 +1,5 @@
 from pytgcalls import PyTgCalls, filters
-from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, Update
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
@@ -19,25 +19,28 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
     try:
         await call.play(chat_id, stream)
         return True
-    except Exception as e:
+    except Exception:
         try:
             await call.change_stream(chat_id, stream)
             return True
-        except Exception as e2:
-            LOGGER.error(f"VC Error: {e2}")
+        except Exception as e:
+            LOGGER.error(f"VC Error: {e}")
             return False
 
-async def pause_stream(chat_id: int): 
-    if call: await call.pause_stream(chat_id)
+async def pause_stream(chat_id: int):
+    if call: 
+        await call.pause(chat_id)  # ✅ Official v2+ method
 
-async def resume_stream(chat_id: int): 
-    if call: await call.resume_stream(chat_id)
+async def resume_stream(chat_id: int):
+    if call: 
+        await call.resume(chat_id) # ✅ Official v2+ method
 
-async def stop_stream(chat_id: int): 
-    if call: await call.leave_call(chat_id)
+async def stop_stream(chat_id: int):
+    if call: 
+        await call.leave_call(chat_id)
 
 @(call.on_update(filters.stream_end()) if call else (lambda x: x))
-async def stream_end_handler(client, update: Update):
+async def stream_end_handler(client, update: StreamEnded): # ✅ Correct Type Hint
     from SunloMusic.queues import get_queue, clear_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
