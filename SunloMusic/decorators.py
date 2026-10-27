@@ -10,17 +10,15 @@ def sudo_only(func):
         user = update.from_user
         if user and await is_sudo(user.id): 
             return await func(client, update, *args, **kwargs)
-        
-        if isinstance(update, Message): 
-            await update.reply_text(NO_SUDO_TEXT)
-        elif isinstance(update, CallbackQuery): 
-            await update.answer(NO_SUDO_TEXT, show_alert=True)
+        if isinstance(update, Message): await update.reply_text(NO_SUDO_TEXT)
+        elif isinstance(update, CallbackQuery): await update.answer(NO_SUDO_TEXT, show_alert=True)
     return wrapper
 
 def admin_only(func):
     @wraps(func)
     async def wrapper(client, message: Message, *args, **kwargs):
-        # Enum check fixed
+        if not message.from_user:
+            return
         if message.chat.type != enums.ChatType.PRIVATE:
             try:
                 member = await message.chat.get_member(message.from_user.id)
@@ -31,13 +29,4 @@ def admin_only(func):
             except Exception:
                 pass
         await message.reply_text(NO_ADMIN_TEXT)
-    return wrapper
-
-def auth_required(func):
-    @wraps(func)
-    async def wrapper(client, message: Message, *args, **kwargs):
-        chat = await get_chat(message.chat.id)
-        if chat.get("auth") or await is_sudo(message.from_user.id):
-            return await func(client, message, *args, **kwargs)
-        await message.reply_text(NO_AUTH_TEXT)
     return wrapper

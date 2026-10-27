@@ -29,9 +29,14 @@ async def stream_end_handler(client, update: Update):
     chat_id = update.chat_id
     q = get_queue(chat_id)
     
+    # Track Loop
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         return
+
+    # Queue Loop
+    if q.loop == 2 and q.now_playing:
+        q.queue.append(q.now_playing)
 
     q.now_playing = None
     if q.queue:

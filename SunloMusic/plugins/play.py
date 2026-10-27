@@ -11,15 +11,20 @@ from SunloMusic.keyboards import controls_keyboard
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @admin_only
 async def play_cmd(_, m):
-    if len(m.command) < 2 and not m.reply_to_message: 
-        return await m.reply_text("❌ <b>Give a song name or link.</b>")
+    query = None
+    if len(m.command) > 1:
+        query = " ".join(m.command[1:])
+    elif m.reply_to_message:
+        query = m.reply_to_message.text or m.reply_to_message.caption
+        
+    if not query: 
+        return await m.reply_text("❌ <b>Give a song name, link, or reply to a text.</b>")
     
-    query = " ".join(m.command[1:]) if len(m.command) > 1 else m.reply_to_message.text
     status = await m.reply_text("🔎 <b>Searching...</b>")
     info = await extract_audio(query)
     
     if not info: 
-        return await status.edit_text("❌ <b>Not found.</b>")
+        return await status.edit_text("❌ <b>Not found or invalid link.</b>")
     
     video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)

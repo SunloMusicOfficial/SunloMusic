@@ -17,7 +17,9 @@ def _extract_sync(query: str):
         with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
             search_query = query if query.startswith("http") else f"ytsearch1:{query}"
             info = ydl.extract_info(search_query, download=False)
+            if not info: return None
             if "entries" in info: 
+                if not info["entries"]: return None
                 info = info["entries"][0]
             return {
                 "title": info.get("title", "Unknown"),
