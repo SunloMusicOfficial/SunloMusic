@@ -33,11 +33,14 @@ async def play_cmd(_, m):
     info = await extract_audio(query)
     if not info: return await status.edit_text("❌ <b>Failed to fetch stream link.</b>")
     
+    raw_title = info["title"]
+    safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
+    
     video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)
-    track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
+    track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
-    # ✅ 1. Queue me add karne ka Exact UI
+    # ✅ Queue UI
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
@@ -76,7 +79,7 @@ async def play_cmd(_, m):
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
-    # ✅ 2. Initial Play Exact UI
+    # ✅ Initial Play UI
     caption = (
         f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
         f"━━━━━━━━━━━━━\n"

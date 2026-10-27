@@ -33,7 +33,7 @@ async def update_live_timer(chat_id, msg_id):
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
-            # ✅ 3. Live Timer Exact UI
+            # ✅ Live Timer UI
             caption = (
                 f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
                 f"━━━━━━━━━━━━━\n"
@@ -91,7 +91,7 @@ async def start_next_song(chat_id, q):
             b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
-            # ✅ 4. Auto-play Exact UI
+            # ✅ Auto-play UI
             caption = (
                 f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
                 f"━━━━━━━━━━━━━\n"
