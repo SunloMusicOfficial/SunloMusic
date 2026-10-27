@@ -21,7 +21,8 @@ def player_keyboard(q) -> InlineKeyboardMarkup:
     pause_btn = InlineKeyboardButton("▶️ RESUME" if q.paused else "⏸ PAUSE", callback_data="cb_pause")
     skip_btn = InlineKeyboardButton("⏭ SKIP", callback_data="cb_skip")
     
-    loop_text = "🔁 AUTO OFF" if q.loop == 0 else ("🔂 AUTO ONE" if q.loop == 1 else "🔁 AUTO ALL")
+    # ✅ AUTO ko LOOP kar diya gaya hai
+    loop_text = "🔁 LOOP OFF" if q.loop == 0 else ("🔂 LOOP ONE" if q.loop == 1 else "🔁 LOOP ALL")
     loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop")
     stop_btn = InlineKeyboardButton("⏹ STOP", callback_data="cb_stop")
     
