@@ -2,7 +2,7 @@ from pyrogram import filters
 from SunloMusic.bot import bot
 from SunloMusic.calls import play_stream
 from SunloMusic.decorators import admin_only
-from SunloMusic.queue import get_queue, Track
+from SunloMusic.queues import get_queue, Track
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
@@ -21,7 +21,6 @@ async def play_cmd(_, m):
     if not info: 
         return await status.edit_text("❌ <b>Not found.</b>")
     
-    # Check if user used /vplay or /play
     video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, video)
