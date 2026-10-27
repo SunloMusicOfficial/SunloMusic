@@ -21,7 +21,8 @@ async def play_cmd(_, m):
     if not info: 
         return await status.edit_text("❌ <b>Not found.</b>")
     
-    video = m.command[0] == "vplay"
+    # Check if user used /vplay or /play
+    video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, video)
     
@@ -32,7 +33,6 @@ async def play_cmd(_, m):
     q.now_playing = track
     await play_stream(m.chat.id, track.url, track.video)
     
-    # Thumbnail generate karega
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     caption = f"🎶 <b>Now Playing:</b>\n<b>{track.title}</b>\n⏱ {format_duration(track.duration)}\n👤 {track.requester}"
     

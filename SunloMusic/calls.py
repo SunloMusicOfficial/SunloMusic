@@ -1,6 +1,6 @@
 from pytgcalls import PyTgCalls, filters
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamType, Update
-from SunloMusic.bot import assistant
+from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
 call = PyTgCalls(assistant, cache_duration=100)
@@ -33,10 +33,20 @@ async def stream_end_handler(client, update: Update):
     from SunloMusic.queue import get_queue, clear_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
+    
+    # Loop Logic (Agar Loop On hai toh same gaana repeat hoga)
+    if q.loop == 1 and q.now_playing:
+        await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
+        await bot.send_message(chat_id, f"🔁 <b>Looping:</b> {q.now_playing.title}")
+        return
+
     q.now_playing = None
     if q.queue:
         nxt = q.queue.pop(0)
         q.now_playing = nxt
         await play_stream(chat_id, nxt.url, nxt.video)
+        # Group me message jayega next song ka
+        await bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n{nxt.title}")
     else:
         clear_queue(chat_id)
+        await bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
