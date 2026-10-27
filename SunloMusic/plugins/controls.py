@@ -2,7 +2,7 @@ import time
 from pyrogram import filters
 from pyrogram.types import CallbackQuery
 from SunloMusic.bot import bot
-from SunloMusic.calls import pause_stream, resume_stream, stop_stream, play_stream
+from SunloMusic.calls import pause_stream, resume_stream, stop_stream, start_next_song
 from SunloMusic.decorators import admin_only
 from SunloMusic.database import is_sudo
 from SunloMusic.queues import get_queue, clear_queue
@@ -34,16 +34,8 @@ async def skip_cmd(_, m):
     except: pass
     q = get_queue(m.chat.id)
     if not q.now_playing: return await m.reply_text(NOT_PLAYING_TEXT)
-    if q.timer_task: q.timer_task.cancel()
     
-    q.now_playing = None
-    if q.queue:
-        nxt = q.queue.pop(0); q.now_playing = nxt
-        await play_stream(m.chat.id, nxt.url, nxt.video)
-        await m.reply_text(f"⏭ <b>Skipped to:</b> {nxt.title}")
-    else:
-        await stop_stream(m.chat.id); clear_queue(m.chat.id)
-        await m.reply_text("⏭ <b>Skipped. Queue is now empty.</b>")
+    await start_next_song(m.chat.id, q)
 
 @bot.on_message(filters.command(["stop", "end"]) & filters.group)
 @admin_only
@@ -51,8 +43,24 @@ async def stop_cmd(_, m):
     try: await m.delete()
     except: pass
     q = get_queue(m.chat.id)
-    if q.timer_task: q.timer_task.cancel()
-    await stop_stream(m.chat.id); clear_queue(m.chat.id)
+    if q.timer_task: 
+        q.timer_task.cancel()
+        q.timer_task = None
+    
+    # Delete playing card
+    if q.playing_message_id:
+        try: await m.chat.delete_messages(q.playing_message_id)
+        except: pass
+        q.playing_message_id = 0
+        
+    # Delete all queue cards
+    for track in q.queue:
+        if track.message_id:
+            try: await m.chat.delete_messages(track.message_id)
+            except: pass
+            
+    await stop_stream(m.chat.id)
+    clear_queue(m.chat.id)
     await m.reply_text("⏹ <b>Stopped and left VC.</b>")
 
 @bot.on_callback_query(filters.regex("^cb_del_"))
@@ -116,24 +124,25 @@ async def controls_cb(_, cq: CallbackQuery):
             else: await cq.answer("Nothing playing", show_alert=True)
                 
         elif action == "cb_skip":
-            if q.timer_task: q.timer_task.cancel()
-            if q.now_playing:
-                q.now_playing = None
-                if q.queue:
-                    nxt = q.queue.pop(0); q.now_playing = nxt
-                    await play_stream(chat_id, nxt.url, nxt.video)
-                    await cq.answer(f"⏭ Skipped to {nxt.title}")
-                else:
-                    await stop_stream(chat_id); clear_queue(chat_id)
-                    await cq.answer("⏭ Queue ended")
-                    await cq.message.delete()
-            else: await cq.answer("Nothing playing", show_alert=True)
+            await start_next_song(chat_id, q)
+            await cq.answer("⏭ Skipped")
             
         elif action == "cb_stop":
-            if q.timer_task: q.timer_task.cancel()
-            await stop_stream(chat_id); clear_queue(chat_id)
+            if q.timer_task: 
+                q.timer_task.cancel()
+                q.timer_task = None
+            await stop_stream(chat_id)
+            
+            # Delete all queue cards
+            for track in q.queue:
+                if track.message_id:
+                    try: await bot.delete_messages(chat_id, track.message_id)
+                    except: pass
+                    
+            clear_queue(chat_id)
             await cq.answer("⏹ Stopped")
-            await cq.message.delete()
+            try: await cq.message.delete()
+            except: pass
             
         elif action == "cb_loop":
             q.loop = (q.loop + 1) % 3

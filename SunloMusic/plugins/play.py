@@ -4,7 +4,7 @@ import base64
 from pyrogram import filters, enums
 from SunloMusic.bot import bot
 from SunloMusic.config import config
-from SunloMusic.calls import play_stream
+from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import admin_only
 from SunloMusic.database import add_user
 from SunloMusic.queues import get_queue, Track
@@ -12,44 +12,6 @@ from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
-
-async def update_live_timer(chat_id, msg_id):
-    while True:
-        await asyncio.sleep(5)
-        q = get_queue(chat_id)
-        if not q.now_playing or q.playing_message_id != msg_id:
-            break
-        if q.paused:
-            continue
-            
-        elapsed = int(time.time() - q.start_time - q.total_paused)
-        if elapsed >= q.now_playing.duration and q.now_playing.duration > 0:
-            break
-            
-        try:
-            dur_str = format_duration(q.now_playing.duration)
-            b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
-            title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-            
-            caption = (
-                f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
-                f"🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n"
-                f"⏱ <b>Duration:</b> {dur_str}\n"
-                f"👤 <b>Request:</b> <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>"
-            )
-            
-            try:
-                await bot.edit_message_caption(
-                    chat_id=chat_id, message_id=msg_id,
-                    caption=caption, reply_markup=player_keyboard(q, elapsed)
-                )
-            except Exception:
-                await bot.edit_message_text(
-                    chat_id=chat_id, message_id=msg_id,
-                    text=caption, reply_markup=player_keyboard(q, elapsed)
-                )
-        except Exception:
-            pass
 
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @admin_only
@@ -74,7 +36,6 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
-    # ✅ Queue logic with Clickable Title
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
@@ -90,10 +51,11 @@ async def play_cmd(_, m):
             f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
         )
         if thumb:
-            await status.delete()
-            await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
+            sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
         else:
-            await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
+            sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
+            
+        track.message_id = sent_msg.id # ✅ Save ID to delete later
         return
     
     await status.edit_text("⏳ <b>Joining Voice Chat...</b>")

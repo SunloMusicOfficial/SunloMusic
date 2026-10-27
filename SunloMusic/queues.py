@@ -12,6 +12,7 @@ class Track:
     requester: str
     requester_id: int
     video: bool = False
+    message_id: int = 0 # ✅ Store queue card message ID
 
 @dataclass
 class ChatQueue:
