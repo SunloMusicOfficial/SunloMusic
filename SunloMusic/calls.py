@@ -3,9 +3,7 @@ from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, Update
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
-call = None
-if assistant:
-    call = PyTgCalls(assistant, cache_duration=100)
+call = PyTgCalls(assistant, cache_duration=100) if assistant else None
 
 async def start_call():
     if call:
@@ -20,17 +18,22 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH)
     try:
         await call.play(chat_id, stream)
-    except Exception:
-        await call.change_stream(chat_id, stream)
-    return True
+        return True
+    except Exception as e:
+        try:
+            await call.change_stream(chat_id, stream)
+            return True
+        except Exception as e2:
+            LOGGER.error(f"VC Error: {e2}")
+            return False
 
-async def pause_stream(chat_id: int):
+async def pause_stream(chat_id: int): 
     if call: await call.pause_stream(chat_id)
 
-async def resume_stream(chat_id: int):
+async def resume_stream(chat_id: int): 
     if call: await call.resume_stream(chat_id)
 
-async def stop_stream(chat_id: int):
+async def stop_stream(chat_id: int): 
     if call: await call.leave_call(chat_id)
 
 @(call.on_update(filters.stream_end()) if call else (lambda x: x))
@@ -50,8 +53,11 @@ async def stream_end_handler(client, update: Update):
     if q.queue:
         nxt = q.queue.pop(0)
         q.now_playing = nxt
-        await play_stream(chat_id, nxt.url, nxt.video)
-        await bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n<b>{nxt.title}</b>\n👤 {nxt.requester}")
+        success = await play_stream(chat_id, nxt.url, nxt.video)
+        if success:
+            try: await bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n<b>{nxt.title}</b>\n👤 {nxt.requester}")
+            except: pass
     else:
         clear_queue(chat_id)
-        await bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
+        try: await bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
+        except: pass

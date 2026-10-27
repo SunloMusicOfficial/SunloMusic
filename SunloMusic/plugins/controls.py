@@ -1,11 +1,11 @@
-from pyrogram import filters, enums
+from pyrogram import filters
 from pyrogram.types import CallbackQuery
 from SunloMusic.bot import bot
 from SunloMusic.calls import pause_stream, resume_stream, stop_stream, play_stream
 from SunloMusic.decorators import admin_only
 from SunloMusic.database import is_sudo
 from SunloMusic.queues import get_queue, clear_queue
-from SunloMusic.texts import NOT_PLAYING_TEXT, NO_QUEUE_TEXT, NO_ADMIN_TEXT
+from SunloMusic.texts import NOT_PLAYING_TEXT, NO_QUEUE_TEXT
 
 @bot.on_message(filters.command("pause") & filters.group)
 @admin_only
@@ -48,24 +48,24 @@ async def stop_cmd(_, m):
 
 @bot.on_callback_query(filters.regex("^cb_"))
 async def controls_cb(_, cq: CallbackQuery):
-    user = cq.from_user
+    action = cq.data
     chat_id = cq.message.chat.id
+    user = cq.from_user
     
-    # 🛑 CHECK IF USER IS ADMIN OR SUDO
-    is_admin = False
-    if await is_sudo(user.id): is_admin = True
-    else:
-        try:
-            member = await cq.message.chat.get_member(user.id)
-            if member.privileges and (member.privileges.can_manage_voice_chats or member.privileges.can_manage_chat):
-                is_admin = True
-        except: pass
+    # Sirf play controls ke liye admin lock hai
+    if action in ["cb_pause", "cb_resume", "cb_skip", "cb_stop", "cb_loop"]:
+        is_admin = False
+        if await is_sudo(user.id): is_admin = True
+        else:
+            try:
+                member = await cq.message.chat.get_member(user.id)
+                if member.privileges and (member.privileges.can_manage_voice_chats or member.privileges.can_manage_chat): is_admin = True
+            except: pass
 
-    if not is_admin:
-        return await cq.answer("🚫 Sirf Admin hi ye buttons use kar sakte hain!", show_alert=True)
+        if not is_admin:
+            return await cq.answer("🚫 Sirf Admin hi ye buttons use kar sakte hain!", show_alert=True)
 
     try:
-        action = cq.data
         q = get_queue(chat_id)
         
         if action == "cb_pause":
@@ -73,11 +73,13 @@ async def controls_cb(_, cq: CallbackQuery):
                 await pause_stream(chat_id); q.paused = True
                 await cq.answer("⏸ Paused")
             else: await cq.answer("Nothing playing", show_alert=True)
+            
         elif action == "cb_resume":
             if q.now_playing:
                 await resume_stream(chat_id); q.paused = False
                 await cq.answer("▶️ Resumed")
             else: await cq.answer("Nothing playing", show_alert=True)
+            
         elif action == "cb_skip":
             if q.now_playing:
                 q.now_playing = None
@@ -90,11 +92,26 @@ async def controls_cb(_, cq: CallbackQuery):
                     await cq.answer("⏭ Queue ended")
                     await cq.message.delete()
             else: await cq.answer("Nothing playing", show_alert=True)
+            
         elif action == "cb_stop":
             await stop_stream(chat_id); clear_queue(chat_id)
             await cq.answer("⏹ Stopped")
             await cq.message.delete()
+            
+        elif action == "cb_loop":
+            q.loop = (q.loop + 1) % 3
+            modes = {0: "Off", 1: "Track", 2: "Queue"}
+            await cq.answer(f"🔁 Loop: {modes[q.loop]}")
+            
+        elif action == "cb_queue":
+            if not q.queue: 
+                await cq.answer(NO_QUEUE_TEXT, show_alert=True)
+            else:
+                text = "⏭ Up Next:\n" + "\n".join(f"{i+1}. {t.title}" for i, t in enumerate(q.queue[:10]))
+                await cq.answer(text, show_alert=True)
+                
         elif action == "cb_close":
             await cq.message.delete()
+            await cq.answer()
     except Exception:
         pass
