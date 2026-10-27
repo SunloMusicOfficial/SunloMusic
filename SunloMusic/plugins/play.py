@@ -26,12 +26,16 @@ async def play_cmd(_, m):
     await add_user(m.from_user.id, m.from_user.first_name)
     query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
     if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
+    
     try: await m.delete()
     except: pass
 
     status = await m.reply_text("🔎 <b>Fetching...</b>")
     info = await extract_audio(query)
-    if not info: return await status.edit_text("❌ <b>Failed to fetch stream link.</b>")
+    
+    if not info:
+        # ✅ Agar fetch fail ho jaye toh message delete karke error do
+        return await status.edit_text("❌ <b>Failed to fetch stream link. Try another song.</b>")
     
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -40,7 +44,6 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
-    # ✅ Queue UI
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
@@ -68,7 +71,10 @@ async def play_cmd(_, m):
     
     await status.edit_text("⏳ <b>Joining Voice Chat...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
-    if not success: return await status.edit_text("❌ <b>Failed to join VC.</b>\nCheck Render logs.")
+    
+    if not success:
+        # ✅ Agar VC join fail ho jaye toh message edit karke error do
+        return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active & Assistant is admin.")
         
     q.now_playing = track
     q.start_time = time.time()
@@ -79,7 +85,6 @@ async def play_cmd(_, m):
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
-    # ✅ Initial Play UI
     caption = (
         f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
         f"━━━━━━━━━━━━━\n"

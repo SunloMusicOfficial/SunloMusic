@@ -15,7 +15,6 @@ API_HEADERS = {
 DOWNLOAD_DIR = "cache/downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# ✅ Optimized for Speed & Accuracy
 YDL_SEARCH_OPTS = {
     "quiet": True,
     "no_warnings": True,
@@ -26,16 +25,11 @@ YDL_SEARCH_OPTS = {
 
 def _search_ytdlp_sync(query: str):
     try:
-        # Smart Query: Appending "song" forces YouTube to prioritize music
         search_query = f"ytsearch1:{query} song audio"
-        LOGGER.info(f"🔎 Searching yt-dlp: {search_query}")
-        
         with yt_dlp.YoutubeDL(YDL_SEARCH_OPTS) as ydl:
             info = ydl.extract_info(search_query, download=False)
             if info and "entries" in info and len(info["entries"]) > 0:
-                best_match = info["entries"][0]
-                LOGGER.info(f"✅ Found: {best_match.get('title')}")
-                return best_match
+                return info["entries"][0]
     except Exception as e:
         LOGGER.error(f"yt-dlp search error: {e}")
     return None
@@ -44,10 +38,9 @@ async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=API_HEADERS, params=params, timeout=25) as resp:
+            # ✅ Timeout added (15 seconds)
+            async with session.get(url, headers=API_HEADERS, params=params, timeout=15) as resp:
                 if resp.status != 200:
-                    text = await resp.text()
-                    LOGGER.error(f"❌ OneGrab API {resp.status}: {text[:300]}")
                     return None
                 return await resp.json()
     except Exception as e:
@@ -82,11 +75,15 @@ async def extract_audio(query: str) -> dict | None:
     webpage_url = query
     fallback_meta = {}
 
-    # ✅ STEP 1: Ultra-Fast Search (1 Result)
     if not query.startswith("http"):
         loop = asyncio.get_running_loop()
-        ytdlp_info = await loop.run_in_executor(None, _search_ytdlp_sync, query)
-        
+        try:
+            # ✅ Timeout added (20 seconds) for yt-dlp search
+            ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=20.0)
+        except asyncio.TimeoutError:
+            LOGGER.error("❌ yt-dlp search timed out")
+            ytdlp_info = None
+            
         if ytdlp_info and ytdlp_info.get("url"):
             webpage_url = ytdlp_info.get("url")
             fallback_meta = {
@@ -95,7 +92,6 @@ async def extract_audio(query: str) -> dict | None:
                 "thumbnail": ytdlp_info.get("thumbnails", [{}])[-1].get("url", "") if ytdlp_info.get("thumbnails") else ""
             }
         else:
-            # Fallback to OneGrab search if yt-dlp fails
             search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
@@ -105,7 +101,6 @@ async def extract_audio(query: str) -> dict | None:
     if not webpage_url:
         return None
 
-    # ✅ STEP 2: Get stream link from OneGrab API
     track_data = await _api_request("/api/track", {"url": webpage_url})
     
     if track_data:
@@ -135,7 +130,6 @@ async def extract_audio(query: str) -> dict | None:
                     "webpage_url": webpage_url
                 }
 
-    # STEP 3: Final fallback
     return {
         "title": fallback_meta.get("title", "Unknown Track"),
         "url": webpage_url,

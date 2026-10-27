@@ -33,7 +33,6 @@ async def update_live_timer(chat_id, msg_id):
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
-            # ✅ Live Timer UI
             caption = (
                 f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
                 f"━━━━━━━━━━━━━\n"
@@ -91,7 +90,6 @@ async def start_next_song(chat_id, q):
             b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             
-            # ✅ Auto-play UI
             caption = (
                 f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
                 f"━━━━━━━━━━━━━\n"
@@ -163,8 +161,12 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
         
     try:
-        await call.play(chat_id, stream, config=GroupCallConfig(auto_start=True))
+        # ✅ Timeout added (15 seconds) to prevent hanging
+        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
         return True
+    except asyncio.TimeoutError:
+        LOGGER.error("❌ PyTgCalls play timed out")
+        return False
     except NoActiveGroupCall:
         LOGGER.error("❌ No active Voice Chat found.")
         return False
@@ -173,7 +175,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         if "mute" in error_msg or "unmute" in error_msg:
             try:
                 await call.unmute(chat_id)
-                await call.play(chat_id, stream, config=GroupCallConfig(auto_start=True))
+                await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=15.0)
                 return True
             except Exception as e2:
                 LOGGER.error(f"❌ Unmute failed: {e2}")
