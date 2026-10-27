@@ -1,5 +1,4 @@
 from pyrogram import filters
-from pyrogram.types import CallbackQuery
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.keyboards import start_keyboard
@@ -12,9 +11,13 @@ async def start_cmd(_, m):
         f"👨‍💻 <b>Owner:</b> Sakil\n"
         f"📢 <b>Channel:</b> <a href='{config.UPDATES_CHANNEL}'>Vip Sakil Bio</a>"
     )
-    if config.START_IMG:
-        await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
-    else:
+    # Photo crash protection
+    try:
+        if config.START_IMG:
+            await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
+        else:
+            raise Exception("No Image")
+    except Exception:
         await m.reply_text(caption, reply_markup=start_keyboard(), disable_web_page_preview=True)
 
 @bot.on_message(filters.command(["ping", "help"]))

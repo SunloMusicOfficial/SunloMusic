@@ -3,13 +3,17 @@ from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, Update
 from SunloMusic.bot import assistant, bot
 from SunloMusic.logger import LOGGER
 
-call = PyTgCalls(assistant, cache_duration=100)
+call = None
+if assistant:
+    call = PyTgCalls(assistant, cache_duration=100)
 
 async def start_call():
-    await call.start()
-    LOGGER.info("✅ PyTgCalls engine started")
+    if call:
+        await call.start()
+        LOGGER.info("✅ PyTgCalls engine started")
 
 async def play_stream(chat_id: int, url: str, video: bool = False):
+    if not call: return False
     if video:
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p)
     else:
@@ -18,23 +22,27 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         await call.play(chat_id, stream)
     except Exception:
         await call.change_stream(chat_id, stream)
+    return True
 
-async def pause_stream(chat_id: int): await call.pause_stream(chat_id)
-async def resume_stream(chat_id: int): await call.resume_stream(chat_id)
-async def stop_stream(chat_id: int): await call.leave_call(chat_id)
+async def pause_stream(chat_id: int):
+    if call: await call.pause_stream(chat_id)
 
-@call.on_update(filters.stream_end())
+async def resume_stream(chat_id: int):
+    if call: await call.resume_stream(chat_id)
+
+async def stop_stream(chat_id: int):
+    if call: await call.leave_call(chat_id)
+
+@(call.on_update(filters.stream_end()) if call else (lambda x: x))
 async def stream_end_handler(client, update: Update):
     from SunloMusic.queues import get_queue, clear_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
     
-    # Track Loop
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         return
 
-    # Queue Loop
     if q.loop == 2 and q.now_playing:
         q.queue.append(q.now_playing)
 

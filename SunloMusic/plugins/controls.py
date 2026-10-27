@@ -1,10 +1,11 @@
-from pyrogram import filters
+from pyrogram import filters, enums
 from pyrogram.types import CallbackQuery
 from SunloMusic.bot import bot
 from SunloMusic.calls import pause_stream, resume_stream, stop_stream, play_stream
 from SunloMusic.decorators import admin_only
+from SunloMusic.database import is_sudo
 from SunloMusic.queues import get_queue, clear_queue
-from SunloMusic.texts import NOT_PLAYING_TEXT, NO_QUEUE_TEXT
+from SunloMusic.texts import NOT_PLAYING_TEXT, NO_QUEUE_TEXT, NO_ADMIN_TEXT
 
 @bot.on_message(filters.command("pause") & filters.group)
 @admin_only
@@ -47,9 +48,24 @@ async def stop_cmd(_, m):
 
 @bot.on_callback_query(filters.regex("^cb_"))
 async def controls_cb(_, cq: CallbackQuery):
+    user = cq.from_user
+    chat_id = cq.message.chat.id
+    
+    # 🛑 CHECK IF USER IS ADMIN OR SUDO
+    is_admin = False
+    if await is_sudo(user.id): is_admin = True
+    else:
+        try:
+            member = await cq.message.chat.get_member(user.id)
+            if member.privileges and (member.privileges.can_manage_voice_chats or member.privileges.can_manage_chat):
+                is_admin = True
+        except: pass
+
+    if not is_admin:
+        return await cq.answer("🚫 Sirf Admin hi ye buttons use kar sakte hain!", show_alert=True)
+
     try:
         action = cq.data
-        chat_id = cq.message.chat.id
         q = get_queue(chat_id)
         
         if action == "cb_pause":
@@ -81,4 +97,4 @@ async def controls_cb(_, cq: CallbackQuery):
         elif action == "cb_close":
             await cq.message.delete()
     except Exception:
-        pass # Prevents crash if message is old/deleted
+        pass
