@@ -1,11 +1,9 @@
-import asyncio
-import time
-import base64
+import asyncio, time, base64
 from pyrogram import filters, enums
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
-from SunloMusic.decorators import admin_only
+from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import add_user
 from SunloMusic.queues import get_queue, Track
 from SunloMusic.ytdlp import extract_audio
@@ -14,6 +12,7 @@ from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
 
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
+@catch_errors
 @admin_only
 async def play_cmd(_, m):
     if m.chat.type != enums.ChatType.SUPERGROUP:
@@ -22,15 +21,12 @@ async def play_cmd(_, m):
     await add_user(m.from_user.id, m.from_user.first_name)
     query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
     if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
-    
     try: await m.delete()
     except: pass
 
     status = await m.reply_text("🔎 <b>Fetching...</b>")
     info = await extract_audio(query)
-    
-    if not info:
-        return await status.edit_text("❌ <b>Failed to fetch stream link.</b>")
+    if not info: return await status.edit_text("❌ <b>Failed to fetch stream link.</b>")
     
     video = "vplay" in m.command[0].lower()
     q = get_queue(m.chat.id)
@@ -40,29 +36,17 @@ async def play_cmd(_, m):
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
         thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
-        
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-        
-        caption = (
-            f"➕ <b>Added to queue (Position: {len(q.queue)})</b>\n\n"
-            f"🎵 <a href='{title_link}'>{track.title}</a>\n"
-            f"⏱ <b>Duration:</b> {format_duration(track.duration)}\n"
-            f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
-        )
-        if thumb:
-            sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
-        else:
-            sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
-            
-        track.message_id = sent_msg.id # ✅ Save ID to delete later
+        caption = f"➕ <b>Added to queue (Position: {len(q.queue)})</b>\n\n🎵 <a href='{title_link}'>{track.title}</a>\n⏱ <b>Duration:</b> {format_duration(track.duration)}\n👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
+        if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
+        else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
+        track.message_id = sent_msg.id
         return
     
     await status.edit_text("⏳ <b>Joining Voice Chat...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
-    
-    if not success:
-        return await status.edit_text("❌ <b>Failed to join VC.</b>\nCheck Render logs.")
+    if not success: return await status.edit_text("❌ <b>Failed to join VC.</b>\nCheck Render logs.")
         
     q.now_playing = track
     q.start_time = time.time()
@@ -71,16 +55,9 @@ async def play_cmd(_, m):
     
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-    
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
-    dur_str = format_duration(track.duration)
     
-    caption = (
-        f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n"
-        f"🎵 <a href='{title_link}'>{track.title}</a>\n"
-        f"⏱ <b>Duration:</b> {dur_str}\n"
-        f"👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
-    )
+    caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n\n🎵 <a href='{title_link}'>{track.title}</a>\n⏱ <b>Duration:</b> {format_duration(track.duration)}\n👤 <b>Request:</b> <a href='tg://user?id={track.requester_id}'>{track.requester}</a>"
     
     if thumb:
         await status.delete()
@@ -89,7 +66,5 @@ async def play_cmd(_, m):
         sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q, 0))
         
     q.playing_message_id = sent_msg.id
-    
-    if q.timer_task:
-        q.timer_task.cancel()
+    if q.timer_task: q.timer_task.cancel()
     q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))

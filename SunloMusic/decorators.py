@@ -3,6 +3,16 @@ from pyrogram import enums
 from pyrogram.types import Message, CallbackQuery
 from SunloMusic.database import is_sudo, get_chat
 from SunloMusic.texts import NO_SUDO_TEXT, NO_ADMIN_TEXT
+from SunloMusic.error_handler import log_error_to_group
+
+def catch_errors(func):
+    @wraps(func)
+    async def wrapper(client, update, *args, **kwargs):
+        try:
+            return await func(client, update, *args, **kwargs)
+        except Exception as e:
+            await log_error_to_group(update, e)
+    return wrapper
 
 def sudo_only(func):
     @wraps(func)

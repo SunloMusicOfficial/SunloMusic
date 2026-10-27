@@ -1,6 +1,7 @@
 from pyrogram import Client
 from SunloMusic.config import config
-from SunloMusic.logger import LOGGER
+from SunloMusic.logger import LOGGER, get_startup_card
+from SunloMusic.error_handler import log_error_to_group
 
 bot = None
 assistant = None
@@ -20,4 +21,10 @@ async def start_bot():
         await assistant.start()
         LOGGER.info("✅ Assistant started (VC Ready)")
     else:
-        LOGGER.warning("⚠️ No SESSION_STRING provided. Voice Chat won't work!")
+        LOGGER.warning("⚠️ No SESSION_STRING provided.")
+        
+    if config.LOGGER_ID:
+        try:
+            await bot.send_message(config.LOGGER_ID, get_startup_card(me.username))
+        except Exception as e:
+            LOGGER.error(f"Failed to send startup card: {e}")

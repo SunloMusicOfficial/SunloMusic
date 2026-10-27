@@ -1,5 +1,6 @@
 import logging
 import sys
+import time
 from pyfiglet import figlet_format
 
 LOGGER = logging.getLogger("SunloMusic")
@@ -8,10 +9,7 @@ LOGGER.propagate = False
 
 if not LOGGER.handlers:
     _handler = logging.StreamHandler(sys.stdout)
-    _handler.setFormatter(logging.Formatter(
-        "\x1b[36m%(asctime)s\x1b[0m │ \x1b[33m%(levelname)-8s\x1b[0m │ %(message)s",
-        datefmt="%H:%M:%S"
-    ))
+    _handler.setFormatter(logging.Formatter("\x1b[36m%(asctime)s\x1b[0m │ \x1b[33m%(levelname)-8s\x1b[0m │ %(message)s", datefmt="%H:%M:%S"))
     LOGGER.addHandler(_handler)
 
 def print_banner():
@@ -22,3 +20,16 @@ def print_banner():
     print("\x1b[93m   Author: Sakil  |  @YO_UR_OFFICIAL_CRUSH\x1b[0m")
     print("\x1b[94m   Channel: https://t.me/Vip_Sakil_Bio\x1b[0m")
     print("\x1b[96m" + "═" * 60 + "\x1b[0m\n")
+
+def get_startup_card(bot_username: str) -> str:
+    uptime = time.strftime("%H:%M:%S", time.gmtime(time.time()))
+    return (
+        f"<b>🟢 SYSTEM ONLINE 🟢</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 <b>Bot:</b> @{bot_username}\n"
+        f"🎙 <b>Assistant:</b> Ready\n"
+        f"⚡ <b>Engine:</b> PyTgCalls v3\n"
+        f"⏱ <b>Server Time:</b> {uptime}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>SunloMusic is now live and ready to play!</i>"
+    )

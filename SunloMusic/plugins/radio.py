@@ -1,11 +1,12 @@
 from pyrogram import filters
 from SunloMusic.bot import bot
 from SunloMusic.calls import play_stream
-from SunloMusic.decorators import admin_only
+from SunloMusic.decorators import catch_errors, admin_only
 from SunloMusic.queues import get_queue, Track
 
 RADIOS = {"hindi": "https://stream.zeno.fm/0r0xa792kwzuv", "english": "https://stream.zeno.fm/8wv4d0g0tf9uv", "lofi": "https://stream.zeno.fm/0r0xa792kwzuv"}
 
+@catch_errors
 @bot.on_message(filters.command("radio") & filters.group)
 @admin_only
 async def radio_cmd(_, m):

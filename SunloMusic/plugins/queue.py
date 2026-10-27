@@ -1,11 +1,12 @@
 import random
 from pyrogram import filters
 from SunloMusic.bot import bot
-from SunloMusic.decorators import admin_only
+from SunloMusic.decorators import catch_errors, admin_only
 from SunloMusic.formatters import format_duration
 from SunloMusic.queues import get_queue
 from SunloMusic.texts import NO_QUEUE_TEXT
 
+@catch_errors
 @bot.on_message(filters.command("queue") & filters.group)
 async def queue_cmd(_, m):
     q = get_queue(m.chat.id)
@@ -19,6 +20,7 @@ async def queue_cmd(_, m):
             text += f"{i}. {t.title} ({format_duration(t.duration)})\n"
     await m.reply_text(text)
 
+@catch_errors
 @bot.on_message(filters.command("loop") & filters.group)
 @admin_only
 async def loop_cmd(_, m):
@@ -36,6 +38,7 @@ async def loop_cmd(_, m):
     except ValueError:
         await m.reply_text("❌ <b>Invalid number.</b>")
 
+@catch_errors
 @bot.on_message(filters.command("shuffle") & filters.group)
 @admin_only
 async def shuffle_cmd(_, m):

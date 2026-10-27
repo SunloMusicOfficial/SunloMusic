@@ -3,6 +3,7 @@ from SunloMusic.bot import bot
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration # ✅ Added missing import
 
+@catch_errors
 @bot.on_message(filters.command("song"))
 async def song_cmd(_, m):
     if len(m.command) < 2:
