@@ -1,4 +1,5 @@
 from pyrogram import filters
+from pyrogram.types import CallbackQuery
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.keyboards import start_keyboard
@@ -15,13 +16,10 @@ async def start_cmd(_, m):
     )
     try:
         if config.START_IMG:
-            # Agar image link sahi hai toh photo bhejega
             await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
         else:
             raise Exception("No Image")
     except Exception:
-        # Agar image link dead hai ya error aata hai, toh bina crash hue text bhejega
-        # (Removed disable_web_page_preview=True as it's deprecated in latest Kurigram)
         await m.reply_text(caption, reply_markup=start_keyboard())
 
 @bot.on_message(filters.command(["ping", "help"]))
@@ -30,3 +28,22 @@ async def ping_help_cmd(_, m):
         await m.reply_text("🏓 <b>Pong! Bot is alive.</b>")
     else:
         await m.reply_text("🎧 <b>Commands:</b>\n\n/play [song]\n/vplay [song]\n/song [song]\n/pause, /resume, /skip, /stop\n/queue\n/auth (Admin)", reply_markup=start_keyboard())
+
+# ✅ Added back help menu callback
+@bot.on_callback_query(filters.regex("^help_menu"))
+async def help_cb(_, cq: CallbackQuery):
+    text = (
+        "<b>🎧 SunloMusic Commands</b>\n\n"
+        "🎵 <b>Music:</b>\n"
+        "/play [song] - Play audio\n"
+        "/vplay [song] - Play video\n"
+        "/song [song] - Get download link\n\n"
+        "⏯ <b>Controls:</b>\n"
+        "/pause, /resume, /skip, /stop\n"
+        "/queue - View current queue\n\n"
+        "🛡 <b>Admin:</b>\n"
+        "/auth, /unauth (Authorize chat)\n"
+        "/broadcast, /stats (Sudo only)"
+    )
+    await cq.message.edit_text(text)
+    await cq.answer()

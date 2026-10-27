@@ -4,7 +4,6 @@ import time
 import aiohttp
 from aiohttp import web
 from SunloMusic.logger import LOGGER
-from SunloMusic.bot import bot
 from SunloMusic.config import config
 
 START_TIME = time.time()
@@ -22,12 +21,14 @@ async def _ping_url(url: str, session: aiohttp.ClientSession) -> float:
 async def _send_premium_log(latency: float, status: str):
     if not config.LOGGER_ID:
         return
+    from SunloMusic.bot import bot  # ✅ Dynamic import (fix for NoneType)
+    if not bot:
+        return
     uptime_sec = int(time.time() - START_TIME)
     h, rem = divmod(uptime_sec, 3600)
     m, s = divmod(rem, 60)
     uptime_str = f"{h}h {m}m {s}s" if h else f"{m}m {s}s"
     
-    # Premium HTML Log Card
     text = (
         f"<b>🛡️ SunloMusic Keep-Alive Monitor</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -43,7 +44,7 @@ async def _send_premium_log(latency: float, status: str):
         LOGGER.error(f"Failed to send premium log: {e}")
 
 async def _background_pinger():
-    await asyncio.sleep(60) # Initial startup delay
+    await asyncio.sleep(60)
     url = os.environ.get("RENDER_EXTERNAL_URL")
     if not url:
         LOGGER.warning("⚠️ RENDER_EXTERNAL_URL not found. Self-ping disabled.")
@@ -59,7 +60,7 @@ async def _background_pinger():
                 await _send_premium_log(latency, "🟢 Active & Healthy")
             else:
                 await _send_premium_log(0.0, "🔴 Ping Failed")
-            await asyncio.sleep(600) # Ping every 10 minutes
+            await asyncio.sleep(600)
 
 async def _handle_ping(request):
     return web.Response(text="SunloMusic is alive!", status=200)
