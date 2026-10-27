@@ -2,7 +2,7 @@ from pytgcalls import PyTgCalls
 from pytgcalls import filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded
 from pytgcalls.exceptions import NoActiveGroupCall
-from SunloMusic.bot import assistant, bot
+import SunloMusic.bot as bot_module # ✅ Module import kiya (Direct variable nahi)
 from SunloMusic.logger import LOGGER
 
 call = None
@@ -24,18 +24,21 @@ async def stream_end_handler(client, update: StreamEnded):
         q.now_playing = nxt
         success = await play_stream(chat_id, nxt.url, nxt.video)
         if success:
-            try: await bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n<b>{nxt.title}</b>\n👤 {nxt.requester}")
+            try: await bot_module.bot.send_message(chat_id, f"🎶 <b>Now Playing:</b>\n<b>{nxt.title}</b>\n👤 {nxt.requester}")
             except: pass
     else:
         clear_queue(chat_id)
-        try: await bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
+        try: await bot_module.bot.send_message(chat_id, "⏹ <b>Queue khatam. Bot ne VC leave kar diya.</b>")
         except: pass
 
 def init_calls():
     global call
-    if assistant:
-        call = PyTgCalls(assistant, cache_duration=100)
+    # ✅ Yahaan bot_module.assistant use kiya taaki updated value mile
+    if bot_module.assistant:
+        call = PyTgCalls(bot_module.assistant, cache_duration=100)
         call.on_update(fl.stream_end())(stream_end_handler)
+    else:
+        LOGGER.error("❌ Assistant not initialized in bot.py")
 
 async def start_call():
     if call:
@@ -73,7 +76,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         return False
     except Exception as e:
         error_msg = str(e).lower()
-        # ✅ Agar error mute se related hai toh unmute try karo
         if "mute" in error_msg or "unmute" in error_msg:
             LOGGER.warning(f"⚠️ Mute-related error detected: {e}. Trying to unmute...")
             try:
