@@ -15,10 +15,14 @@ async def start_cmd(_, m):
     )
     try:
         if config.START_IMG:
+            # Agar image link sahi hai toh photo bhejega
             await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
-        else: raise Exception("No Image")
+        else:
+            raise Exception("No Image")
     except Exception:
-        await m.reply_text(caption, reply_markup=start_keyboard(), disable_web_page_preview=True)
+        # Agar image link dead hai ya error aata hai, toh bina crash hue text bhejega
+        # (Removed disable_web_page_preview=True as it's deprecated in latest Kurigram)
+        await m.reply_text(caption, reply_markup=start_keyboard())
 
 @bot.on_message(filters.command(["ping", "help"]))
 async def ping_help_cmd(_, m):
