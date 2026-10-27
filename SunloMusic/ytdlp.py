@@ -1,6 +1,6 @@
 import aiohttp
 import asyncio
-import yt_dlp
+import yt_dlp # Only for search, not for download
 import os
 from urllib.parse import urlparse
 from SunloMusic.config import config
@@ -23,24 +23,6 @@ YDL_SEARCH_OPTS = {
     "nocheckcertificate": True,
 }
 
-# ✅ New Video Downloader for /vplay
-def _download_video_sync(url: str, output_path: str):
-    try:
-        ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'outtmpl': output_path,
-            'quiet': True,
-            'no_warnings': True,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if 'requested_downloads' in info:
-                return info['requested_downloads'][0]['filepath']
-            return output_path
-    except Exception as e:
-        LOGGER.error(f"Video download error: {e}")
-        return None
-
 def _search_ytdlp_sync(query: str):
     try:
         search_query = f"ytsearch1:{query} song audio"
@@ -56,7 +38,7 @@ async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=API_HEADERS, params=params, timeout=15) as resp:
+            async with session.get(url, headers=API_HEADERS, params=params, timeout=20) as resp:
                 if resp.status != 200: return None
                 return await resp.json()
     except Exception as e:
@@ -87,10 +69,11 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     webpage_url = query
     fallback_meta = {}
 
+    # ✅ Search using yt-dlp (Sirf metadata ke liye)
     if not query.startswith("http"):
         loop = asyncio.get_running_loop()
         try:
-            ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=20.0)
+            ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=15.0)
         except asyncio.TimeoutError:
             ytdlp_info = None
             
@@ -110,32 +93,23 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
-    # ✅ Video Path for /vplay
-    if video:
-        LOGGER.info(f"🎬 Downloading Video for: {webpage_url}")
-        output_path = f"{DOWNLOAD_DIR}/{abs(hash(webpage_url))}.mp4"
-        loop = asyncio.get_running_loop()
-        local_path = await loop.run_in_executor(None, _download_video_sync, webpage_url, output_path)
-        if local_path:
-            return {
-                "title": fallback_meta.get("title", "Video Track"),
-                "url": local_path,
-                "duration": int(fallback_meta.get("duration") or 0),
-                "thumbnail": fallback_meta.get("thumbnail", ""),
-                "webpage_url": webpage_url
-            }
-        return None # Fail if video download fails
-
-    # ✅ Audio Path for /play
-    track_data = await _api_request("/api/track", {"url": webpage_url})
+    # ✅ OneGrab API se Video ya Audio Link fetch karna
+    req_type = "video" if video else "audio"
+    LOGGER.info(f"🎬 Fetching {req_type} stream via OneGrab API for: {webpage_url}")
+    
+    track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
+    
     if track_data:
         result = track_data
         if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
             result = track_data["results"][0]
 
-        cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url")
+        # Video ya Audio ka link dhoondhna
+        cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
+        
         if cdnurl:
             if "t.me" in cdnurl or "telegram.me" in cdnurl:
+                # Agar Telegram CDN link hai toh download karo
                 local_path = await _download_telegram_cdn(cdnurl)
                 if local_path:
                     return {
@@ -146,6 +120,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                         "webpage_url": webpage_url
                     }
             else:
+                # Agar direct HTTP link hai toh wahi return karo
                 return {
                     "title": result.get("title", fallback_meta.get("title", "Unknown")),
                     "url": cdnurl,
@@ -154,6 +129,9 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                     "webpage_url": webpage_url
                 }
 
+    LOGGER.warning(f"⚠️ OneGrab API ne {req_type} link nahi diya. Fallback to default URL.")
+    
+    # Fallback (Audio ke liye toh chalega, Video ke liye API fail hui toh error dega)
     return {
         "title": fallback_meta.get("title", "Unknown Track"),
         "url": webpage_url,

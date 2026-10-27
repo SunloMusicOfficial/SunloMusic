@@ -16,7 +16,6 @@ from SunloMusic.keyboards import player_keyboard
 call = None
 
 def cleanup_file(url: str):
-    """Deletes downloaded video files to save disk space"""
     if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a')):
         try: os.remove(url)
         except: pass
@@ -75,7 +74,6 @@ async def start_next_song(chat_id, q):
         except: pass
         q.playing_message_id = 0
 
-    # ✅ Cleanup old file
     if q.now_playing:
         cleanup_file(q.now_playing.url)
 
@@ -169,8 +167,8 @@ async def play_stream(chat_id: int, url: str, video: bool = False):
         stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE)
         
     try:
-        # 60 sec timeout for Video downloads
-        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=60.0)
+        # Timeout 30s
+        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
         return True
     except Exception as e:
         LOGGER.error(f"❌ PyTgCalls Error: {type(e).__name__} - {e}")
