@@ -22,18 +22,26 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
     
-    # ✅ Live Moving Emoji Timer
-    bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "─" * 8
-    timer_btn = InlineKeyboardButton(f"{elapsed_str} {bar} {dur_str}", callback_data="cb_timer")
+    # Progress bar
+    bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "━" * 8
+    timer_btn = InlineKeyboardButton(f"{elapsed_str} 🎵 {bar} {dur_str}", callback_data="cb_timer")
     
-    pause_btn = InlineKeyboardButton("▶️ RESUME" if q.paused else "⏸ PAUSE", callback_data="cb_pause")
-    skip_btn = InlineKeyboardButton("⏭ SKIP", callback_data="cb_skip")
+    # ✅ Small Caps + Colored Emojis
+    pause_text = "▶️ ʀᴇsᴜᴍᴇ" if q.paused else "⏸️ ᴘᴀᴜsᴇ"
+    pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause")
+    skip_btn = InlineKeyboardButton("⏭️ sᴋɪᴘ", callback_data="cb_skip")
     
-    loop_text = "🔁 LOOP OFF" if q.loop == 0 else ("🔂 LOOP ONE" if q.loop == 1 else "🔁 LOOP ALL")
+    # ✅ LOOP text in Small Caps
+    if q.loop == 0:
+        loop_text = "🔁 ʟᴏᴏᴘ ᴏғғ"
+    elif q.loop == 1:
+        loop_text = "🔂 ʟᴏᴏᴘ ᴏɴᴇ"
+    else:
+        loop_text = "🔁 ʟᴏᴏᴘ ᴀʟʟ"
+        
     loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop")
-    stop_btn = InlineKeyboardButton("⏹ STOP", callback_data="cb_stop")
-    
-    more_btn = InlineKeyboardButton("🎵 MORE", callback_data="cb_more")
+    stop_btn = InlineKeyboardButton("⏹️ sᴛᴏᴘ", callback_data="cb_stop")
+    more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more")
     
     return InlineKeyboardMarkup([
         [timer_btn],
@@ -44,5 +52,5 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
 
 def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("❌ Remove from Queue", callback_data=f"cb_del_{track_hash}")]
+        [InlineKeyboardButton("❌ ʀᴇᴍᴏᴠᴇ ғʀᴏᴍ ǫᴜᴇᴜᴇ", callback_data=f"cb_del_{track_hash}")]
     ])
