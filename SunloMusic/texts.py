@@ -1,5 +1,3 @@
 NO_SUDO_TEXT = "🚫 <b>Only sudo users can use this.</b>"
 NO_ADMIN_TEXT = "🚫 <b>Only admins can use this.</b>"
-NO_AUTH_TEXT = "🔒 <b>Chat not authorized. Use /auth</b>"
 NOT_PLAYING_TEXT = "❌ <b>Nothing is playing.</b>"
-NO_QUEUE_TEXT = "📭 <b>Queue is empty.</b>"

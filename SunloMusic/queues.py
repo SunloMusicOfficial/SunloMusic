@@ -12,7 +12,7 @@ class Track:
     requester: str
     requester_id: int
     video: bool = False
-    message_id: int = 0 # ✅ Store queue card message ID
+    message_id: int = 0
 
 @dataclass
 class ChatQueue:
@@ -26,6 +26,7 @@ class ChatQueue:
     total_paused: float = 0.0
     playing_message_id: int = 0
     timer_task: Optional[asyncio.Task] = None
+    votes: set = field(default_factory=set) # ✅ For Vote Skip
 
 _queues: dict[int, ChatQueue] = {}
 
