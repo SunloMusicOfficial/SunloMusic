@@ -1,6 +1,6 @@
 import asyncio, time, base64
 from pyrogram import filters, enums
-from SunloMusic.bot import bot, ensure_assistant_in_chat # ✅ Import kiya
+from SunloMusic.bot import bot, ensure_assistant_in_chat
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import admin_only, catch_errors
@@ -32,10 +32,14 @@ async def play_cmd(_, m):
 
     status = await m.reply_text("🔎 <b>Checking Assistant...</b>")
     
-    # ✅ CHECK KARO ASSISTANT GROUP ME HAI YA NAHI
     is_assistant_ready = await ensure_assistant_in_chat(m.chat.id)
     if not is_assistant_ready:
-        return await status.edit_text("❌ <b>Assistant could not join the group!</b>\nMake sure the Bot is Admin with 'Invite Users' permission.")
+        return await status.edit_text(
+            "❌ <b>Assistant could not join the group!</b>\n\n"
+            "Please make sure:\n"
+            "1. The Bot is Admin with <b>'Invite Users'</b> permission.\n"
+            "2. Group is not restricted."
+        )
         
     video = "vplay" in m.command[0].lower()
     
