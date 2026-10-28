@@ -124,7 +124,19 @@ async def start_next_song(chat_id, q):
             if call: await call.leave_call(chat_id)
         except Exception: pass
         clear_queue(chat_id)
-        await bot_module.bot.send_message(chat_id, "⏹ <b>Queue khatam. Assistant ne VC leave kar diya.</b>")
+        
+        # ✅ Premium "Ghosted" Message (Option 26)
+        ghost_text = (
+            f"👻 <b>G H O S T E D !</b> 👻\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"<i>The queue vanished into thin air...</i>\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📭 <b>STATUS:</b> <code>EMPTY</code>\n"
+            f"🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"<blockquote>Boo! Hope you enjoyed the vibes. 👻</blockquote>"
+        )
+        await bot_module.bot.send_message(chat_id, ghost_text)
 
 async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue
@@ -159,9 +171,7 @@ async def start_call():
 async def play_stream(chat_id: int, url: str, video: bool = False):
     if not call: return False
     
-    # ✅ Smart Check: Agar API ne video ke liye .m4a diya hai, toh audio mode me switch karo
     if video and (url.endswith('.m4a') or url.endswith('.mp3')):
-        LOGGER.warning("⚠️ API returned audio for Video request. Switching to Audio mode.")
         video = False
         
     LOGGER.info(f"🎵 Streaming: {url[:80]}... in {chat_id} (Video: {video})")
