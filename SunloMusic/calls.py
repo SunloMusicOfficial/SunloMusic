@@ -1,4 +1,5 @@
 import asyncio, time, base64, os
+from pyrogram import enums
 from pytgcalls import PyTgCalls, filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
 from pytgcalls.exceptions import NoActiveGroupCall
@@ -12,11 +13,32 @@ from SunloMusic.ytdlp import extract_audio
 
 call = None
 AUTO_DJ_CHATS = set()
+EMPTY_VC_TIMERS = {}
 
 def cleanup_file(url: str):
     if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a')):
         try: os.remove(url)
         except: pass
+
+async def check_empty_vc(chat_id):
+    try:
+        members = await bot_module.bot.get_chat_members(chat_id, filter=enums.ChatMembersFilter.VOICE_CHAT)
+        # Exclude Bot and Assistant
+        humans = [m for m in members if not m.user.is_bot]
+        if len(humans) == 0:
+            if chat_id not in EMPTY_VC_TIMERS:
+                EMPTY_VC_TIMERS[chat_id] = time.time()
+            elif time.time() - EMPTY_VC_TIMERS[chat_id] > 180: # 3 mins
+                await bot_module.bot.send_message(chat_id, "💤 <b>No humans in VC for 3 minutes. Leaving to save resources...</b>")
+                await stop_stream(chat_id)
+                from SunloMusic.queues import clear_queue
+                clear_queue(chat_id)
+                if chat_id in EMPTY_VC_TIMERS: del EMPTY_VC_TIMERS[chat_id]
+                return True
+        else:
+            if chat_id in EMPTY_VC_TIMERS: del EMPTY_VC_TIMERS[chat_id]
+    except: pass
+    return False
 
 async def update_live_timer(chat_id, msg_id):
     from SunloMusic.queues import get_queue
@@ -25,6 +47,9 @@ async def update_live_timer(chat_id, msg_id):
         q = get_queue(chat_id)
         if not q.now_playing or q.playing_message_id != msg_id: break
         if q.paused: continue
+        
+        if await check_empty_vc(chat_id): break # Auto leave
+        
         elapsed = int(time.time() - q.start_time - q.total_paused)
         if elapsed >= q.now_playing.duration and q.now_playing.duration > 0: break
         try:
@@ -63,8 +88,7 @@ async def start_next_song(chat_id, q):
         success = await play_stream(chat_id, nxt.url, nxt.video)
         if success:
             q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
-            # ✅ Custom Thumbnail Integration
-            thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
+            thumb = await generate_thumbnail(nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
             dur_str = format_duration(nxt.duration)
             b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"

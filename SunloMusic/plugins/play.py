@@ -1,6 +1,5 @@
 import asyncio, time, base64
 from pyrogram import filters, enums
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
@@ -23,17 +22,6 @@ async def play_cmd(_, m):
 
     if m.chat.type != enums.ChatType.SUPERGROUP:
         return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>")
-
-    # ✅ Force Subscribe Check
-    if config.UPDATES_CHANNEL and "t.me/" in config.UPDATES_CHANNEL:
-        try:
-            channel_username = config.UPDATES_CHANNEL.split("t.me/")[1].split("/")[0]
-            await assistant.get_chat_member(channel_username, m.from_user.id)
-        except Exception:
-            return await m.reply_text(
-                f"🚫 <b>You must join our channel to use this bot!</b>\n\n👉 <a href='{config.UPDATES_CHANNEL}'>Click Here to Join</a>",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Joined", callback_data="chk_sub")]])
-            )
 
     # Anti-Spam
     uid = m.from_user.id
@@ -71,8 +59,7 @@ async def play_cmd(_, m):
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
-        # ✅ Added chat_id to thumbnail
-        thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
+        thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         
@@ -95,8 +82,7 @@ async def play_cmd(_, m):
     
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-    # ✅ Added chat_id to thumbnail
-    thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
+    thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
     
@@ -109,8 +95,3 @@ async def play_cmd(_, m):
     q.playing_message_id = sent_msg.id
     if q.timer_task: q.timer_task.cancel()
     q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))
-
-@bot.on_callback_query(filters.regex("^chk_sub"))
-async def check_sub_cb(_, cq):
-    await cq.message.delete()
-    await cq.answer("✅ Please send your song again!", show_alert=True)
