@@ -8,8 +8,8 @@ users_col = db["users"]
 chats_col = db["chats"]
 sudo_col = db["sudoers"]
 playlists_col = db["playlists"]
+thumbs_col = db["thumbs"]
 
-# ✅ In-Memory Spam Control
 SPAM_DICT = {}
 
 async def add_user(user_id: int, name: str = ""):
@@ -38,14 +38,19 @@ async def get_all_chats() -> list:
     return [c["chat_id"] async for c in chats_col.find({}, {"chat_id": 1})]
 
 async def save_playlist(user_id: int, name: str, queue_data: list):
-    await playlists_col.update_one(
-        {"user_id": user_id, "name": name},
-        {"$set": {"queue": queue_data}},
-        upsert=True
-    )
+    await playlists_col.update_one({"user_id": user_id, "name": name}, {"$set": {"queue": queue_data}}, upsert=True)
 
 async def get_playlist(user_id: int, name: str) -> list:
     data = await playlists_col.find_one({"user_id": user_id, "name": name})
     return data["queue"] if data else None
 
-LOGGER.info("✅ MongoDB connected successfully")
+# ✅ Custom Thumbnails
+async def set_custom_thumb(chat_id: int, file_id: str):
+    await thumbs_col.update_one({"chat_id": chat_id}, {"$set": {"file_id": file_id}}, upsert=True)
+
+async def get_custom_thumb(chat_id: int) -> str:
+    data = await thumbs_col.find_one({"chat_id": chat_id})
+    return data["file_id"] if data else None
+
+async def del_custom_thumb(chat_id: int):
+    await thumbs_col.delete_one({"chat_id": chat_id})

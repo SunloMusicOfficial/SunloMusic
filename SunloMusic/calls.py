@@ -37,7 +37,7 @@ async def update_live_timer(chat_id, msg_id):
         except: pass
 
 async def start_next_song(chat_id, q):
-    from SunloMusic.queues import clear_queue
+    from SunloMusic.queues import clear_queue, Track
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.playing_message_id:
         try: await bot_module.bot.delete_messages(chat_id, q.playing_message_id)
@@ -47,13 +47,9 @@ async def start_next_song(chat_id, q):
 
     q.now_playing = None
     if not q.queue and chat_id in AUTO_DJ_CHATS:
-        LOGGER.info(f"🎧 Auto-DJ active for {chat_id}, fetching random song...")
         try:
-            # Simple Auto-DJ: Play a trending hindi song
             info = await extract_audio("trending hindi songs 2024")
-            if info:
-                from SunloMusic.queues import Track
-                q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
+            if info: q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
         except: pass
 
     if q.queue:
@@ -67,7 +63,8 @@ async def start_next_song(chat_id, q):
         success = await play_stream(chat_id, nxt.url, nxt.video)
         if success:
             q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
-            thumb = await generate_thumbnail(nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
+            # ✅ Custom Thumbnail Integration
+            thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
             dur_str = format_duration(nxt.duration)
             b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
@@ -117,7 +114,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     try:
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
         return True
-    except Exception as e: return False
+    except: return False
 
 async def pause_stream(chat_id: int):
     if call: await call.pause(chat_id)

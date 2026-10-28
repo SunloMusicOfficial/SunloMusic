@@ -9,3 +9,4 @@ Pillow
 pyfiglet
 pytz
 tgcrypto
+shazamio
