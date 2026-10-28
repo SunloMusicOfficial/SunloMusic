@@ -4,7 +4,7 @@ from SunloMusic.bot import bot, ensure_assistant_in_chat
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import admin_only, catch_errors
-from SunloMusic.database import add_user
+from SunloMusic.database import add_user, SPAM_DICT
 from SunloMusic.queues import get_queue, Track
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
@@ -23,7 +23,21 @@ async def play_cmd(_, m):
     if m.chat.type != enums.ChatType.SUPERGROUP:
         return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>")
 
-    await add_user(m.from_user.id, m.from_user.first_name)
+    # ✅ Anti-Spam Logic
+    uid = m.from_user.id
+    now = time.time()
+    if uid in SPAM_DICT:
+        count, last_time = SPAM_DICT[uid]
+        if now - last_time < 60:
+            if count >= 3:
+                return await m.reply_text("⚠️ <b>Spam Detected! Please wait a minute before playing again.</b>")
+            SPAM_DICT[uid] = (count + 1, now)
+        else:
+            SPAM_DICT[uid] = (1, now)
+    else:
+        SPAM_DICT[uid] = (1, now)
+
+    await add_user(uid, m.from_user.first_name)
     query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
     if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
     
@@ -34,24 +48,13 @@ async def play_cmd(_, m):
     
     is_assistant_ready = await ensure_assistant_in_chat(m.chat.id)
     if not is_assistant_ready:
-        return await status.edit_text(
-            "❌ <b>Assistant could not join the group!</b>\n\n"
-            "Please make sure:\n"
-            "1. The Bot is Admin with <b>'Invite Users'</b> permission.\n"
-            "2. Group is not restricted."
-        )
+        return await status.edit_text("❌ <b>Assistant could not join the group!</b>\nMake sure Bot is Admin with 'Invite Users'.")
         
     video = "vplay" in m.command[0].lower()
-    
-    if video:
-        await status.edit_text("🎬 <b>Downloading Video, please wait...</b>")
-    else:
-        await status.edit_text("⏳ <b>Wait a sec, getting the beats...</b>")
+    await status.edit_text("🎬 <b>Downloading...</b>" if video else "⏳ <b>Wait a sec, getting the beats...</b>")
         
     info = await extract_audio(query, video=video)
-    
-    if not info:
-        return await status.edit_text("❌ <b>Failed to fetch media. Try another song.</b>")
+    if not info: return await status.edit_text("❌ <b>Failed to fetch media.</b>")
     
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -87,13 +90,13 @@ async def play_cmd(_, m):
     await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
     
-    if not success:
-        return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active.")
+    if not success: return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active.")
         
     q.now_playing = track
     q.start_time = time.time()
     q.total_paused = 0
     q.paused = False
+    q.votes = set()
     
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"

@@ -7,6 +7,10 @@ db = client["SunloMusic"]
 users_col = db["users"]
 chats_col = db["chats"]
 sudo_col = db["sudoers"]
+playlists_col = db["playlists"]
+
+# ✅ In-Memory Spam Control
+SPAM_DICT = {}
 
 async def add_user(user_id: int, name: str = ""):
     await users_col.update_one({"user_id": user_id}, {"$setOnInsert": {"user_id": user_id, "name": name}}, upsert=True)
@@ -32,5 +36,16 @@ async def get_stats() -> dict:
 
 async def get_all_chats() -> list:
     return [c["chat_id"] async for c in chats_col.find({}, {"chat_id": 1})]
+
+async def save_playlist(user_id: int, name: str, queue_data: list):
+    await playlists_col.update_one(
+        {"user_id": user_id, "name": name},
+        {"$set": {"queue": queue_data}},
+        upsert=True
+    )
+
+async def get_playlist(user_id: int, name: str) -> list:
+    data = await playlists_col.find_one({"user_id": user_id, "name": name})
+    return data["queue"] if data else None
 
 LOGGER.info("✅ MongoDB connected successfully")

@@ -1,9 +1,5 @@
-import asyncio
-import time
-import base64
-import os
-from pytgcalls import PyTgCalls
-from pytgcalls import filters as fl
+import asyncio, time, base64, os
+from pytgcalls import PyTgCalls, filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
 from pytgcalls.exceptions import NoActiveGroupCall
 import SunloMusic.bot as bot_module
@@ -12,8 +8,10 @@ from SunloMusic.config import config
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard
+from SunloMusic.ytdlp import extract_audio
 
 call = None
+AUTO_DJ_CHATS = set()
 
 def cleanup_file(url: str):
     if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a')):
@@ -25,36 +23,18 @@ async def update_live_timer(chat_id, msg_id):
     while True:
         await asyncio.sleep(5)
         q = get_queue(chat_id)
-        if not q.now_playing or q.playing_message_id != msg_id:
-            break
+        if not q.now_playing or q.playing_message_id != msg_id: break
         if q.paused: continue
-            
         elapsed = int(time.time() - q.start_time - q.total_paused)
-        if elapsed >= q.now_playing.duration and q.now_playing.duration > 0:
-            break
-            
+        if elapsed >= q.now_playing.duration and q.now_playing.duration > 0: break
         try:
             dur_str = format_duration(q.now_playing.duration)
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-            
-            caption = (
-                f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
-                f"━━━━━━━━━━━━━\n"
-                f"🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n"
-                f"━━━━━━━━━━━━━\n"
-                f"⏱ Duration: {dur_str}\n"
-                f"━━━━━━━━━━━━━\n"
-                f"🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n"
-                f"━━━━━━━━━━━━━"
-            )
-            
-            try:
-                await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
-            except:
-                await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed))
-        except Exception:
-            pass
+            caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n━━━━━━━━━━━━━"
+            try: await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
+            except: await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed))
+        except: pass
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import clear_queue
@@ -63,14 +43,22 @@ async def start_next_song(chat_id, q):
         try: await bot_module.bot.delete_messages(chat_id, q.playing_message_id)
         except: pass
         q.playing_message_id = 0
-
     if q.now_playing: cleanup_file(q.now_playing.url)
 
     q.now_playing = None
+    if not q.queue and chat_id in AUTO_DJ_CHATS:
+        LOGGER.info(f"🎧 Auto-DJ active for {chat_id}, fetching random song...")
+        try:
+            # Simple Auto-DJ: Play a trending hindi song
+            info = await extract_audio("trending hindi songs 2024")
+            if info:
+                from SunloMusic.queues import Track
+                q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
+        except: pass
+
     if q.queue:
         nxt = q.queue.pop(0)
         q.now_playing = nxt
-        
         if nxt.message_id:
             try: await bot_module.bot.delete_messages(chat_id, nxt.message_id)
             except: pass
@@ -78,64 +66,35 @@ async def start_next_song(chat_id, q):
 
         success = await play_stream(chat_id, nxt.url, nxt.video)
         if success:
-            q.start_time = time.time()
-            q.total_paused = 0
-            q.paused = False
-            q.votes = set() # Reset votes for new song
-            
+            q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
             thumb = await generate_thumbnail(nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
             dur_str = format_duration(nxt.duration)
             b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-            
-            caption = (
-                f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
-                f"━━━━━━━━━━━━━\n"
-                f"🎵 <a href='{title_link}'>{nxt.title}</a>\n"
-                f"━━━━━━━━━━━━━\n"
-                f"⏱ Duration: {dur_str}\n"
-                f"━━━━━━━━━━━━━\n"
-                f"🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n"
-                f"━━━━━━━━━━━━━"
-            )
-            
+            caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
             if thumb: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
             else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0))
-                
             q.playing_message_id = sent_msg.id
             q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         else:
-            await bot_module.bot.send_message(chat_id, "❌ <b>Failed to play next song. Skipping...</b>")
             await start_next_song(chat_id, q)
     else:
         try:
             if call: await call.leave_call(chat_id)
         except: pass
         clear_queue(chat_id)
-        ghost_text = (
-            f"👻 <b>G H O S T E D !</b> 👻\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"<i>The queue vanished into thin air...</i>\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"📭 <b>STATUS:</b> <code>EMPTY</code>\n"
-            f"🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"<blockquote>Boo! Hope you enjoyed the vibes. 👻</blockquote>"
-        )
+        ghost_text = f"👻 <b>G H O S T E D !</b> 👻\n━━━━━━━━━━━━━━━━━━━\n<i>The queue vanished into thin air...</i>\n━━━━━━━━━━━━━━━━━━━\n📭 <b>STATUS:</b> <code>EMPTY</code>\n🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n━━━━━━━━━━━━━━━━━━━\n<blockquote>Boo! Hope you enjoyed the vibes. 👻</blockquote>"
         await bot_module.bot.send_message(chat_id, ghost_text)
 
 async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
-    
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         q.start_time = time.time(); q.total_paused = 0; q.paused = False
         return
-    if q.loop == 2 and q.now_playing:
-        q.queue.append(q.now_playing)
-        
+    if q.loop == 2 and q.now_playing: q.queue.append(q.now_playing)
     await start_next_song(chat_id, q)
 
 def init_calls():
@@ -151,26 +110,14 @@ async def start_call():
 
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
     if not call: return False
-    
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
-    LOGGER.info(f"🎵 Streaming: {url[:80]}... (Video: {video}, Effect: {effect})")
-    
-    ffmpeg_args = None
-    if effect == "bass": ffmpeg_args = "-af bass=g=10"
-    elif effect == "8d": ffmpeg_args = "-af apulsator=hz=0.1"
-    elif effect == "nightcore": ffmpeg_args = "-af atempo=1.25,asetrate=44100*1.25"
-    
-    if video:
-        stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
-    else:
-        stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
-        
+    ffmpeg_args = "-af bass=g=10" if effect == "bass" else "-af apulsator=hz=0.1" if effect == "8d" else "-af atempo=1.25,asetrate=44100*1.25" if effect == "nightcore" else None
+    if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
+    else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
     try:
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
         return True
-    except Exception as e:
-        LOGGER.error(f"❌ PyTgCalls Error: {type(e).__name__} - {e}")
-        return False
+    except Exception as e: return False
 
 async def pause_stream(chat_id: int):
     if call: await call.pause(chat_id)
