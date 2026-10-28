@@ -59,37 +59,40 @@ async def ensure_assistant_in_chat(chat_id: int) -> bool:
             except UserAlreadyParticipant:
                 ASSISTANT_CHATS.add(chat_id)
                 return True
-            except Exception as e:
-                LOGGER.warning(f"⚠️ Public join failed: {e}")
+            except Exception:
+                pass
     except: pass
 
-    # 3. Try Primary Invite Link (export_chat_invite_link - Most Reliable)
+    # 3. Try Invite Link + Auto-Approve (Fixes the manual approval issue)
     try:
         link = await bot.export_chat_invite_link(chat_id)
-        await asyncio.sleep(2) # Delay for Telegram to process the link
+        await asyncio.sleep(1)
         try:
             await assistant.join_chat(link)
-            ASSISTANT_CHATS.add(chat_id)
-            LOGGER.info(f"✅ Assistant joined via primary invite link")
-            return True
-        except InviteHashExpired:
-            LOGGER.warning("⚠️ Primary link expired, trying fresh link...")
-    except: pass
-
-    # 4. Try Fresh Invite Link (No member limit, No expiry)
-    try:
-        invite = await bot.create_chat_invite_link(chat_id, name="Auto Join", member_limit=0)
-        await asyncio.sleep(2) # Crucial delay
+        except Exception as e:
+            # Sometimes join_chat throws error if request is pending
+            LOGGER.info(f"Join attempt: {e}")
+            
+        await asyncio.sleep(2) # Wait for Telegram to process
+        
+        # Check if joined
         try:
-            await assistant.join_chat(invite.invite_link)
+            await assistant.get_chat_member(chat_id, "me")
             ASSISTANT_CHATS.add(chat_id)
-            LOGGER.info(f"✅ Assistant joined via fresh invite link")
+            LOGGER.info(f"✅ Assistant joined via invite link")
             return True
-        except InviteHashExpired:
-            LOGGER.error("❌ Fresh link also expired. Telegram might be blocking the join.")
-            try: await bot.revoke_chat_invite_link(chat_id, invite.invite_link)
-            except: pass
+        except:
+            # ✅ If still not joined, Bot auto-approves the join request!
+            LOGGER.info("📝 Assistant join request pending. Bot auto-approving...")
+            try:
+                me_ass = await assistant.get_me()
+                await bot.approve_chat_join_request(chat_id, me_ass.id)
+                LOGGER.info("✅ Bot auto-approved Assistant's request!")
+                ASSISTANT_CHATS.add(chat_id)
+                return True
+            except Exception as approve_err:
+                LOGGER.error(f"❌ Auto-approve failed: {approve_err}. Make sure Bot has 'Add Users' permission.")
     except Exception as e:
-        LOGGER.error(f"❌ Could not create invite link: {e} (Check Bot Admin Rights)")
+        LOGGER.error(f"❌ Could not create invite link: {e}")
 
     return False
