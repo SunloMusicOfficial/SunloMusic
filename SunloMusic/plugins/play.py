@@ -23,13 +23,13 @@ async def play_cmd(_, m):
     if m.chat.type != enums.ChatType.SUPERGROUP:
         return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>")
 
-    # Anti-Spam
     uid = m.from_user.id
     now = time.time()
+    # ✅ Increased spam limit to 5
     if uid in SPAM_DICT:
         count, last_time = SPAM_DICT[uid]
         if now - last_time < 60:
-            if count >= 3: return await m.reply_text("⚠️ <b>Spam Detected! Please wait.</b>")
+            if count >= 5: return await m.reply_text("⚠️ <b>Spam Detected! Please wait a minute.</b>")
             SPAM_DICT[uid] = (count + 1, now)
         else: SPAM_DICT[uid] = (1, now)
     else: SPAM_DICT[uid] = (1, now)
@@ -45,10 +45,11 @@ async def play_cmd(_, m):
         return await status.edit_text("❌ <b>Assistant could not join the group!</b>\nMake sure Bot is Admin with 'Invite Users'.")
         
     video = "vplay" in m.command[0].lower()
-    await status.edit_text("🎬 <b>Downloading...</b>" if video else "⏳ <b>Wait a sec, getting the beats...</b>")
+    await status.edit_text("🎬 <b>Downloading Video...</b>" if video else "⏳ <b>Wait a sec, getting the beats...</b>")
         
     info = await extract_audio(query, video=video)
-    if not info: return await status.edit_text("❌ <b>Failed to fetch media.</b>")
+    if not info: 
+        return await status.edit_text("❌ <b>Failed to fetch media.</b>\n<i>The API might be down or the song is not available.</i>")
     
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -62,9 +63,7 @@ async def play_cmd(_, m):
         thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-        
         caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
-        
         if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
         else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
         track.message_id = sent_msg.id
@@ -72,7 +71,8 @@ async def play_cmd(_, m):
     
     await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
     success = await play_stream(m.chat.id, track.url, track.video)
-    if not success: return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active.")
+    if not success: 
+        return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active & Assistant is in group.")
         
     q.now_playing = track
     q.start_time = time.time()
