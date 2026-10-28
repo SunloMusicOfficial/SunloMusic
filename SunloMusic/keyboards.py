@@ -11,7 +11,8 @@ def start_keyboard() -> InlineKeyboardMarkup:
 def help_main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🎵 Music", callback_data="help_music"), InlineKeyboardButton("⏯ Controls", callback_data="help_controls")],
-        [InlineKeyboardButton("🛡 Admin", callback_data="help_admin")],
+        [InlineKeyboardButton("🎛 Effects", callback_data="help_effects"), InlineKeyboardButton("🛡 Admin", callback_data="help_admin")],
+        [InlineKeyboardButton("📜 All Commands", callback_data="all_commands")],
         [InlineKeyboardButton("🔙 Back to Start", callback_data="back_start")]
     ])
 
@@ -22,23 +23,14 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
     
-    # Progress bar
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "━" * 8
     timer_btn = InlineKeyboardButton(f"{elapsed_str} 🎵 {bar} {dur_str}", callback_data="cb_timer")
     
-    # ✅ Small Caps + Colored Emojis
     pause_text = "▶️ ʀᴇsᴜᴍᴇ" if q.paused else "⏸️ ᴘᴀᴜsᴇ"
     pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause")
     skip_btn = InlineKeyboardButton("⏭️ sᴋɪᴘ", callback_data="cb_skip")
     
-    # ✅ LOOP text in Small Caps
-    if q.loop == 0:
-        loop_text = "🔁 ʟᴏᴏᴘ ᴏғғ"
-    elif q.loop == 1:
-        loop_text = "🔂 ʟᴏᴏᴘ ᴏɴᴇ"
-    else:
-        loop_text = "🔁 ʟᴏᴏᴘ ᴀʟʟ"
-        
+    loop_text = "🔁 ʟᴏᴏᴘ ᴏғғ" if q.loop == 0 else ("🔂 ʟᴏᴏᴘ ᴏɴᴇ" if q.loop == 1 else "🔁 ʟᴏᴏᴘ ᴀʟʟ")
     loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop")
     stop_btn = InlineKeyboardButton("⏹️ sᴛᴏᴘ", callback_data="cb_stop")
     more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more")
