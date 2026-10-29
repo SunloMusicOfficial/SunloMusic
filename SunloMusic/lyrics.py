@@ -1,13 +1,31 @@
 import aiohttp
 import re
+import yt_dlp
 from urllib.parse import quote
 from SunloMusic.logger import LOGGER
 
+def _get_real_title(query):
+    """Uses yt-dlp to find the exact song title if the query is short"""
+    try:
+        ydl_opts = {"quiet": True, "noplaylist": True, "extract_flat": True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query} song lyrics", download=False)
+            if info and "entries" in info and len(info["entries"]) > 0:
+                return info["entries"][0].get("title", query)
+    except Exception as e:
+        LOGGER.error(f"yt-dlp lyrics search error: {e}")
+    return query
+
 async def fetch_lyrics_text(query: str) -> str | None:
-    # Clean title perfectly
-    clean_query = query.split("(")[0].split("|")[0].split("[")[0].replace("Lyrics", "").replace("Audio", "").replace("Official", "").replace("Full Song", "").strip()
+    # ✅ 1. Agar query choti hai, toh pehle asli gaane ka naam dhoondho
+    real_title = query
+    if len(query.split()) <= 3:
+        real_title = _get_real_title(query)
     
-    # ✅ Smart Logic: Split Artist and Title
+    # Clean title
+    clean_query = real_title.split("(")[0].split("|")[0].split("[")[0].replace("Lyrics", "").replace("Audio", "").replace("Official", "").strip()
+    
+    # ✅ 2. Smart Logic: Split Artist and Title
     artist, title = "", clean_query
     if " - " in clean_query:
         parts = clean_query.split(" - ")
@@ -18,13 +36,12 @@ async def fetch_lyrics_text(query: str) -> str | None:
         title = parts[0].strip()
         artist = parts[1].strip()
         
-    # Clean artist name (remove &, ft., etc.)
-    clean_artist = re.split(r'&|,|ft\.|feat\.', artist)[0].strip()
+    clean_artist = re.split(r'&|,|ft\.|feat\.|X|x', artist)[0].strip()
     LOGGER.info(f"🔎 Searching lyrics for Title: '{title}', Artist: '{clean_artist}'")
     
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-    # ✅ 1. Lyrics.ovh API (Best for Bollywood & Pop)
+    # ✅ 3. Lyrics.ovh API (Best for Bollywood & Pop)
     if clean_artist and title:
         try:
             url = f"https://api.lyrics.ovh/v1/{quote(clean_artist)}/{quote(title)}"
@@ -35,10 +52,9 @@ async def fetch_lyrics_text(query: str) -> str | None:
                         if "lyrics" in data and data["lyrics"]:
                             LOGGER.info("✅ Found on Lyrics.ovh")
                             return f"🎤 <b>{title} - {clean_artist}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
-        except Exception as e:
-            LOGGER.error(f"Lyrics.ovh failed: {e}")
+        except: pass
 
-    # ✅ 2. Lyrist API (Fallback)
+    # ✅ 4. Lyrist API (Fuzzy match)
     try:
         encoded = quote(clean_query)
         async with aiohttp.ClientSession(headers=headers) as s:
@@ -47,38 +63,21 @@ async def fetch_lyrics_text(query: str) -> str | None:
                     data = await r.json()
                     if "lyrics" in data and data["lyrics"]:
                         LOGGER.info("✅ Found on Lyrist")
-                        return f"🎤 <b>{data.get('title', clean_query)} - {data.get('artist', '')}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
-    except Exception as e:
-        LOGGER.error(f"Lyrist failed: {e}")
+                        return f"🎤 <b>{data.get('title', title)} - {data.get('artist', artist)}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
+    except: pass
 
-    # ✅ 3. Some-Random-API (Fallback)
+    # ✅ 5. Popcat API (Fallback)
     try:
         encoded = quote(clean_query)
         async with aiohttp.ClientSession(headers=headers) as s:
-            async with s.get(f"https://some-random-api.com/lyrics?title={encoded}", timeout=10) as r:
+            async with s.get(f"https://api.popcat.xyz/lyrics?song={encoded}", timeout=10) as r:
                 if r.status == 200:
                     data = await r.json()
                     if "lyrics" in data and data["lyrics"]:
-                        LOGGER.info("✅ Found on Some-Random")
-                        return f"🎤 <b>{data.get('title', clean_query)}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
-    except Exception as e:
-        LOGGER.error(f"Some-Random failed: {e}")
+                        LOGGER.info("✅ Found on Popcat")
+                        return f"🎤 <b>{data.get('title', title)}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
+    except: pass
 
-    # ✅ 4. Textyl API (Fallback)
-    try:
-        encoded = quote(clean_query)
-        async with aiohttp.ClientSession(headers=headers) as s:
-            async with s.get(f"https://api.textyl.co/api/lyrics?q={encoded}", timeout=10) as r:
-                if r.status == 200:
-                    data = await r.json()
-                    if isinstance(data, list) and len(data) > 0:
-                        full_lyrics = "\n".join([item.get("lyrics", "") for item in data if "lyrics" in item])
-                        if full_lyrics:
-                            LOGGER.info("✅ Found on Textyl")
-                            return f"🎤 <b>{clean_query}</b>\n━━━━━━━━━━━━━\n<blockquote>{full_lyrics[:4000]}</blockquote>"
-    except Exception as e:
-        LOGGER.error(f"Textyl failed: {e}")
-    
     LOGGER.error(f"❌ Lyrics not found for {clean_query}")
     return None
 
