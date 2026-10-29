@@ -1,4 +1,4 @@
-import asyncio, time, base64, os
+import asyncio, time, base64, os, random
 from pyrogram import enums
 from pyrogram.types import LinkPreviewOptions
 from pyrogram.errors import FloodWait
@@ -11,11 +11,10 @@ from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio
-from SunloMusic.queues import KARAOKE_CHATS
+from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
 from SunloMusic.lyrics import start_live_karaoke
 
 call = None
-AUTO_DJ_CHATS = set()
 EMPTY_VC_TIMERS = {}
 
 def cleanup_file(url: str):
@@ -84,11 +83,18 @@ async def start_next_song(chat_id, q):
     if q.now_playing: cleanup_file(q.now_playing.url)
 
     q.now_playing = None
+    
+    # ✅ Auto-DJ Logic with Randomization
     if not q.queue and chat_id in AUTO_DJ_CHATS:
         try:
-            info = await extract_audio("trending hindi songs 2024")
-            if info: q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
-        except: pass
+            queries = ["trending hindi songs 2024", "top bollywood hits", "arijit singh best songs", "lofi hindi chill", "punjabi top hits"]
+            random_query = random.choice(queries)
+            LOGGER.info(f"🎧 Auto-DJ fetching for query: {random_query}")
+            info = await extract_audio(random_query)
+            if info: 
+                q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
+        except Exception as e: 
+            LOGGER.error(f"Auto-DJ fetch error: {e}")
 
     if q.queue:
         nxt = q.queue.pop(0)
