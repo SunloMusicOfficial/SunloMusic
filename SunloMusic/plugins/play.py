@@ -1,5 +1,6 @@
 import asyncio, time, base64
 from pyrogram import filters, enums
+from pyrogram.types import LinkPreviewOptions
 from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
@@ -29,7 +30,7 @@ async def play_cmd(_, m):
     if uid in SPAM_DICT:
         count, last_time = SPAM_DICT[uid]
         if now - last_time < 60:
-            if count >= 5: return await m.reply_text("⚠️ <b>Spam Detected! Please wait a minute.</b>")
+            if count >= 5: return await m.reply_text("⚠️ <b>Spam Detected! Please wait.</b>")
             SPAM_DICT[uid] = (count + 1, now)
         else: SPAM_DICT[uid] = (1, now)
     else: SPAM_DICT[uid] = (1, now)
@@ -63,8 +64,9 @@ async def play_cmd(_, m):
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
+        
         if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
-        else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
+        else: sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=queue_add_keyboard(track_hash), link_preview_options=LinkPreviewOptions(is_disabled=True))
         track.message_id = sent_msg.id
         return
     
@@ -88,8 +90,9 @@ async def play_cmd(_, m):
         await status.delete()
         sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
     else:
-        # ✅ Removed disable_web_page_preview
-        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q, 0))
+        # ✅ Fixed Link Preview
+        await status.delete()
+        sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
         
     q.playing_message_id = sent_msg.id
     if q.timer_task: q.timer_task.cancel()

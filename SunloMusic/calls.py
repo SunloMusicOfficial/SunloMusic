@@ -1,5 +1,6 @@
 import asyncio, time, base64, os
 from pyrogram import enums
+from pyrogram.types import LinkPreviewOptions
 from pytgcalls import PyTgCalls, filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
 from pytgcalls.exceptions import NoActiveGroupCall
@@ -25,8 +26,7 @@ async def check_empty_vc(chat_id):
         members = await bot_module.bot.get_chat_members(chat_id, filter=enums.ChatMembersFilter.VOICE_CHAT)
         humans = [m for m in members if not m.user.is_bot]
         if len(humans) == 0:
-            if chat_id not in EMPTY_VC_TIMERS:
-                EMPTY_VC_TIMERS[chat_id] = time.time()
+            if chat_id not in EMPTY_VC_TIMERS: EMPTY_VC_TIMERS[chat_id] = time.time()
             elif time.time() - EMPTY_VC_TIMERS[chat_id] > 180:
                 await bot_module.bot.send_message(chat_id, "💤 <b>No humans in VC for 3 minutes. Leaving...</b>")
                 await stop_stream(chat_id)
@@ -59,12 +59,9 @@ async def update_live_timer(chat_id, msg_id):
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n━━━━━━━━━━━━━"
-            
-            # ✅ Removed disable_web_page_preview here too
             try: await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
-            except: await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed))
-        except Exception as e: 
-            LOGGER.error(f"Timer edit error: {e}")
+            except: await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed), link_preview_options=LinkPreviewOptions(is_disabled=True))
+        except: pass
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import clear_queue, Track
@@ -101,8 +98,7 @@ async def start_next_song(chat_id, q):
             caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
             
             if thumb: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-            else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0))
-            
+            else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
             q.playing_message_id = sent_msg.id
             q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         else:
@@ -146,9 +142,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     try:
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
         return True
-    except Exception as e:
-        LOGGER.error(f"Play error: {e}")
-        return False
+    except: return False
 
 async def pause_stream(chat_id: int):
     if call: await call.pause(chat_id)
