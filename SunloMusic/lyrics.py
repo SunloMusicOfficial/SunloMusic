@@ -12,7 +12,7 @@ async def _api_get(url, headers, timeout=10):
                 if r.status == 200:
                     return await r.json()
     except Exception as e:
-        LOGGER.error(f"Lyrics API Error ({url}): {e}")
+        LOGGER.error(f"Lyrics API Error: {e}")
     return None
 
 async def fetch_lyrics_text(query: str) -> str | None:
@@ -27,12 +27,10 @@ async def fetch_lyrics_text(query: str) -> str | None:
         clean_artist = re.split(r'&|,|ft\.|feat\.|X|x', artist)[0].strip()
         headers = {"User-Agent": "Mozilla/5.0"}
 
-        # 1. Lyrics.ovh
         if clean_artist and title:
             data = await _api_get(f"https://api.lyrics.ovh/v1/{quote(clean_artist)}/{quote(title)}", headers)
             if data and "lyrics" in data and data["lyrics"]: return data["lyrics"]
 
-        # 2. Lyrist
         encoded = quote(clean_query)
         data = await _api_get(f"https://lyrist.vercel.app/api/{encoded}", headers)
         if data and "lyrics" in data and data["lyrics"]: return data["lyrics"]
@@ -43,8 +41,6 @@ async def fetch_lyrics_text(query: str) -> str | None:
         return None
 
 async def start_live_karaoke(bot, chat_id, title, duration, q):
-    # ✅ Removed q.karaoke_task.cancel() to fix the deadlock
-    
     msg = await bot.send_message(chat_id, f"🎤 <b>Fetching live lyrics for:</b> <i>{title}</i>...")
     
     try:
@@ -63,22 +59,42 @@ async def start_live_karaoke(bot, chat_id, title, duration, q):
         delay = (duration / total_lines) if duration > 0 else 4.0
         delay = max(3.0, min(delay, 6.0))
 
-        # ✅ First line
-        await msg.edit_text(f"🎤 <b>Live Karaoke</b>\n\n<blockquote>{lines[0]}</blockquote>")
+        header = "🎤 <b>Live Karaoke</b>\n\n<blockquote>"
+        accumulated = lines[0]
+        
+        # ✅ Send first line
+        await msg.edit_text(f"{header}{accumulated}</blockquote>")
         q.karaoke_msg_id = msg.id
 
         for i in range(1, len(lines)):
             if not q.now_playing or q.now_playing.title != title or q.paused:
                 break
+            
             await asyncio.sleep(delay)
-            text = f"🎤 <b>Live Karaoke</b>\n\n<blockquote>{lines[i]}</blockquote>"
-            try: await msg.edit_text(text)
-            except: pass
+            
+            next_line = lines[i]
+            
+            # ✅ Telegram limit check (4096 chars)
+            if len(accumulated) + len(next_line) + len(header) > 4000:
+                # Finalize current message
+                try: await msg.edit_text(f"{header}{accumulated}</blockquote>")
+                except: pass
+                
+                # Start new message
+                accumulated = next_line
+                msg = await bot.send_message(chat_id, f"{header}{accumulated}</blockquote>")
+                q.karaoke_msg_id = msg.id
+            else:
+                # ✅ Append line
+                accumulated += f"\n{next_line}"
+                try:
+                    await msg.edit_text(f"{header}{accumulated}</blockquote>")
+                except Exception:
+                    pass
 
     except asyncio.TimeoutError:
         await msg.edit_text("❌ <b>Karaoke Error:</b> Timed out while fetching lyrics.")
     except asyncio.CancelledError:
-        try: await msg.delete()
-        except: pass
+        pass
     except Exception as e:
         await msg.edit_text(f"❌ <b>Karaoke Error:</b> <code>{e}</code>")
