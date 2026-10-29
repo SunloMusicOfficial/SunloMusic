@@ -17,8 +17,7 @@ def _get_real_title(query):
 
 async def fetch_lyrics_text(query: str) -> str | None:
     real_title = query
-    if len(query.split()) <= 3:
-        real_title = _get_real_title(query)
+    if len(query.split()) <= 3: real_title = _get_real_title(query)
     
     clean_query = real_title.split("(")[0].split("|")[0].split("[")[0].replace("Lyrics", "").replace("Audio", "").replace("Official", "").strip()
     
@@ -40,7 +39,7 @@ async def fetch_lyrics_text(query: str) -> str | None:
                     if r.status == 200:
                         data = await r.json()
                         if "lyrics" in data and data["lyrics"]: return data["lyrics"]
-        except: pass
+        except Exception as e: LOGGER.error(f"Lyrics.ovh error: {e}")
 
     # Lyrist
     try:
@@ -50,44 +49,47 @@ async def fetch_lyrics_text(query: str) -> str | None:
                 if r.status == 200:
                     data = await r.json()
                     if "lyrics" in data and data["lyrics"]: return data["lyrics"]
-    except: pass
+    except Exception as e: LOGGER.error(f"Lyrist error: {e}")
 
     return None
 
-# ✅ LIVE KARAOKE ENGINE
 async def start_live_karaoke(bot, chat_id, title, duration, q):
-    if q.karaoke_task: q.karaoke_task.cancel()
-    
-    lyrics = await fetch_lyrics_text(title)
-    if not lyrics:
-        return
-    
-    # Split into lines and remove empty ones
-    lines = [line.strip() for line in lyrics.split('\n') if line.strip()]
-    if not lines: return
-    
-    # Calculate delay (duration / total_lines)
-    # We add a small buffer so it doesn't finish too early
-    total_lines = len(lines)
-    delay = (duration / total_lines) if duration > 0 else 4.0
-    delay = max(3.0, min(delay, 6.0)) # Keep between 3 to 6 seconds to avoid Telegram flood limits
-    
-    msg = await bot.send_message(chat_id, f"🎤 <b>Live Karaoke: {title}</b>\n\n<blockquote>🎵 ...</blockquote>")
-    q.karaoke_msg_id = msg.id
-    
     try:
-        for line in lines:
+        if q.karaoke_task:
+            q.karaoke_task.cancel()
+            q.karaoke_task = None
+
+        lyrics = await fetch_lyrics_text(title)
+
+        # ✅ Agar lyrics nahi mile toh chat me batao
+        if not lyrics:
+            await bot.send_message(chat_id, f"🎤 <b>Karaoke:</b> Lyrics not found for <i>{title}</i> in database.")
+            return
+
+        lines = [line.strip() for line in lyrics.split('\n') if line.strip()]
+        if not lines: return
+
+        total_lines = len(lines)
+        delay = (duration / total_lines) if duration > 0 else 5.0
+        delay = max(4.0, min(delay, 8.0)) # 4 se 8 second ka gap
+
+        # ✅ Pehli line turant bhejo
+        msg = await bot.send_message(chat_id, f"🎤 <b>Live Karaoke</b>\n\n<blockquote>{lines[0]}</blockquote>")
+        q.karaoke_msg_id = msg.id
+
+        for i in range(1, len(lines)):
             if not q.now_playing or q.now_playing.title != title or q.paused:
                 break
-            
-            text = f"🎤 <b>Live Karaoke</b>\n\n<blockquote>{line}</blockquote>"
-            try:
-                await bot.edit_message_text(chat_id, msg.id, text)
-            except: pass
-            
+
             await asyncio.sleep(delay)
+
+            text = f"🎤 <b>Live Karaoke</b>\n\n<blockquote>{lines[i]}</blockquote>"
+            try: await bot.edit_message_text(chat_id, msg.id, text)
+            except: pass
+
     except asyncio.CancelledError:
         pass
-    finally:
-        try: await bot.delete_message(chat_id, msg.id)
+    except Exception as e:
+        LOGGER.error(f"Karaoke error: {e}")
+        try: await bot.send_message(chat_id, f"❌ <b>Karaoke Error:</b> <code>{e}</code>")
         except: pass

@@ -17,7 +17,6 @@ async def karaoke_cmd(_, m):
         q = get_queue(m.chat.id)
         if q.now_playing:
             await m.reply_text("🎤 <b>Karaoke Mode ON!</b>\nStarting live lyrics for the current song...")
-            # ✅ Fixed: Now using start_live_karaoke with correct arguments
             q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, q.now_playing.title, q.now_playing.duration, q))
         else:
             await m.reply_text("🎤 <b>Karaoke Mode ON!</b>\nBot will send live lyrics for upcoming songs.")
