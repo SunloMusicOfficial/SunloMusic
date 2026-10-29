@@ -8,22 +8,27 @@ API_HEADERS = {"X-API-Key": config.ONEGRAB_API_KEY, "Accept": "application/json"
 DOWNLOAD_DIR = "cache/downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# ✅ Removed "extract_flat": True so yt-dlp fetches duration & thumbnail
-YDL_SEARCH_OPTS = {
-    "quiet": True, 
-    "no_warnings": True, 
-    "noplaylist": True, 
-    "nocheckcertificate": True
-}
-
-def _search_ytdlp_sync(query: str):
+# ✅ Helper to fetch exact metadata (duration & thumbnail) from a URL
+def _fetch_metadata_sync(url: str):
     try:
-        with yt_dlp.YoutubeDL(YDL_SEARCH_OPTS) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
-            if info and "entries" in info and len(info["entries"]) > 0:
-                return info["entries"][0]
-    except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
-    return None
+        with yt_dlp.YoutubeDL({"quiet": True, "noplaylist": True}) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info: return None
+            
+            thumb_url = ""
+            if info.get("thumbnails"):
+                thumb_url = info["thumbnails"][-1]["url"]
+            elif info.get("id"):
+                thumb_url = f"https://i.ytimg.com/vi/{info['id']}/hqdefault.jpg"
+                
+            return {
+                "title": info.get("title", "Unknown"),
+                "duration": int(info.get("duration") or 0),
+                "thumbnail": thumb_url
+            }
+    except Exception as e:
+        LOGGER.error(f"Metadata fetch error: {e}")
+        return None
 
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
@@ -55,39 +60,44 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     fallback_meta = {}
 
     if not query.startswith("http"):
-        loop = asyncio.get_running_loop()
-        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=20.0)
-        except: ytdlp_info = None
-            
-        if ytdlp_info and ytdlp_info.get("url"):
-            webpage_url = ytdlp_info.get("url")
-            
-            thumb_url = ""
-            if ytdlp_info.get("thumbnails"):
-                thumb_url = ytdlp_info["thumbnails"][-1]["url"]
-            elif ytdlp_info.get("id"):
-                thumb_url = f"https://i.ytimg.com/vi/{ytdlp_info['id']}/hqdefault.jpg"
-                
+        # ✅ Step 1: Use OneGrab Search FIRST (Accurate Song Name)
+        LOGGER.info(f"🔎 Searching via OneGrab: {query}")
+        search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
+        
+        if search_data and search_data.get("results"):
+            track = search_data["results"][0]
+            webpage_url = track.get("webpage_url") or track.get("url")
             fallback_meta = {
-                "title": ytdlp_info.get("title", "Unknown"), 
-                "duration": int(ytdlp_info.get("duration") or 0),
-                "thumbnail": thumb_url
+                "title": track.get("title", "Unknown"),
+                "duration": int(track.get("duration") or 0),
+                "thumbnail": track.get("thumbnail", "")
             }
         else:
-            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
-            if search_data and search_data.get("results"):
-                track = search_data["results"][0]
-                webpage_url = track.get("webpage_url") or track.get("url")
-                fallback_meta = {
-                    "title": track.get("title", "Unknown"),
-                    "duration": int(track.get("duration") or 0),
-                    "thumbnail": track.get("thumbnail", "")
-                }
+            # Fallback to yt-dlp search if OneGrab fails
+            LOGGER.warning("⚠️ OneGrab search failed, trying yt-dlp search...")
+            loop = asyncio.get_running_loop()
+            try:
+                with yt_dlp.YoutubeDL({"quiet": True, "noplaylist": True, "extract_flat": True}) as ydl:
+                    info = await loop.run_in_executor(None, lambda: ydl.extract_info(f"ytsearch1:{query}", download=False))
+                    if info and "entries" in info and len(info["entries"]) > 0:
+                        webpage_url = info["entries"][0].get("url")
+                        fallback_meta = {"title": info["entries"][0].get("title", "Unknown")}
+            except Exception as e:
+                LOGGER.error(f"yt-dlp search error: {e}")
+
+        # ✅ Step 2: Fetch exact metadata (Duration & Thumbnail) using yt-dlp
+        if webpage_url:
+            loop = asyncio.get_running_loop()
+            meta = await loop.run_in_executor(None, _fetch_metadata_sync, webpage_url)
+            if meta:
+                fallback_meta.update(meta)
+                LOGGER.info(f"✅ Metadata fetched: {meta['duration']}s | {meta['thumbnail'][:50]}")
 
     if not webpage_url: 
         LOGGER.error("❌ No webpage URL found.")
         return None
 
+    # ✅ Step 3: Fetch Stream Link via OneGrab
     req_type = "video" if video else "audio"
     LOGGER.info(f"🌐 Fetching {req_type} via OneGrab API: {webpage_url}")
     
