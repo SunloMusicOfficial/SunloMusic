@@ -27,10 +27,11 @@ class ChatQueue:
     playing_message_id: int = 0
     timer_task: Optional[asyncio.Task] = None
     votes: set = field(default_factory=set)
+    # ✅ Added for Karaoke
+    karaoke_task: Optional[asyncio.Task] = None
+    karaoke_msg_id: int = 0
 
 _queues: dict[int, ChatQueue] = {}
-
-# ✅ Global set for Karaoke
 KARAOKE_CHATS = set()
 
 def get_queue(chat_id: int) -> ChatQueue:
@@ -38,7 +39,8 @@ def get_queue(chat_id: int) -> ChatQueue:
     return _queues[chat_id]
 
 def clear_queue(chat_id: int):
-    _queues.pop(chat_id, None)
+    q = _queues.pop(chat_id, None)
+    if q and q.karaoke_task: q.karaoke_task.cancel()
 
 def active_chats() -> list[int]:
     return list(_queues.keys())
