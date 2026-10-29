@@ -1,9 +1,9 @@
 import asyncio, time, base64, os
 from pyrogram import enums
 from pyrogram.types import LinkPreviewOptions
+from pyrogram.errors import FloodWait
 from pytgcalls import PyTgCalls, filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
-from pytgcalls.exceptions import NoActiveGroupCall
 import SunloMusic.bot as bot_module
 from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
@@ -12,7 +12,6 @@ from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.queues import KARAOKE_CHATS
-# ✅ Fixed import name here
 from SunloMusic.lyrics import start_live_karaoke
 
 call = None
@@ -49,7 +48,6 @@ async def update_live_timer(chat_id, msg_id):
         q = get_queue(chat_id)
         if not q.now_playing or q.playing_message_id != msg_id: break
         if q.paused: continue
-        
         if await check_empty_vc(chat_id): break
         
         if q.now_playing.duration <= 0: dur_str = "Live"
@@ -62,16 +60,23 @@ async def update_live_timer(chat_id, msg_id):
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n━━━━━━━━━━━━━"
-            try: await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
-            except: await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed), link_preview_options=LinkPreviewOptions(is_disabled=True))
+            
+            try: 
+                await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+            except: 
+                try: 
+                    await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed), link_preview_options=LinkPreviewOptions(is_disabled=True))
+                except FloodWait as e:
+                    await asyncio.sleep(e.value)
+                except: pass
         except: pass
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import clear_queue, Track
-    
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
-    
     if q.playing_message_id:
         try: await bot_module.bot.delete_messages(chat_id, q.playing_message_id)
         except: pass
@@ -94,10 +99,9 @@ async def start_next_song(chat_id, q):
             nxt.message_id = 0
 
         await play_stream(chat_id, nxt.url, nxt.video)
-        
         q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
-        thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
         
+        thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
         dur_str = format_duration(nxt.duration) if nxt.duration > 0 else "Live"
         b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
@@ -109,7 +113,6 @@ async def start_next_song(chat_id, q):
         q.playing_message_id = sent_msg.id
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
 
-        # ✅ Trigger Live Karaoke for Auto-Play
         if chat_id in KARAOKE_CHATS:
             q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
@@ -118,7 +121,8 @@ async def start_next_song(chat_id, q):
         except: pass
         clear_queue(chat_id)
         ghost_text = f"👻 <b>G H O S T E D !</b> 👻\n━━━━━━━━━━━━━━━━━━━\n<i>The queue vanished into thin air...</i>\n━━━━━━━━━━━━━━━━━━━\n📭 <b>STATUS:</b> <code>EMPTY</code>\n🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n━━━━━━━━━━━━━━━━━━━\n<blockquote>Boo! Hope you enjoyed the vibes. 👻</blockquote>"
-        await bot_module.bot.send_message(chat_id, ghost_text)
+        try: await bot_module.bot.send_message(chat_id, ghost_text)
+        except: pass
 
 async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue
@@ -140,7 +144,6 @@ def init_calls():
 async def start_call():
     if call:
         await call.start()
-        LOGGER.info("✅ PyTgCalls engine started")
 
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
     if not call: return False
@@ -152,9 +155,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
         return True
     except Exception as e:
-        LOGGER.error(f"Play error: {e}")
-        if "already" in str(e).lower() or "stream" in str(e).lower() or "playing" in str(e).lower():
-            return True
+        if "already" in str(e).lower() or "stream" in str(e).lower(): return True
         return True
 
 async def pause_stream(chat_id: int):
