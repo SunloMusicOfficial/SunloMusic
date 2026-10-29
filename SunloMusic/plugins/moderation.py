@@ -1,3 +1,4 @@
+import asyncio
 from pyrogram import filters, enums
 from pyrogram.types import Message
 from SunloMusic.bot import bot
@@ -25,40 +26,72 @@ async def purge_cmd(_, m: Message):
     end_id = m.id
     msg_ids = list(range(start_id, end_id + 1))
     
-    # Delete in chunks of 100
     for i in range(0, len(msg_ids), 100):
         try: await bot.delete_messages(m.chat.id, msg_ids[i:i+100])
         except: pass
     try: await m.reply_text(f"🧹 <b>Purged {len(msg_ids)} messages.</b>")
     except: pass
 
+# ✅ ADVANCED & PREMIUM /tagall
 @bot.on_message(filters.command("tagall") & filters.group)
 @catch_errors
 @admin_only
 async def tagall_cmd(_, m: Message):
-    if len(m.command) < 2:
-        return await m.reply_text("❌ <b>Usage:</b> <code>/tagall [message]</code>")
+    # Get custom message (from command or replied message)
+    custom_msg = " ".join(m.command[1:]) if len(m.command) > 1 else None
     
-    text = " ".join(m.command[1:])
+    if not custom_msg and not m.reply_to_message:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/tagall [message]</code> or reply to a message.")
+
+    status = await m.reply_text("⏳ <b>Gathering members & preparing tags...</b>")
+    
+    try:
+        await m.delete() # Delete command
+    except: pass
+
     members = []
     async for member in m.chat.get_members():
         if not member.user.is_bot and not member.user.is_deleted:
             members.append(member.user.mention)
-            
+
     if not members:
-        return await m.reply_text("❌ <b>No members found to tag.</b>")
-        
-    status = await m.reply_text("📢 <b>Tagging members...</b>")
-    
-    tag_text = f"📢 <b>Attention Everyone!</b>\n\n{text}\n\n"
-    # Send tags in chunks to avoid message limit
-    chunk_size = 50
+        return await status.edit_text("❌ <b>No members found to tag.</b>")
+
+    # Premium Intro Card
+    header = (
+        f"<b>📢 ATTENTION EVERYONE 📢</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👑 <b>Admin:</b> {m.from_user.mention}\n"
+        f"💬 <b>Message:</b> {custom_msg if custom_msg else 'Please read the above message.'}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 <b>Tagging {len(members)} members...</b>"
+    )
+    await status.edit_text(header)
+
+    # If it's a reply, send that message first
+    if m.reply_to_message:
+        try:
+            await m.reply_to_message.copy(m.chat.id)
+        except: pass
+
+    # Send tags in chunks of 20 (to make it look like a clean list)
+    chunk_size = 20
     for i in range(0, len(members), chunk_size):
         chunk = members[i:i+chunk_size]
+        
+        # Formatting each tag on a new line or joined with spaces
+        tags_text = " ".join(chunk)
+        
         try:
-            await m.reply_text(tag_text + " ".join(chunk), disable_notification=True)
-        except: pass
-    await status.delete()
+            await m.reply_text(
+                f"<b>🔔 Tag Group {int(i/chunk_size) + 1}:</b>\n{tags_text}", 
+                disable_notification=(i != 0) # Only notify on first chunk to avoid extreme spam
+            )
+        except Exception as e:
+            LOGGER.error(f"Tagall error: {e}")
+            break
+            
+        await asyncio.sleep(2) # 2 second delay to prevent Telegram FloodWait
 
 @bot.on_message(filters.command("welcome") & filters.group)
 @catch_errors
