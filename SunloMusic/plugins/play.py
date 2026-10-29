@@ -11,7 +11,7 @@ from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
-from SunloMusic.plugins.tools import send_karaoke
+from SunloMusic.lyrics import send_karaoke
 from SunloMusic.logger import LOGGER
 
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
@@ -97,6 +97,5 @@ async def play_cmd(_, m):
     if q.timer_task: q.timer_task.cancel()
     q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))
 
-    # ✅ Trigger Karaoke
     if m.chat.id in KARAOKE_CHATS:
-        asyncio.create_task(send_karaoke(m.chat.id, track.title))
+        asyncio.create_task(send_karaoke(bot, m.chat.id, track.title))

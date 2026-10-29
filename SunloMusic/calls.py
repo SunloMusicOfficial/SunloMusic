@@ -12,7 +12,7 @@ from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.queues import KARAOKE_CHATS
-from SunloMusic.plugins.tools import send_karaoke
+from SunloMusic.lyrics import send_karaoke
 
 call = None
 AUTO_DJ_CHATS = set()
@@ -105,9 +105,8 @@ async def start_next_song(chat_id, q):
         q.playing_message_id = sent_msg.id
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
 
-        # ✅ Trigger Karaoke for Auto-Play
         if chat_id in KARAOKE_CHATS:
-            asyncio.create_task(send_karaoke(chat_id, nxt.title))
+            asyncio.create_task(send_karaoke(bot_module.bot, chat_id, nxt.title))
     else:
         try:
             if call: await call.leave_call(chat_id)
