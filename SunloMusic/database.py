@@ -41,7 +41,14 @@ async def get_stats() -> dict:
 async def get_all_chats() -> list:
     return [c["chat_id"] async for c in chats_col.find({}, {"chat_id": 1})]
 
-# ✅ Thumbnails (Wapas add kiye gaye)
+# ✅ Purane Working Functions (Wapas add kiye)
+async def save_playlist(user_id: int, name: str, queue_data: list):
+    await playlists_col.update_one({"user_id": user_id, "name": name}, {"$set": {"queue": queue_data}}, upsert=True)
+
+async def get_playlist(user_id: int, name: str) -> list:
+    data = await playlists_col.find_one({"user_id": user_id, "name": name})
+    return data["queue"] if data else None
+
 async def set_custom_thumb(chat_id: int, file_id: str):
     await thumbs_col.update_one({"chat_id": chat_id}, {"$set": {"file_id": file_id}}, upsert=True)
 
@@ -52,7 +59,7 @@ async def get_custom_thumb(chat_id: int) -> str:
 async def del_custom_thumb(chat_id: int):
     await thumbs_col.delete_one({"chat_id": chat_id})
 
-# Group Settings
+# ✅ Naye Functions (Leaderboard, Group Settings, etc.)
 async def set_group_setting(chat_id: int, key: str, value: any):
     await settings_col.update_one({"chat_id": chat_id}, {"$set": {key: value}}, upsert=True)
 
@@ -60,7 +67,6 @@ async def get_group_setting(chat_id: int, key: str, default: any = None):
     data = await settings_col.find_one({"chat_id": chat_id})
     return data.get(key, default) if data else default
 
-# Leaderboard
 async def add_lb_point(chat_id: int, user_id: int, user_name: str):
     await lb_col.update_one(
         {"chat_id": chat_id, "user_id": user_id},
@@ -71,7 +77,6 @@ async def add_lb_point(chat_id: int, user_id: int, user_name: str):
 async def get_leaderboard(chat_id: int, limit: int = 5):
     return await lb_col.find({"chat_id": chat_id}).sort("points", -1).limit(limit).to_list(limit)
 
-# Group Playlists
 async def save_gplaylist(chat_id: int, name: str, queue_data: list):
     await gplaylists_col.update_one(
         {"chat_id": chat_id, "name": name},
@@ -83,7 +88,6 @@ async def get_gplaylist(chat_id: int, name: str):
     data = await gplaylists_col.find_one({"chat_id": chat_id, "name": name})
     return data["queue"] if data else None
 
-# AFK
 async def set_afk(user_id: int, reason: str):
     await afk_col.update_one({"user_id": user_id}, {"$set": {"reason": reason}}, upsert=True)
 
