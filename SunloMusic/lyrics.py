@@ -11,20 +11,42 @@ async def fetch_lyrics_text(query: str) -> str | None:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
 
-    # ✅ 1. Lyrist API (Best for exact matches)
+    # ✅ 1. Textyl API (Best for Hindi/Bollywood Songs)
     try:
         encoded_query = quote(clean_query)
         async with aiohttp.ClientSession(headers=headers) as s:
-            async with s.get(f"https://lyrist.vercel.app/api/{encoded_query}", timeout=10) as r:
+            async with s.get(f"https://api.textyl.co/api/lyrics?q={encoded_query}", timeout=10) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        full_lyrics = "\n".join([item.get("lyrics", "") for item in data if "lyrics" in item])
+                        if full_lyrics:
+                            LOGGER.info("✅ Found on Textyl API")
+                            return f"🎤 <b>{clean_query}</b>\n━━━━━━━━━━━━━\n<blockquote>{full_lyrics[:4000]}</blockquote>"
+    except Exception as e:
+        LOGGER.error(f"Textyl API failed: {e}")
+
+    # ✅ 2. Lyrics.ovh API (General Fallback)
+    try:
+        if " - " in clean_query:
+            artist, title = clean_query.split(" - ", 1)
+        else:
+            artist, title = "", clean_query
+            
+        encoded_artist = quote(artist.strip())
+        encoded_title = quote(title.strip())
+        
+        async with aiohttp.ClientSession(headers=headers) as s:
+            async with s.get(f"https://api.lyrics.ovh/v1/{encoded_artist}/{encoded_title}", timeout=10) as r:
                 if r.status == 200:
                     data = await r.json()
                     if "lyrics" in data and data["lyrics"]:
-                        LOGGER.info("✅ Found on Lyrist API")
-                        return f"🎤 <b>{data.get('title', clean_query)} - {data.get('artist', '')}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
+                        LOGGER.info("✅ Found on Lyrics.ovh API")
+                        return f"🎤 <b>{title.strip()} - {artist.strip()}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
     except Exception as e:
-        LOGGER.error(f"Lyrist API failed: {e}")
+        LOGGER.error(f"Lyrics.ovh API failed: {e}")
 
-    # ✅ 2. Popcat API (Fallback 1)
+    # ✅ 3. Popcat API (Fallback 2)
     try:
         encoded_query = quote(clean_query)
         async with aiohttp.ClientSession(headers=headers) as s:
@@ -36,19 +58,6 @@ async def fetch_lyrics_text(query: str) -> str | None:
                         return f"🎤 <b>{data.get('title', clean_query)}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
     except Exception as e:
         LOGGER.error(f"Popcat API failed: {e}")
-
-    # ✅ 3. Some-Random-API (Fallback 2)
-    try:
-        encoded_query = quote(clean_query)
-        async with aiohttp.ClientSession(headers=headers) as s:
-            async with s.get(f"https://some-random-api.com/lyrics?title={encoded_query}", timeout=10) as r:
-                if r.status == 200:
-                    data = await r.json()
-                    if "lyrics" in data and data["lyrics"]:
-                        LOGGER.info("✅ Found on Some-Random API")
-                        return f"🎤 <b>{data.get('title', clean_query)}</b>\n━━━━━━━━━━━━━\n<blockquote>{data['lyrics'][:4000]}</blockquote>"
-    except Exception as e:
-        LOGGER.error(f"Some-Random API failed: {e}")
     
     LOGGER.error(f"❌ Lyrics not found for {clean_query} in any API")
     return None
