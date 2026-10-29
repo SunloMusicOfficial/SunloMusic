@@ -12,7 +12,8 @@ from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.queues import KARAOKE_CHATS
-from SunloMusic.lyrics import send_karaoke
+# ✅ Fixed import name here
+from SunloMusic.lyrics import start_live_karaoke
 
 call = None
 AUTO_DJ_CHATS = set()
@@ -67,7 +68,10 @@ async def update_live_timer(chat_id, msg_id):
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import clear_queue, Track
+    
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
+    if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
+    
     if q.playing_message_id:
         try: await bot_module.bot.delete_messages(chat_id, q.playing_message_id)
         except: pass
@@ -105,8 +109,9 @@ async def start_next_song(chat_id, q):
         q.playing_message_id = sent_msg.id
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
 
+        # ✅ Trigger Live Karaoke for Auto-Play
         if chat_id in KARAOKE_CHATS:
-            asyncio.create_task(send_karaoke(bot_module.bot, chat_id, nxt.title))
+            q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
         try:
             if call: await call.leave_call(chat_id)
