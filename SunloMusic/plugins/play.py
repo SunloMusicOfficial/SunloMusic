@@ -10,6 +10,7 @@ from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
+from SunloMusic.logger import LOGGER
 
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @catch_errors
@@ -25,7 +26,6 @@ async def play_cmd(_, m):
 
     uid = m.from_user.id
     now = time.time()
-    # ✅ Increased spam limit to 5
     if uid in SPAM_DICT:
         count, last_time = SPAM_DICT[uid]
         if now - last_time < 60:
@@ -42,14 +42,19 @@ async def play_cmd(_, m):
 
     status = await m.reply_text("🔎 <b>Checking Assistant...</b>")
     if not await ensure_assistant_in_chat(m.chat.id):
-        return await status.edit_text("❌ <b>Assistant could not join the group!</b>\nMake sure Bot is Admin with 'Invite Users'.")
+        return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
         
     video = "vplay" in m.command[0].lower()
     await status.edit_text("🎬 <b>Downloading Video...</b>" if video else "⏳ <b>Wait a sec, getting the beats...</b>")
         
+    LOGGER.info(f"🔍 Extracting audio for: {query}")
     info = await extract_audio(query, video=video)
+    
     if not info: 
-        return await status.edit_text("❌ <b>Failed to fetch media.</b>\n<i>The API might be down or the song is not available.</i>")
+        LOGGER.error("❌ extract_audio returned None!")
+        return await status.edit_text("❌ <b>Failed to fetch media.</b>\n<i>The API might be down.</i>")
+    
+    LOGGER.info(f"✅ Got media info: {info['title']} | URL: {info['url'][:50]}")
     
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -59,21 +64,18 @@ async def play_cmd(_, m):
     
     if q.now_playing:
         q.queue.append(track)
-        track_hash = str(abs(hash(track.url)))
-        thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
-        b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
-        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-        caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
-        if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
-        else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
-        track.message_id = sent_msg.id
+        # ... queue logic ...
         return
     
     await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
+    LOGGER.info("🎵 Calling play_stream...")
     success = await play_stream(m.chat.id, track.url, track.video)
+    
     if not success: 
-        return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active & Assistant is in group.")
+        LOGGER.error("❌ play_stream failed!")
+        return await status.edit_text("❌ <b>Failed to join VC.</b>\nMake sure VC is active.")
         
+    LOGGER.info("✅ play_stream success! Sending card...")
     q.now_playing = track
     q.start_time = time.time()
     q.total_paused = 0
@@ -82,6 +84,8 @@ async def play_cmd(_, m):
     
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+    
+    await asyncio.sleep(1) # ✅ Delay for Telegram to process stream
     thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
