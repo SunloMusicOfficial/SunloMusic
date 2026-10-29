@@ -42,7 +42,7 @@ async def play_cmd(_, m):
 
     status = await m.reply_text("🔎 <b>Checking Assistant...</b>")
     if not await ensure_assistant_in_chat(m.chat.id):
-        return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
+        return await status.edit_text("❌ <b>Assistant could not join the group!</b>\nMake sure Bot is Admin with 'Invite Users'.")
         
     video = "vplay" in m.command[0].lower()
     await status.edit_text("🎬 <b>Downloading Video...</b>" if video else "⏳ <b>Wait a sec, getting the beats...</b>")
@@ -62,9 +62,17 @@ async def play_cmd(_, m):
     q = get_queue(m.chat.id)
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
+    # ✅ Fixed: Added m.chat.id in generate_thumbnail
     if q.now_playing:
         q.queue.append(track)
-        # ... queue logic ...
+        track_hash = str(abs(hash(track.url)))
+        thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
+        b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
+        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+        caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
+        if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
+        else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
+        track.message_id = sent_msg.id
         return
     
     await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
@@ -85,8 +93,10 @@ async def play_cmd(_, m):
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     
-    await asyncio.sleep(1) # ✅ Delay for Telegram to process stream
-    thumb = await generate_thumbnail(track.thumbnail, track.title, format_duration(track.duration), track.requester)
+    await asyncio.sleep(1) # Delay for Telegram to process stream
+    
+    # ✅ Fixed: Added m.chat.id in generate_thumbnail
+    thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
     
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
     
