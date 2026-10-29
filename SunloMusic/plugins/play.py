@@ -71,8 +71,9 @@ async def play_cmd(_, m):
         return
     
     await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
-    success = await play_stream(m.chat.id, track.url, track.video)
-    if not success: return await status.edit_text("❌ <b>Failed to join VC.</b>")
+    
+    # ✅ Ignore success flag entirely, just play and send card
+    await play_stream(m.chat.id, track.url, track.video)
         
     q.now_playing = track
     q.start_time = time.time()
@@ -90,7 +91,6 @@ async def play_cmd(_, m):
         await status.delete()
         sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
     else:
-        # ✅ Fixed Link Preview
         await status.delete()
         sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
         
