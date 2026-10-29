@@ -6,11 +6,12 @@ from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import add_user, SPAM_DICT
-from SunloMusic.queues import get_queue, Track
+from SunloMusic.queues import get_queue, Track, KARAOKE_CHATS
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
+from SunloMusic.plugins.tools import send_karaoke
 from SunloMusic.logger import LOGGER
 
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
@@ -71,8 +72,6 @@ async def play_cmd(_, m):
         return
     
     await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
-    
-    # ✅ Ignore success flag entirely, just play and send card
     await play_stream(m.chat.id, track.url, track.video)
         
     q.now_playing = track
@@ -97,3 +96,7 @@ async def play_cmd(_, m):
     q.playing_message_id = sent_msg.id
     if q.timer_task: q.timer_task.cancel()
     q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))
+
+    # ✅ Trigger Karaoke
+    if m.chat.id in KARAOKE_CHATS:
+        asyncio.create_task(send_karaoke(m.chat.id, track.title))

@@ -26,9 +26,12 @@ class ChatQueue:
     total_paused: float = 0.0
     playing_message_id: int = 0
     timer_task: Optional[asyncio.Task] = None
-    votes: set = field(default_factory=set) # ✅ For Vote Skip
+    votes: set = field(default_factory=set)
 
 _queues: dict[int, ChatQueue] = {}
+
+# ✅ Global set for Karaoke
+KARAOKE_CHATS = set()
 
 def get_queue(chat_id: int) -> ChatQueue:
     if chat_id not in _queues: _queues[chat_id] = ChatQueue(chat_id=chat_id)

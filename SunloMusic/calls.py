@@ -11,6 +11,8 @@ from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio
+from SunloMusic.queues import KARAOKE_CHATS
+from SunloMusic.plugins.tools import send_karaoke
 
 call = None
 AUTO_DJ_CHATS = set()
@@ -87,7 +89,6 @@ async def start_next_song(chat_id, q):
             except: pass
             nxt.message_id = 0
 
-        # Ignore success flag, just proceed to send card if stream started
         await play_stream(chat_id, nxt.url, nxt.video)
         
         q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
@@ -103,6 +104,10 @@ async def start_next_song(chat_id, q):
         
         q.playing_message_id = sent_msg.id
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
+
+        # ✅ Trigger Karaoke for Auto-Play
+        if chat_id in KARAOKE_CHATS:
+            asyncio.create_task(send_karaoke(chat_id, nxt.title))
     else:
         try:
             if call: await call.leave_call(chat_id)
@@ -144,7 +149,13 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         return True
     except Exception as e:
         LOGGER.error(f"Play error: {e}")
-        # ✅ SMART FIX: Agar error "already playing" ya "stream" se related hai, toh True return karo
         if "already" in str(e).lower() or "stream" in str(e).lower() or "playing" in str(e).lower():
             return True
-        return True # Even if error, assume it started so card is sent
+        return True
+
+async def pause_stream(chat_id: int):
+    if call: await call.pause(chat_id)
+async def resume_stream(chat_id: int):
+    if call: await call.resume(chat_id)
+async def stop_stream(chat_id: int):
+    if call: await call.leave_call(chat_id)
