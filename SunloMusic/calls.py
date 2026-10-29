@@ -84,12 +84,10 @@ async def start_next_song(chat_id, q):
 
     q.now_playing = None
     
-    # ✅ Auto-DJ Logic with Randomization
     if not q.queue and chat_id in AUTO_DJ_CHATS:
         try:
             queries = ["trending hindi songs 2024", "top bollywood hits", "arijit singh best songs", "lofi hindi chill", "punjabi top hits"]
             random_query = random.choice(queries)
-            LOGGER.info(f"🎧 Auto-DJ fetching for query: {random_query}")
             info = await extract_audio(random_query)
             if info: 
                 q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
@@ -117,6 +115,11 @@ async def start_next_song(chat_id, q):
         else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
         
         q.playing_message_id = sent_msg.id
+        
+        # ✅ AUTO-PIN FOR AUTO-PLAY
+        try: await sent_msg.pin(disable_notification=True)
+        except: pass
+        
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
 
         if chat_id in KARAOKE_CHATS:

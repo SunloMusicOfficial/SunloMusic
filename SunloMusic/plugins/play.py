@@ -5,14 +5,13 @@ from SunloMusic.bot import bot, ensure_assistant_in_chat
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import admin_only, catch_errors
-from SunloMusic.database import add_user, SPAM_DICT
+from SunloMusic.database import add_user, SPAM_DICT, add_lb_point
 from SunloMusic.queues import get_queue, Track, KARAOKE_CHATS
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
 from SunloMusic.lyrics import start_live_karaoke
-from SunloMusic.logger import LOGGER
 
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @catch_errors
@@ -37,6 +36,8 @@ async def play_cmd(_, m):
     else: SPAM_DICT[uid] = (1, now)
 
     await add_user(uid, m.from_user.first_name)
+    await add_lb_point(m.chat.id, uid, m.from_user.first_name) # ✅ Leaderboard point
+    
     query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
     if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
     try: await m.delete()
@@ -94,9 +95,14 @@ async def play_cmd(_, m):
         sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
         
     q.playing_message_id = sent_msg.id
+    
+    # ✅ AUTO-PIN THE MESSAGE
+    try: 
+        await sent_msg.pin(disable_notification=True)
+    except: pass
+    
     if q.timer_task: q.timer_task.cancel()
     q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))
 
-    # ✅ Trigger Live Karaoke
     if m.chat.id in KARAOKE_CHATS:
         q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, track.title, track.duration, q))
