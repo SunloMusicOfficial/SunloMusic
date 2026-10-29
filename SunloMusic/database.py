@@ -23,6 +23,12 @@ async def is_sudo(user_id: int) -> bool:
     if user_id in config.sudo_list or user_id == config.OWNER_ID: return True
     return await sudo_col.find_one({"user_id": user_id}) is not None
 
+async def add_sudo(user_id: int):
+    await sudo_col.update_one({"user_id": user_id}, {"$set": {"user_id": user_id}}, upsert=True)
+
+async def remove_sudo(user_id: int):
+    await sudo_col.delete_one({"user_id": user_id})
+
 async def get_chat(chat_id: int) -> dict:
     return await chats_col.find_one({"chat_id": chat_id}) or {"chat_id": chat_id, "auth": False}
 
@@ -34,6 +40,17 @@ async def get_stats() -> dict:
 
 async def get_all_chats() -> list:
     return [c["chat_id"] async for c in chats_col.find({}, {"chat_id": 1})]
+
+# ✅ Thumbnails (Wapas add kiye gaye)
+async def set_custom_thumb(chat_id: int, file_id: str):
+    await thumbs_col.update_one({"chat_id": chat_id}, {"$set": {"file_id": file_id}}, upsert=True)
+
+async def get_custom_thumb(chat_id: int) -> str:
+    data = await thumbs_col.find_one({"chat_id": chat_id})
+    return data["file_id"] if data else None
+
+async def del_custom_thumb(chat_id: int):
+    await thumbs_col.delete_one({"chat_id": chat_id})
 
 # Group Settings
 async def set_group_setting(chat_id: int, key: str, value: any):
