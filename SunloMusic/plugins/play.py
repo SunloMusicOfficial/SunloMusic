@@ -64,7 +64,7 @@ async def play_cmd(_, m):
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
         if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
-        else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash), disable_web_page_preview=True)
+        else: sent_msg = await status.edit_text(caption, reply_markup=queue_add_keyboard(track_hash))
         track.message_id = sent_msg.id
         return
     
@@ -88,7 +88,8 @@ async def play_cmd(_, m):
         await status.delete()
         sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
     else:
-        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q, 0), disable_web_page_preview=True)
+        # ✅ Removed disable_web_page_preview
+        sent_msg = await status.edit_text(caption, reply_markup=player_keyboard(q, 0))
         
     q.playing_message_id = sent_msg.id
     if q.timer_task: q.timer_task.cancel()

@@ -49,11 +49,8 @@ async def update_live_timer(chat_id, msg_id):
         
         if await check_empty_vc(chat_id): break
         
-        # ✅ Fix: If duration is 0, don't show timer bar, just show elapsed
-        if q.now_playing.duration <= 0:
-            dur_str = "Live"
-        else:
-            dur_str = format_duration(q.now_playing.duration)
+        if q.now_playing.duration <= 0: dur_str = "Live"
+        else: dur_str = format_duration(q.now_playing.duration)
             
         elapsed = int(time.time() - q.start_time - q.total_paused)
         if q.now_playing.duration > 0 and elapsed >= q.now_playing.duration: break
@@ -62,9 +59,12 @@ async def update_live_timer(chat_id, msg_id):
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
             title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
             caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n━━━━━━━━━━━━━"
+            
+            # ✅ Removed disable_web_page_preview here too
             try: await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
-            except: await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed), disable_web_page_preview=True)
-        except: pass
+            except: await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed))
+        except Exception as e: 
+            LOGGER.error(f"Timer edit error: {e}")
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import clear_queue, Track
@@ -101,7 +101,8 @@ async def start_next_song(chat_id, q):
             caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
             
             if thumb: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-            else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), disable_web_page_preview=True)
+            else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0))
+            
             q.playing_message_id = sent_msg.id
             q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         else:
@@ -145,7 +146,9 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     try:
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
         return True
-    except: return False
+    except Exception as e:
+        LOGGER.error(f"Play error: {e}")
+        return False
 
 async def pause_stream(chat_id: int):
     if call: await call.pause(chat_id)
