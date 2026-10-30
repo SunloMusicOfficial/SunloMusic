@@ -10,7 +10,6 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def _search_ytdlp_sync(query: str):
     try:
-        # extract_flat=True makes it super fast
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
@@ -26,6 +25,27 @@ def _search_ytdlp_sync(query: str):
     except Exception as e: 
         LOGGER.error(f"yt-dlp search error: {e}")
     return None
+
+def _search_ytdlp_multi_sync(query: str, limit: int = 10):
+    try:
+        ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            results = []
+            if info and "entries" in info:
+                for e in info["entries"]:
+                    if e:
+                        thumb = f"https://i.ytimg.com/vi/{e.get('id')}/hqdefault.jpg" if e.get("id") else ""
+                        results.append({
+                            "title": e.get("title", "Unknown"),
+                            "url": f"https://www.youtube.com/watch?v={e.get('id')}" if e.get("id") else e.get("url"),
+                            "duration": int(e.get("duration") or 0),
+                            "thumbnail": thumb,
+                        })
+            return results
+    except Exception as e:
+        LOGGER.error(f"yt-dlp multi search error: {e}")
+        return []
 
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
@@ -57,7 +77,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     fallback_meta = {}
 
     if not query.startswith("http"):
-        # ✅ 1. yt-dlp Fast Search
         LOGGER.info(f"🔎 Searching via yt-dlp: {query}")
         loop = asyncio.get_running_loop()
         try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
@@ -77,7 +96,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
-    # ✅ 2. OneGrab Stream Link
     req_type = "video" if video else "audio"
     LOGGER.info(f"🌐 Fetching {req_type} stream via OneGrab...")
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
@@ -90,7 +108,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
         cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
         
         if cdnurl:
-            # ✅ ALWAYS prioritize yt-dlp metadata
             final_thumb = fallback_meta.get("thumbnail") or result.get("thumbnail", "")
             final_dur = fallback_meta.get("duration") or int(result.get("duration") or 0)
             final_title = fallback_meta.get("title") or result.get("title", "Unknown")
@@ -102,3 +119,69 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             else:
                 return {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
     return None
+
+# ═══════════════════════════════════════════
+# ✅ NEW: File Download (for /song and /video)
+# ═══════════════════════════════════════════
+def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600):
+    try:
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "nocheckcertificate": True,
+            "match_filter": yt_dlp.utils.match_filter_func(f"duration < {max_duration}"),
+        }
+        if video:
+            ydl_opts["format"] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
+            ydl_opts["merge_output_format"] = "mp4"
+        else:
+            ydl_opts["format"] = "bestaudio/best"
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }]
+        
+        ydl_opts["outtmpl"] = f"{DOWNLOAD_DIR}/%(id)s.%(ext)s"
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            final_path = ydl.prepare_filename(info)
+            if not video:
+                base = os.path.splitext(final_path)[0]
+                if os.path.exists(base + ".mp3"):
+                    final_path = base + ".mp3"
+            return {
+                "path": final_path,
+                "title": info.get("title", "Unknown"),
+                "duration": int(info.get("duration") or 0),
+                "thumbnail": info.get("thumbnail", ""),
+            }
+    except Exception as e:
+        LOGGER.error(f"File download error: {e}")
+        return None
+
+async def download_media_file(query: str, video: bool = False, max_duration: int = 3600):
+    url = query
+    if not query.startswith("http"):
+        loop = asyncio.get_running_loop()
+        info = await loop.run_in_executor(None, _search_ytdlp_sync, query)
+        if not info: return None
+        url = info["url"]
+    
+    loop = asyncio.get_running_loop()
+    try:
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, _download_file_sync, url, video, max_duration),
+            timeout=180.0
+        )
+        return result
+    except asyncio.TimeoutError:
+        LOGGER.error("Download timed out")
+        return None
+
+def cleanup_download(path: str):
+    if path and os.path.exists(path):
+        try: os.remove(path)
+        except: pass

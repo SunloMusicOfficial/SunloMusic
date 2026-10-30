@@ -24,7 +24,6 @@ START_CAPTION = (
 async def start_cmd(_, m):
     await add_user(m.from_user.id, m.from_user.first_name)
     
-    # ✅ DM START LOG
     log_text = (
         f"<b>🚀 New User Started Bot!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -61,5 +60,14 @@ async def start_cmd(_, m):
 @bot.on_message(filters.command(["ping", "help"]))
 @catch_errors
 async def ping_help_cmd(_, m):
-    if m.command[0] == "ping": return await m.reply_text("🏓 <b>Pong! System is active.</b>")
-    await m.reply_text("🎧 <b>Use /allcommand to see all commands.</b>", reply_markup=start_keyboard())
+    if m.command[0] == "ping":
+        return await m.reply_text("🏓 <b>Pong! System is active.</b>")
+    
+    # ✅ Better /help — shows help menu directly
+    await m.reply_text(
+        "<b>❓ SunloMusic Help</b>\n"
+        "━━━━━━━━━━━━━\n\n"
+        "Choose a category to explore commands:\n\n"
+        "💡 Use <code>/allcommand</code> for full list",
+        reply_markup=help_main_keyboard()
+    )

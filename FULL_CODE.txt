@@ -1,0 +1,2130 @@
+### FILE: ./SunloMusic/plugins/__init__.py
+import os
+from importlib import import_module
+from SunloMusic.logger import LOGGER
+
+def load_plugins():
+    for file in sorted(os.listdir(os.path.dirname(__file__))):
+        if file.endswith(".py") and not file.startswith("_"):
+            try:
+                import_module(f"SunloMusic.plugins.{file[:-3]}")
+                LOGGER.info(f"🔌 Loaded: {file}")
+            except Exception as e: LOGGER.error(f"❌ Failed {file}: {e}")
+
+
+
+### FILE: ./SunloMusic/plugins/start.py
+import base64
+from pyrogram import filters
+from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from SunloMusic.bot import bot
+from SunloMusic.config import config
+from SunloMusic.keyboards import start_keyboard, help_main_keyboard, help_back_keyboard
+from SunloMusic.database import add_user
+from SunloMusic.ytdlp import extract_audio
+from SunloMusic.decorators import catch_errors
+
+START_CAPTION = (
+    "<b>🎶 Welcome to {bot_name}!</b>\n\n"
+    "<i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
+    "✨ <b>Features:</b>\n"
+    "• High-Quality Audio & Video Streaming\n"
+    "• Zero Lag & 24/7 Uptime\n"
+    "• Premium User Interface\n\n"
+    "👨‍💻 <b>Developer:</b> <a href='https://t.me/YO_UR_OFFICIAL_CRUSH'>Sakil</a>\n"
+    "📢 <b>Updates:</b> <a href='{channel}'>Vip Sakil Bio</a>"
+)
+
+@bot.on_message(filters.command("start") & filters.private)
+@catch_errors
+async def start_cmd(_, m):
+    await add_user(m.from_user.id, m.from_user.first_name)
+    
+    # ✅ DM START LOG
+    log_text = (
+        f"<b>🚀 New User Started Bot!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Name:</b> {m.from_user.mention}\n"
+        f"🆔 <b>ID:</b> <code>{m.from_user.id}</code>\n"
+        f"🔗 <b>Username:</b> @{m.from_user.username if m.from_user.username else 'None'}\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    if config.LOGGER_ID:
+        try: await bot.send_message(config.LOGGER_ID, log_text)
+        except: pass
+    if config.OWNER_ID:
+        try: await bot.send_message(config.OWNER_ID, log_text)
+        except: pass
+
+    if len(m.command) > 1 and m.command[1].startswith("dl_"):
+        b64_query = m.command[1][3:]
+        try:
+            query = base64.urlsafe_b64decode(b64_query + "=" * (-len(b64_query) % 4)).decode()
+            await m.reply_text(
+                f"📥 <b>Download Menu</b>\n\nSong: <b>{query}</b>\nChoose format:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🎵 Audio", callback_data=f"dla_{b64_query}"), InlineKeyboardButton("🎬 Video", callback_data=f"dlv_{b64_query}")]
+                ])
+            )
+            return
+        except Exception: pass
+    caption = START_CAPTION.format(bot_name=config.BOT_NAME, channel=config.UPDATES_CHANNEL)
+    try:
+        if config.START_IMG: await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
+        else: raise Exception()
+    except Exception: await m.reply_text(caption, reply_markup=start_keyboard())
+
+@bot.on_message(filters.command(["ping", "help"]))
+@catch_errors
+async def ping_help_cmd(_, m):
+    if m.command[0] == "ping": return await m.reply_text("🏓 <b>Pong! System is active.</b>")
+    await m.reply_text("🎧 <b>Use /allcommand to see all commands.</b>", reply_markup=start_keyboard())
+
+
+
+### FILE: ./SunloMusic/plugins/play.py
+import asyncio, time, base64
+from pyrogram import filters, enums
+from pyrogram.types import LinkPreviewOptions
+from SunloMusic.bot import bot, ensure_assistant_in_chat
+from SunloMusic.config import config
+from SunloMusic.calls import play_stream, update_live_timer
+from SunloMusic.decorators import admin_only, catch_errors
+from SunloMusic.database import add_user, SPAM_DICT, add_lb_point
+from SunloMusic.queues import get_queue, Track, KARAOKE_CHATS
+from SunloMusic.ytdlp import extract_audio
+from SunloMusic.formatters import format_duration
+from SunloMusic.thumbnails import generate_thumbnail
+from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
+from SunloMusic.lyrics import start_live_karaoke
+
+@bot.on_message(filters.command(["play", "vplay"]) & filters.group)
+@catch_errors
+@admin_only
+async def play_cmd(_, m):
+    if m.reply_to_message and m.reply_to_message.from_user and m.reply_to_message.from_user.is_bot:
+        if m.reply_to_message.from_user.id != bot.me.id: return
+    if m.text and m.text.startswith("/") and "@" in m.text.split()[0]:
+        if bot.me.username not in m.text.split()[0]: return
+
+    if m.chat.type != enums.ChatType.SUPERGROUP:
+        return await m.reply_text("❌ <b>Voice Chat sirf Supergroup me kaam karta hai.</b>")
+
+    uid = m.from_user.id
+    now = time.time()
+    if uid in SPAM_DICT:
+        count, last_time = SPAM_DICT[uid]
+        if now - last_time < 60:
+            if count >= 5: return await m.reply_text("⚠️ <b>Spam Detected! Please wait.</b>")
+            SPAM_DICT[uid] = (count + 1, now)
+        else: SPAM_DICT[uid] = (1, now)
+    else: SPAM_DICT[uid] = (1, now)
+
+    await add_user(uid, m.from_user.first_name)
+    await add_lb_point(m.chat.id, uid, m.from_user.first_name) # ✅ Leaderboard point
+    
+    query = " ".join(m.command[1:]) if len(m.command) > 1 else (m.reply_to_message.text or m.reply_to_message.caption if m.reply_to_message else None)
+    if not query: return await m.reply_text("❌ <b>Give a song name or link.</b>")
+    try: await m.delete()
+    except: pass
+
+    status = await m.reply_text("🔎 <b>Checking Assistant...</b>")
+    if not await ensure_assistant_in_chat(m.chat.id):
+        return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
+        
+    video = "vplay" in m.command[0].lower()
+    await status.edit_text("🎬 <b>Downloading Video...</b>" if video else "⏳ <b>Wait a sec, getting the beats...</b>")
+        
+    info = await extract_audio(query, video=video)
+    if not info: return await status.edit_text("❌ <b>Failed to fetch media.</b>")
+    
+    raw_title = info["title"]
+    safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
+    
+    q = get_queue(m.chat.id)
+    track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
+    
+    if q.now_playing:
+        q.queue.append(track)
+        track_hash = str(abs(hash(track.url)))
+        thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
+        b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
+        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+        caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
+        
+        if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
+        else: sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=queue_add_keyboard(track_hash), link_preview_options=LinkPreviewOptions(is_disabled=True))
+        track.message_id = sent_msg.id
+        return
+    
+    await status.edit_text("⚡ <b>Joining VC at light speed...</b>")
+    await play_stream(m.chat.id, track.url, track.video)
+        
+    q.now_playing = track
+    q.start_time = time.time()
+    q.total_paused = 0
+    q.paused = False
+    q.votes = set()
+    
+    b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
+    title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+    thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
+    
+    caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
+    
+    if thumb:
+        await status.delete()
+        sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+    else:
+        await status.delete()
+        sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
+        
+    q.playing_message_id = sent_msg.id
+    
+    # ✅ AUTO-PIN THE MESSAGE
+    try: 
+        await sent_msg.pin(disable_notification=True)
+    except: pass
+    
+    if q.timer_task: q.timer_task.cancel()
+    q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))
+
+    if m.chat.id in KARAOKE_CHATS:
+        q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, track.title, track.duration, q))
+
+
+
+### FILE: ./SunloMusic/plugins/controls.py
+import time
+from pyrogram import filters, enums
+from pyrogram.types import CallbackQuery
+from SunloMusic.bot import bot
+from SunloMusic.calls import pause_stream, resume_stream, stop_stream, start_next_song
+from SunloMusic.decorators import admin_only, catch_errors
+from SunloMusic.database import is_sudo
+from SunloMusic.queues import get_queue, clear_queue
+from SunloMusic.texts import NOT_PLAYING_TEXT
+from SunloMusic.keyboards import player_keyboard
+
+@bot.on_message(filters.command(["skip", "next"]) & filters.group)
+@catch_errors
+async def skip_cmd(_, m):
+    try: await m.delete()
+    except: pass
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text(NOT_PLAYING_TEXT)
+    
+    user = m.from_user
+    is_admin = False
+    if await is_sudo(user.id): is_admin = True
+    else:
+        try:
+            member = await m.chat.get_member(user.id)
+            if member.privileges and (member.privileges.can_manage_voice_chats or member.privileges.can_manage_chat): is_admin = True
+        except: pass
+        
+    if is_admin:
+        if q.karaoke_task: q.karaoke_task.cancel()
+        return await start_next_song(m.chat.id, q)
+        
+    if user.id in q.votes: return await m.reply_text("🗳️ You have already voted to skip!")
+    q.votes.add(user.id)
+    
+    try:
+        participants = await m.chat.get_members(filter=enums.ChatMembersFilter.VOICE_CHAT)
+        total_listeners = len(participants) - 2
+    except: total_listeners = 5
+        
+    votes_needed = max(1, int(total_listeners / 2))
+    if len(q.votes) >= votes_needed:
+        await m.reply_text(f"🗳️ <b>Vote Skip Passed!</b> Skipping...")
+        if q.karaoke_task: q.karaoke_task.cancel()
+        await start_next_song(m.chat.id, q)
+    else:
+        await m.reply_text(f"🗳️ <b>Vote Added!</b> Needed: {votes_needed - len(q.votes)} more.")
+
+@bot.on_callback_query(filters.regex("^cb_"))
+@catch_errors
+async def controls_cb(_, cq: CallbackQuery):
+    action = cq.data
+    chat_id = cq.message.chat.id
+    user = cq.from_user
+    
+    if action not in ["cb_more", "cb_close", "cb_timer"]:
+        is_admin = False
+        if await is_sudo(user.id): is_admin = True
+        else:
+            try:
+                member = await cq.message.chat.get_member(user.id)
+                if member.privileges and (member.privileges.can_manage_voice_chats or member.privileges.can_manage_chat): is_admin = True
+            except: pass
+        if not is_admin: return await cq.answer("🚫 Sirf Admin hi ye buttons use kar sakte hain!", show_alert=True)
+
+    try:
+        q = get_queue(chat_id)
+        
+        if action == "cb_pause":
+            if q.now_playing:
+                elapsed = int(time.time() - q.start_time - q.total_paused)
+                if q.paused:
+                    await resume_stream(chat_id); q.paused = False; q.total_paused += time.time() - q.paused_at
+                    await cq.answer("▶️ Resumed")
+                else:
+                    await pause_stream(chat_id); q.paused = True; q.paused_at = time.time()
+                    await cq.answer("⏸ Paused")
+                try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
+                except: pass
+            else: await cq.answer("Nothing playing", show_alert=True)
+                
+        elif action == "cb_skip":
+            if q.karaoke_task: q.karaoke_task.cancel()
+            await start_next_song(chat_id, q)
+            await cq.answer("⏭ Skipped")
+            
+        elif action == "cb_stop":
+            if q.timer_task: q.timer_task.cancel()
+            if q.karaoke_task: q.karaoke_task.cancel()
+            await stop_stream(chat_id)
+            clear_queue(chat_id)
+            await cq.answer("⏹ Stopped")
+            try: await cq.message.delete()
+            except: pass
+            
+        elif action == "cb_loop":
+            q.loop = (q.loop + 1) % 3
+            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
+            try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
+            except: pass
+            modes = {0: "Off", 1: "One", 2: "All"}
+            await cq.answer(f"🔁 Loop: {modes[q.loop]}")
+            
+        elif action == "cb_more":
+            await cq.answer("📋 Queue: /queue\n🔄 Shuffle: /shuffle", show_alert=True)
+        elif action == "cb_close":
+            await cq.message.delete(); await cq.answer()
+    except Exception: pass
+
+
+
+### FILE: ./SunloMusic/plugins/queue.py
+import random
+from pyrogram import filters
+from SunloMusic.bot import bot
+from SunloMusic.decorators import admin_only, catch_errors
+from SunloMusic.formatters import format_duration
+from SunloMusic.queues import get_queue
+
+@bot.on_message(filters.command("queue") & filters.group)
+@catch_errors
+async def queue_cmd(_, m):
+    q = get_queue(m.chat.id)
+    if not q.now_playing and not q.queue: return await m.reply_text("📭 <b>Queue is empty.</b>")
+    text = "<b>📋 Current Queue</b>\n\n"
+    if q.now_playing: text += f"<b>▶️ Now Playing:</b>\n🎵 {q.now_playing.title}\n⏱ {format_duration(q.now_playing.duration)}\n\n"
+    if q.queue:
+        text += "<b>⏭ Up Next:</b>\n"
+        for i, t in enumerate(q.queue[:10], 1): text += f"{i}. {t.title} ({format_duration(t.duration)})\n"
+    await m.reply_text(text)
+
+@bot.on_message(filters.command("clear") & filters.group)
+@catch_errors
+@admin_only
+async def clear_cmd(_, m):
+    q = get_queue(m.chat.id)
+    if not q.queue: return await m.reply_text("📭 <b>Queue is already empty.</b>")
+    
+    # Delete queue messages
+    for t in q.queue:
+        if t.message_id:
+            try: await bot.delete_messages(m.chat.id, t.message_id)
+            except: pass
+            
+    q.queue.clear()
+    await m.reply_text("🗑 <b>Queue Cleared!</b>")
+
+@bot.on_message(filters.command("shuffle") & filters.group)
+@catch_errors
+@admin_only
+async def shuffle_cmd(_, m):
+    q = get_queue(m.chat.id)
+    if not q.queue: return await m.reply_text("📭 <b>Queue is empty.</b>")
+    random.shuffle(q.queue)
+    await m.reply_text("🔀 <b>Queue shuffled!</b>")
+
+
+
+### FILE: ./SunloMusic/plugins/admin.py
+import asyncio, time, platform
+from pyrogram import filters
+from SunloMusic.bot import bot
+from SunloMusic.database import set_auth, get_all_chats, get_stats, add_sudo, remove_sudo
+from SunloMusic.decorators import sudo_only, admin_only, catch_errors
+from SunloMusic.queues import active_chats
+
+@bot.on_message(filters.command("auth") & filters.group)
+@catch_errors
+@admin_only
+async def auth_cmd(_, m):
+    await set_auth(m.chat.id, True)
+    await m.reply_text("✅ <b>Chat Authorized</b>")
+
+@bot.on_message(filters.command("stats"))
+@catch_errors
+@sudo_only
+async def stats_cmd(_, m):
+    s = await get_stats()
+    uptime = int(time.time() - m.date.timestamp()) # Simplified uptime
+    text = (
+        f"📊 <b>SunloMusic Premium Stats</b>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"👥 <b>Total Users:</b> <code>{s['users']}</code>\n"
+        f"💬 <b>Total Chats:</b> <code>{s['chats']}</code>\n"
+        f"🎵 <b>Active VCs:</b> <code>{len(active_chats())}</code>\n"
+        f"💻 <b>System:</b> <code>Python {platform.python_version()}</code>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"<i>Bot is running smoothly.</i>"
+    )
+    await m.reply_text(text)
+
+@bot.on_message(filters.command("broadcast"))
+@catch_errors
+@sudo_only
+async def bc_cmd(_, m):
+    if not m.reply_to_message: return await m.reply_text("Reply to a message.")
+    chats = await get_all_chats()
+    status = await m.reply_text(f"📢 Broadcasting to {len(chats)} chats...")
+    for c in chats:
+        try: await m.reply_to_message.copy(c)
+        except: pass
+        await asyncio.sleep(0.1)
+    await status.edit_text("✅ <b>Broadcast Complete</b>")
+
+@bot.on_message(filters.command("addsudo") & filters.private)
+@catch_errors
+@sudo_only
+async def addsudo_cmd(_, m):
+    if not m.reply_to_message: return await m.reply_text("Reply to a user.")
+    await add_sudo(m.reply_to_message.from_user.id)
+    await m.reply_text("✅ <b>Sudo added.</b>")
+
+@bot.on_message(filters.command("delsudo") & filters.private)
+@catch_errors
+@sudo_only
+async def delsudo_cmd(_, m):
+    if len(m.command) < 2: return await m.reply_text("❌ <code>/delsudo user_id</code>")
+    try:
+        await remove_sudo(int(m.command[1]))
+        await m.reply_text("🗑 <b>Sudo removed.</b>")
+    except ValueError:
+        await m.reply_text("❌ Invalid ID")
+
+
+
+### FILE: ./SunloMusic/plugins/tools.py
+import asyncio
+from pyrogram import filters
+from SunloMusic.bot import bot
+from SunloMusic.decorators import catch_errors, admin_only
+from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, get_queue
+from SunloMusic.lyrics import fetch_lyrics_text, start_live_karaoke
+
+@bot.on_message(filters.command("karaoke") & filters.group)
+@catch_errors
+@admin_only
+async def karaoke_cmd(_, m):
+    if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/karaoke on</code>")
+    state = m.command[1].lower()
+    
+    if state == "on":
+        KARAOKE_CHATS.add(m.chat.id)
+        q = get_queue(m.chat.id)
+        if q.now_playing:
+            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>\nStarting live lyrics for the current song...")
+            q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, q.now_playing.title, q.now_playing.duration, q))
+        else:
+            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>\nBot will send live lyrics for upcoming songs.")
+            
+    elif state == "off":
+        KARAOKE_CHATS.discard(m.chat.id)
+        q = get_queue(m.chat.id)
+        if q.karaoke_task:
+            q.karaoke_task.cancel()
+            q.karaoke_task = None
+        await m.reply_text("🎤 <b>Karaoke Mode OFF.</b>")
+
+# ✅ Added /autodj back
+@bot.on_message(filters.command("autodj") & filters.group)
+@catch_errors
+@admin_only
+async def autodj_cmd(_, m):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/autodj on</code> or <code>/autodj off</code>")
+    
+    state = m.command[1].lower()
+    if state == "on":
+        AUTO_DJ_CHATS.add(m.chat.id)
+        await m.reply_text("🎧 <b>Auto-DJ Enabled!</b>\nBot will auto-play random songs when queue ends.")
+    elif state == "off":
+        AUTO_DJ_CHATS.discard(m.chat.id)
+        await m.reply_text("🛑 <b>Auto-DJ Disabled.</b>")
+    else:
+        await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
+
+@bot.on_message(filters.command("lyrics"))
+@catch_errors
+async def lyrics_cmd(_, m):
+    if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/lyrics song name</code>")
+    query = " ".join(m.command[1:])
+    status = await m.reply_text("🔎 <b>Searching lyrics...</b>")
+    
+    res = await fetch_lyrics_text(query)
+    if res: 
+        await status.edit_text(f"🎤 <b>{query}</b>\n━━━━━━━━━━━━━\n<blockquote>{res[:4000]}</blockquote>")
+    else: 
+        await status.edit_text("❌ <b>Lyrics not found in any database.</b>")
+
+
+
+### FILE: ./SunloMusic/plugins/radio.py
+from pyrogram import filters
+from SunloMusic.bot import bot
+from SunloMusic.calls import play_stream
+from SunloMusic.decorators import catch_errors, admin_only
+from SunloMusic.queues import get_queue, Track
+
+RADIOS = {"hindi": "https://stream.zeno.fm/0r0xa792kwzuv", "english": "https://stream.zeno.fm/8wv4d0g0tf9uv", "lofi": "https://stream.zeno.fm/0r0xa792kwzuv"}
+
+@catch_errors
+@bot.on_message(filters.command("radio") & filters.group)
+@admin_only
+async def radio_cmd(_, m):
+    if len(m.command) < 2: return await m.reply_text("Usage: <code>/radio hindi</code>")
+    key = m.command[1].lower()
+    if key not in RADIOS: return await m.reply_text("❌ Unknown radio.")
+    q = get_queue(m.chat.id)
+    q.now_playing = Track(title=f"Radio: {key}", url=RADIOS[key], duration=0, thumbnail="", requester=m.from_user.first_name, requester_id=m.from_user.id)
+    if await play_stream(m.chat.id, RADIOS[key]): await m.reply_text(f"📻 <b>Now streaming:</b> {key}")
+    else: q.now_playing = None; await m.reply_text("❌ <b>Failed to join VC.</b>")
+
+
+
+### FILE: ./SunloMusic/plugins/effects.py
+import asyncio
+from pyrogram import filters
+from SunloMusic.bot import bot
+from SunloMusic.calls import play_stream, stop_stream
+from SunloMusic.decorators import admin_only, catch_errors
+from SunloMusic.queues import get_queue, clear_queue
+
+@bot.on_message(filters.command("bass") & filters.group)
+@catch_errors
+@admin_only
+async def bass_cmd(_, m):
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text("❌ Nothing is playing.")
+    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, effect="bass")
+    await m.reply_text("🔊 <b>Bass Boost Activated!</b>")
+
+@bot.on_message(filters.command("8d") & filters.group)
+@catch_errors
+@admin_only
+async def eightd_cmd(_, m):
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text("❌ Nothing is playing.")
+    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, effect="8d")
+    await m.reply_text("🎧 <b>8D Audio Activated!</b>")
+
+@bot.on_message(filters.command("nightcore") & filters.group)
+@catch_errors
+@admin_only
+async def nightcore_cmd(_, m):
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text("❌ Nothing is playing.")
+    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, effect="nightcore")
+    await m.reply_text("⚡ <b>Nightcore Activated!</b>")
+
+@bot.on_message(filters.command("reset") & filters.group)
+@catch_errors
+@admin_only
+async def reset_cmd(_, m):
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text("❌ Nothing is playing.")
+    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, effect="none")
+    await m.reply_text("🎵 <b>Normal Audio Restored.</b>")
+
+@bot.on_message(filters.command("sleep") & filters.group)
+@catch_errors
+@admin_only
+async def sleep_cmd(_, m):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/sleep 10m</code> (or 30s)")
+    
+    time_str = m.command[1].lower()
+    seconds = 0
+    if time_str.endswith("m"): seconds = int(time_str[:-1]) * 60
+    elif time_str.endswith("s"): seconds = int(time_str[:-1])
+    else:
+        try: seconds = int(time_str) * 60
+        except: return await m.reply_text("❌ Invalid time format. Use 10m or 30s.")
+        
+    if seconds <= 0: return await m.reply_text("❌ Time must be greater than 0.")
+    
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text("❌ Nothing is playing.")
+    
+    await m.reply_text(f"💤 <b>Sleep Timer set for {time_str}.</b>\nBot will leave VC automatically.")
+    
+    async def sleep_task():
+        await asyncio.sleep(seconds)
+        await stop_stream(m.chat.id)
+        clear_queue(m.chat.id)
+        try: await bot.send_message(m.chat.id, "💤 <b>Sleep timer ended. Assistant left VC. Good night!</b>")
+        except: pass
+        
+    asyncio.create_task(sleep_task())
+
+
+
+### FILE: ./SunloMusic/plugins/search.py
+import yt_dlp
+from pyrogram import filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from SunloMusic.bot import bot
+from SunloMusic.decorators import catch_errors
+from SunloMusic.logger import LOGGER
+
+def _search_sync(query: str):
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True, "noplaylist": True}) as ydl:
+            info = ydl.extract_info(f"ytsearch5:{query} audio", download=False)
+            results = []
+            if info and "entries" in info:
+                for e in info["entries"]:
+                    if e:
+                        results.append({
+                            "title": e.get("title", "Unknown"),
+                            "url": e.get("url"),
+                            "duration": e.get("duration", 0),
+                            "id": e.get("id")
+                        })
+            return results
+    except Exception as e:
+        LOGGER.error(f"Search error: {e}")
+        return []
+
+@bot.on_message(filters.command("search") & filters.group)
+@catch_errors
+async def search_cmd(_, m):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Give a song name to search.</b>")
+    
+    query = " ".join(m.command[1:])
+    status = await m.reply_text("🔎 <b>Searching YouTube...</b>")
+    
+    import asyncio
+    loop = asyncio.get_running_loop()
+    results = await loop.run_in_executor(None, _search_sync, query)
+    
+    if not results:
+        return await status.edit_text("❌ <b>No results found.</b>")
+        
+    buttons = []
+    for idx, res in enumerate(results):
+        dur = res["duration"] or 0
+        mins, secs = divmod(dur, 60)
+        dur_str = f"{mins}:{secs:02d}"
+        buttons.append([InlineKeyboardButton(f"{res['title'][:35]}... ({dur_str})", callback_data=f"srch_{res['url']}")])
+        
+    await status.edit_text(
+        f"<b>🔍 Search Results for:</b> <i>{query}</i>\n\nSelect a song to play:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+@bot.on_callback_query(filters.regex("^srch_"))
+@catch_errors
+async def search_select(_, cq):
+    url = cq.data.replace("srch_", "")
+    await cq.message.delete()
+    # Trigger the play command artificially
+    await cq.message.reply_text(f"/play {url}")
+
+
+
+### FILE: ./SunloMusic/plugins/playlist.py
+from pyrogram import filters
+from SunloMusic.bot import bot
+from SunloMusic.decorators import catch_errors, admin_only
+from SunloMusic.database import save_gplaylist, get_gplaylist
+from SunloMusic.queues import get_queue, Track
+
+@bot.on_message(filters.command("gsave") & filters.group)
+@catch_errors
+@admin_only
+async def gsave_cmd(_, m):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/gsave party</code>")
+    
+    name = m.command[1].lower()
+    q = get_queue(m.chat.id)
+    
+    if not q.now_playing and not q.queue:
+        return await m.reply_text("❌ <b>Queue is empty, nothing to save.</b>")
+        
+    queue_data = []
+    if q.now_playing:
+        queue_data.append({"title": q.now_playing.title, "url": q.now_playing.url, "duration": q.now_playing.duration, "thumbnail": q.now_playing.thumbnail, "requester": "Playlist", "requester_id": 0})
+    for t in q.queue:
+        queue_data.append({"title": t.title, "url": t.url, "duration": t.duration, "thumbnail": t.thumbnail, "requester": "Playlist", "requester_id": 0})
+        
+    await save_gplaylist(m.chat.id, name, queue_data)
+    await m.reply_text(f"✅ <b>Group Playlist saved as '{name}'!</b>\nLoad it anytime using <code>/gload {name}</code>.")
+
+@bot.on_message(filters.command("gload") & filters.group)
+@catch_errors
+@admin_only
+async def gload_cmd(_, m):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/gload party</code>")
+        
+    name = m.command[1].lower()
+    data = await get_gplaylist(m.chat.id, name)
+    
+    if not data:
+        return await m.reply_text(f"❌ <b>No group playlist found with name '{name}'.</b>")
+        
+    q = get_queue(m.chat.id)
+    for item in data:
+        track = Track(item["title"], item["url"], item["duration"], item["thumbnail"], m.from_user.first_name, m.from_user.id, False)
+        q.queue.append(track)
+        
+    await m.reply_text(f"✅ <b>Group Playlist '{name}' loaded with {len(data)} tracks!</b>")
+
+
+
+### FILE: ./SunloMusic/plugins/shazam.py
+import os, asyncio
+from pyrogram import filters
+from SunloMusic.bot import bot
+from SunloMusic.decorators import catch_errors
+from SunloMusic.logger import LOGGER
+from shazamio import Shazam
+from SunloMusic.ytdlp import extract_audio
+
+@bot.on_message(filters.voice | filters.audio | (filters.video & ~filters.command(["play", "vplay", "song"])) & filters.group)
+@catch_errors
+async def shazam_handler(_, m):
+    # Ignore if it's a command
+    if m.text and m.text.startswith("/"): return
+    
+    msg = await m.reply_text("🎧 <b>Listening to your voice/audio...</b>")
+    path = await m.download()
+    
+    try:
+        shazam = Shazam()
+        out = await shazam.recognize(path)
+        
+        if out and "track" in out:
+            title = out["track"]["title"]
+            artist = out["track"]["subtitle"]
+            await msg.edit_text(f"🎵 <b>Found:</b> {title} by {artist}\n\n⚡ <b>Fetching stream link to play...</b>")
+            
+            # Play the song
+            info = await extract_audio(f"{title} {artist}")
+            if info:
+                await msg.edit_text(f"🎶 <b>Matched:</b> {title} by {artist}\n\n<i>Use /play {title} to play it in VC!</i>")
+            else:
+                await msg.edit_text(f"🎵 <b>Matched:</b> {title} by {artist}\n<i>Could not auto-fetch stream link.</i>")
+        else:
+            await msg.edit_text("❌ <b>Could not recognize this audio.</b> Try a clearer snippet.")
+    except Exception as e:
+        LOGGER.error(f"Shazam Error: {e}")
+        await msg.edit_text("❌ <b>Failed to analyze audio.</b>")
+    finally:
+        if os.path.exists(path): os.remove(path)
+
+
+
+### FILE: ./SunloMusic/plugins/moderation.py
+import asyncio
+import random
+from pyrogram import filters, enums
+from pyrogram.types import Message
+from SunloMusic.bot import bot
+from SunloMusic.decorators import catch_errors
+from SunloMusic.database import set_group_setting, get_group_setting
+from SunloMusic.logger import LOGGER
+
+# ✅ Random Premium Emojis
+EMOJIS = ["🍃", "🌿", "🌺", "🌸", "🦋", "✨", "💎", "🪐", "🌌", "🔥", "🎵", "🎶", "🌟", "👑", "🥂", "🎧", "⚜️"]
+
+@bot.on_message(filters.command("id") & filters.group)
+@catch_errors
+async def id_cmd(_, m: Message):
+    if m.reply_to_message:
+        user = m.reply_to_message.from_user
+        text = f"👤 <b>User ID:</b> <code>{user.id}</code>\n📝 <b>Name:</b> {user.mention}\n💬 <b>Message ID:</b> <code>{m.reply_to_message.id}</code>"
+    else:
+        text = f"💬 <b>Chat ID:</b> <code>{m.chat.id}</code>\n👤 <b>Your ID:</b> <code>{m.from_user.id}</code>"
+    await m.reply_text(text)
+
+@bot.on_message(filters.command("purge") & filters.group)
+@catch_errors
+async def purge_cmd(_, m: Message):
+    if not m.reply_to_message:
+        return await m.reply_text("❌ <b>Reply to a message to start purging from.</b>")
+    start_id = m.reply_to_message.id
+    end_id = m.id
+    msg_ids = list(range(start_id, end_id + 1))
+    for i in range(0, len(msg_ids), 100):
+        try: await bot.delete_messages(m.chat.id, msg_ids[i:i+100])
+        except: pass
+    try: await m.reply_text(f"🧹 <b>Purged {len(msg_ids)} messages.</b>")
+    except: pass
+
+@bot.on_message(filters.command("tagall") & filters.group)
+@catch_errors
+async def tagall_cmd(_, m: Message):
+    custom_msg = " ".join(m.command[1:]) if len(m.command) > 1 else None
+    if not custom_msg and not m.reply_to_message:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/tagall [message]</code> or reply to a message.")
+
+    status = await m.reply_text("⏳ <b>Preparing premium tags...</b>")
+    try: await m.delete()
+    except: pass
+
+    if m.reply_to_message:
+        try: await m.reply_to_message.copy(m.chat.id)
+        except: pass
+
+    # ✅ Highlight Message Format (Blockquote)
+    msg_text = f"<blockquote><b>{custom_msg}</b></blockquote>" if custom_msg else ""
+
+    header = (
+        f"✨ ─── 𝓐𝓽𝓽𝓮𝓷𝓽𝓲𝓸𝓷 ─── ✨\n\n"
+        f"🌸 {msg_text}\n\n"
+        f"🕊️ <b>With regards,</b> {m.from_user.mention}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"🕊️ <b>Peaceful Pings:</b>\n\n"
+    )
+
+    current_text = header
+    count = 0
+    member_count = 0 # ✅ Track members for 20-page limit
+    
+    async for member in m.chat.get_members():
+        if member.user.is_bot or member.user.is_deleted:
+            continue
+            
+        emoji = random.choice(EMOJIS)
+        line = f"{emoji} {member.user.mention}\n"
+        
+        current_text += line
+        member_count += 1
+        
+        # ✅ 20 members per message
+        if member_count == 20:
+            try: 
+                await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
+            except Exception as e: 
+                LOGGER.error(f"Tagall send error: {e}")
+                
+            current_text = "" # Reset for next page
+            member_count = 0
+            count += 1
+            await asyncio.sleep(1) # Anti-flood delay
+
+    # Send remaining members if any
+    if current_text:
+        try: 
+            await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
+        except Exception as e: 
+            LOGGER.error(f"Tagall final error: {e}")
+
+    await status.delete()
+
+@bot.on_message(filters.command("welcome") & filters.group)
+@catch_errors
+async def welcome_cmd(_, m: Message):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/welcome on</code> or <code>/welcome off</code>")
+    state = m.command[1].lower()
+    if state == "on":
+        await set_group_setting(m.chat.id, "welcome", True)
+        await m.reply_text("✅ <b>Welcome Messages Enabled!</b>")
+    elif state == "off":
+        await set_group_setting(m.chat.id, "welcome", False)
+        await m.reply_text("❌ <b>Welcome Messages Disabled.</b>")
+
+@bot.on_message(filters.new_chat_members)
+@catch_errors
+async def welcome_new_member(_, m: Message):
+    is_welcome = await get_group_setting(m.chat.id, "welcome", False)
+    if not is_welcome: return
+    for user in m.new_chat_members:
+        if user.is_bot: continue
+        caption = (
+            f"<b>✨ Welcome to {m.chat.title}!</b>\n"
+            f"━━━━━━━━━━━━━\n"
+            f"👤 <b>User:</b> {user.mention}\n"
+            f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
+            f"━━━━━━━━━━━━━\n"
+            f"<i>Hope you enjoy your stay here. Use /play to listen to music!</i>"
+        )
+        try: await m.reply_text(caption)
+        except: pass
+
+
+
+### FILE: ./SunloMusic/plugins/utility.py
+from pyrogram import filters, enums
+from pyrogram.types import Message
+from SunloMusic.bot import bot
+from SunloMusic.decorators import catch_errors
+from SunloMusic.database import set_afk, get_afk, remove_afk, get_leaderboard
+
+@bot.on_message(filters.command("afk") & filters.group)
+@catch_errors
+async def afk_cmd(_, m: Message):
+    reason = " ".join(m.command[1:]) if len(m.command) > 1 else "No reason provided."
+    await set_afk(m.from_user.id, reason)
+    await m.reply_text(f"💤 <b>{m.from_user.first_name} is now AFK.</b>\n📝 <b>Reason:</b> {reason}")
+
+@bot.on_message(filters.group, group=10)
+@catch_errors
+async def check_afk(_, m: Message):
+    if not m.from_user or m.from_user.is_bot: return
+    
+    # Check if the sender is back
+    afk_reason = await get_afk(m.from_user.id)
+    if afk_reason:
+        await remove_afk(m.from_user.id)
+        return await m.reply_text(f"👋 <b>Welcome back {m.from_user.first_name}!</b> I removed your AFK status.")
+        
+    # Check if someone tagged an AFK user
+    if m.reply_to_message and m.reply_to_message.from_user:
+        target_afk = await get_afk(m.reply_to_message.from_user.id)
+        if target_afk:
+            return await m.reply_text(f"💤 <b>{m.reply_to_message.from_user.first_name} is currently AFK.</b>\n📝 <b>Reason:</b> {target_afk}")
+            
+    if m.entities:
+        for entity in m.entities:
+            if entity.type == enums.MessageEntityType.MENTION:
+                username = m.text[entity.offset:entity.offset + entity.length].replace("@", "")
+                # Note: To check by username properly we would need to resolve it to ID, 
+                # but for simplicity, we just check if the username matches.
+                # For a full fix, resolving username to ID is needed. 
+                pass
+
+@bot.on_message(filters.command("leaderboard") & filters.group)
+@catch_errors
+async def lb_cmd(_, m: Message):
+    top_users = await get_leaderboard(m.chat.id, limit=5)
+    if not top_users:
+        return await m.reply_text("📊 <b>Leaderboard is empty!</b>\nStart playing songs to earn points.")
+        
+    text = "<b>🏆 Group Leaderboard 🏆</b>\n━━━━━━━━━━━━━\n"
+    for i, user in enumerate(top_users, 1):
+        emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+        text += f"{emoji} <a href='tg://user?id={user['user_id']}'>{user['name']}</a> - <code>{user['points']}</code> plays\n"
+    text += "━━━━━━━━━━━━━"
+    await m.reply_text(text)
+
+@bot.on_message(filters.command("gstats") & filters.group)
+@catch_errors
+async def gstats_cmd(_, m: Message):
+    total_members = m.chat.members_count if hasattr(m.chat, 'members_count') else "N/A"
+    text = (
+        f"<b>📊 {m.chat.title} Stats</b>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"🆔 <b>Chat ID:</b> <code>{m.chat.id}</code>\n"
+        f"👥 <b>Total Members:</b> {total_members}\n"
+        f"📝 <b>Type:</b> Supergroup\n"
+        f"━━━━━━━━━━━━━"
+    )
+    await m.reply_text(text)
+
+
+
+### FILE: ./SunloMusic/plugins/events.py
+from pyrogram import filters, enums
+from pyrogram.types import Message
+from SunloMusic.bot import bot, assistant
+from SunloMusic.config import config
+from SunloMusic.decorators import catch_errors
+
+async def send_bot_log(text):
+    if config.LOGGER_ID:
+        try: await bot.send_message(config.LOGGER_ID, text)
+        except: pass
+    if config.OWNER_ID:
+        try: await bot.send_message(config.OWNER_ID, text)
+        except: pass
+
+@bot.on_message(filters.new_chat_members)
+@catch_errors
+async def log_added(_, m: Message):
+    me = await bot.get_me()
+    for user in m.new_chat_members:
+        if user.id == me.id or (assistant and user.id == assistant.me.id):
+            client = "Bot" if user.id == me.id else "Assistant"
+            try:
+                link = f"https://t.me/{m.chat.username}" if m.chat.username else (await m.chat.export_chat_invite_link() if not m.chat.username else "Private Group")
+            except: link = "Private/Link Unavailable"
+            
+            text = (
+                f"<b>➕ {client} Added to Group!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"👤 <b>Added By:</b> {m.from_user.mention}\n"
+                f"🆔 <b>User ID:</b> <code>{m.from_user.id}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"💬 <b>Group:</b> {m.chat.title}\n"
+                f"🆔 <b>Group ID:</b> <code>{m.chat.id}</code>\n"
+                f"🔗 <b>Link:</b> <a href='{link}'>Click Here</a>\n"
+                f"━━━━━━━━━━━━━━━━━━━━"
+            )
+            await send_bot_log(text)
+
+@bot.on_message(filters.left_chat_member)
+@catch_errors
+async def log_removed(_, m: Message):
+    me = await bot.get_me()
+    if m.left_chat_member.id == me.id or (assistant and m.left_chat_member.id == assistant.me.id):
+        client = "Bot" if m.left_chat_member.id == me.id else "Assistant"
+        text = (
+            f"<b>➖ {client} Removed from Group!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Removed By:</b> {m.from_user.mention}\n"
+            f"🆔 <b>User ID:</b> <code>{m.from_user.id}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💬 <b>Group:</b> {m.chat.title}\n"
+            f"🆔 <b>Group ID:</b> <code>{m.chat.id}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+        await send_bot_log(text)
+
+
+
+### FILE: ./SunloMusic/__init__.py
+__version__ = "1.0.0"
+__author__ = "Sakil"
+__github__ = "https://github.com/SunloMusicOfficial"
+__channel__ = "https://t.me/Vip_Sakil_Bio"
+__support__ = "https://t.me/YO_UR_OFFICIAL_CRUSH"
+__bot_name__ = "🎶 SunloMusic"
+
+
+
+### FILE: ./SunloMusic/__main__.py
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import asyncio
+from SunloMusic.logger import LOGGER, print_banner
+from SunloMusic.bot import init_clients, start_bot
+from SunloMusic.calls import init_calls, start_call
+from SunloMusic.plugins import load_plugins
+from SunloMusic.keep_alive import start_keep_alive
+
+async def main():
+    print_banner()
+    LOGGER.info("🚀 Starting SunloMusic...")
+    
+    # ✅ Initialize clients inside the running event loop
+    init_clients()
+    init_calls()
+    
+    await start_bot()
+    await start_call()
+    await start_keep_alive()
+    
+    load_plugins()
+    LOGGER.info("✅ Bot is live and ready!")
+    await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        LOGGER.info("🛑 Shutting down...")
+
+
+
+### FILE: ./SunloMusic/config.py
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+class Config(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=True)
+
+    API_ID: int
+    API_HASH: str
+    BOT_TOKEN: str
+    SESSION_STRING: str
+    MONGO_URL: str
+
+    ONEGRAB_API_KEY: str = "" # ✅ OneGrab API Key
+    ONEGRAB_API_URL: str = "https://api.onegrab.fun"
+
+    OWNER_ID: int = 0
+    LOGGER_ID: int = 0
+    SUDO_USERS: str = ""
+
+    BOT_NAME: str = "SunloMusic"
+    BOT_USERNAME: str = "@SunloMusicBot"
+    START_IMG: str = ""
+
+    SUPPORT_CHAT: str = ""
+    UPDATES_CHANNEL: str = ""
+
+    DURATION_LIMIT: int = 3600
+    QUEUE_LIMIT: int = 50
+
+    @property
+    def sudo_list(self) -> list[int]:
+        try:
+            return [int(x.strip()) for x in self.SUDO_USERS.split(",") if x.strip()]
+        except Exception:
+            return []
+
+config = Config()
+
+
+
+### FILE: ./SunloMusic/logger.py
+import logging
+import sys
+import time
+from pyfiglet import figlet_format
+
+LOGGER = logging.getLogger("SunloMusic")
+LOGGER.setLevel(logging.INFO)
+LOGGER.propagate = False
+
+if not LOGGER.handlers:
+    _handler = logging.StreamHandler(sys.stdout)
+    _handler.setFormatter(logging.Formatter("\x1b[36m%(asctime)s\x1b[0m │ \x1b[33m%(levelname)-8s\x1b[0m │ %(message)s", datefmt="%H:%M:%S"))
+    LOGGER.addHandler(_handler)
+
+def print_banner():
+    banner = figlet_format("SunloMusic", font="slant")
+    print(f"\x1b[95m{banner}\x1b[0m")
+    print("\x1b[96m" + "═" * 60 + "\x1b[0m")
+    print("\x1b[92m   🎶 Premium Telegram VC Music Bot\x1b[0m")
+    print("\x1b[93m   Author: Sakil  |  @YO_UR_OFFICIAL_CRUSH\x1b[0m")
+    print("\x1b[94m   Channel: https://t.me/Vip_Sakil_Bio\x1b[0m")
+    print("\x1b[96m" + "═" * 60 + "\x1b[0m\n")
+
+def get_startup_card(bot_username: str) -> str:
+    uptime = time.strftime("%H:%M:%S", time.gmtime(time.time()))
+    return (
+        f"<b>🟢 SYSTEM ONLINE 🟢</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 <b>Bot:</b> @{bot_username}\n"
+        f"🎙 <b>Assistant:</b> Ready\n"
+        f"⚡ <b>Engine:</b> PyTgCalls v3\n"
+        f"⏱ <b>Server Time:</b> {uptime}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<i>SunloMusic is now live and ready to play!</i>"
+    )
+
+
+
+### FILE: ./SunloMusic/database.py
+from motor.motor_asyncio import AsyncIOMotorClient
+from SunloMusic.config import config
+from SunloMusic.logger import LOGGER
+
+client = AsyncIOMotorClient(config.MONGO_URL)
+db = client["SunloMusic"]
+users_col = db["users"]
+chats_col = db["chats"]
+sudo_col = db["sudoers"]
+playlists_col = db["playlists"]
+thumbs_col = db["thumbs"]
+lb_col = db["leaderboard"]
+gplaylists_col = db["gplaylists"]
+afk_col = db["afk"]
+settings_col = db["settings"]
+
+SPAM_DICT = {}
+
+async def add_user(user_id: int, name: str = ""):
+    await users_col.update_one({"user_id": user_id}, {"$setOnInsert": {"user_id": user_id, "name": name}}, upsert=True)
+
+async def is_sudo(user_id: int) -> bool:
+    if user_id in config.sudo_list or user_id == config.OWNER_ID: return True
+    return await sudo_col.find_one({"user_id": user_id}) is not None
+
+async def add_sudo(user_id: int):
+    await sudo_col.update_one({"user_id": user_id}, {"$set": {"user_id": user_id}}, upsert=True)
+
+async def remove_sudo(user_id: int):
+    await sudo_col.delete_one({"user_id": user_id})
+
+async def get_chat(chat_id: int) -> dict:
+    return await chats_col.find_one({"chat_id": chat_id}) or {"chat_id": chat_id, "auth": False}
+
+async def set_auth(chat_id: int, status: bool):
+    await chats_col.update_one({"chat_id": chat_id}, {"$set": {"auth": status}}, upsert=True)
+
+async def get_stats() -> dict:
+    return {"users": await users_col.count_documents({}), "chats": await chats_col.count_documents({})}
+
+async def get_all_chats() -> list:
+    return [c["chat_id"] async for c in chats_col.find({}, {"chat_id": 1})]
+
+# ✅ Purane Working Functions (Wapas add kiye)
+async def save_playlist(user_id: int, name: str, queue_data: list):
+    await playlists_col.update_one({"user_id": user_id, "name": name}, {"$set": {"queue": queue_data}}, upsert=True)
+
+async def get_playlist(user_id: int, name: str) -> list:
+    data = await playlists_col.find_one({"user_id": user_id, "name": name})
+    return data["queue"] if data else None
+
+async def set_custom_thumb(chat_id: int, file_id: str):
+    await thumbs_col.update_one({"chat_id": chat_id}, {"$set": {"file_id": file_id}}, upsert=True)
+
+async def get_custom_thumb(chat_id: int) -> str:
+    data = await thumbs_col.find_one({"chat_id": chat_id})
+    return data["file_id"] if data else None
+
+async def del_custom_thumb(chat_id: int):
+    await thumbs_col.delete_one({"chat_id": chat_id})
+
+# ✅ Naye Functions (Leaderboard, Group Settings, etc.)
+async def set_group_setting(chat_id: int, key: str, value: any):
+    await settings_col.update_one({"chat_id": chat_id}, {"$set": {key: value}}, upsert=True)
+
+async def get_group_setting(chat_id: int, key: str, default: any = None):
+    data = await settings_col.find_one({"chat_id": chat_id})
+    return data.get(key, default) if data else default
+
+async def add_lb_point(chat_id: int, user_id: int, user_name: str):
+    await lb_col.update_one(
+        {"chat_id": chat_id, "user_id": user_id},
+        {"$inc": {"points": 1}, "$set": {"name": user_name}},
+        upsert=True
+    )
+
+async def get_leaderboard(chat_id: int, limit: int = 5):
+    return await lb_col.find({"chat_id": chat_id}).sort("points", -1).limit(limit).to_list(limit)
+
+async def save_gplaylist(chat_id: int, name: str, queue_data: list):
+    await gplaylists_col.update_one(
+        {"chat_id": chat_id, "name": name},
+        {"$set": {"queue": queue_data}},
+        upsert=True
+    )
+
+async def get_gplaylist(chat_id: int, name: str):
+    data = await gplaylists_col.find_one({"chat_id": chat_id, "name": name})
+    return data["queue"] if data else None
+
+async def set_afk(user_id: int, reason: str):
+    await afk_col.update_one({"user_id": user_id}, {"$set": {"reason": reason}}, upsert=True)
+
+async def get_afk(user_id: int):
+    data = await afk_col.find_one({"user_id": user_id})
+    return data["reason"] if data else None
+
+async def remove_afk(user_id: int):
+    await afk_col.delete_one({"user_id": user_id})
+
+
+
+### FILE: ./SunloMusic/bot.py
+import asyncio
+from pyrogram import Client
+from pyrogram.errors import InviteHashExpired, UserAlreadyParticipant
+from SunloMusic.config import config
+from SunloMusic.logger import LOGGER, get_startup_card
+
+bot = None
+assistant = None
+ASSISTANT_CHATS = set()
+
+def init_clients():
+    global bot, assistant
+    bot = Client("SunloMusicBot", api_id=config.API_ID, api_hash=config.API_HASH, bot_token=config.BOT_TOKEN, in_memory=True)
+    if config.SESSION_STRING:
+        assistant = Client("SunloAssistant", api_id=config.API_ID, api_hash=config.API_HASH, session_string=config.SESSION_STRING, in_memory=True)
+
+async def start_bot():
+    await bot.start()
+    me = await bot.get_me()
+    LOGGER.info(f"✅ Bot started as @{me.username}")
+    
+    if assistant:
+        await assistant.start()
+        LOGGER.info("✅ Assistant started (VC Ready)")
+    else:
+        LOGGER.warning("⚠️ No SESSION_STRING provided.")
+        
+    if config.LOGGER_ID:
+        try:
+            await bot.send_message(config.LOGGER_ID, get_startup_card(me.username))
+        except Exception as e:
+            LOGGER.error(f"Failed to send startup card: {e}")
+
+async def ensure_assistant_in_chat(chat_id: int) -> bool:
+    global ASSISTANT_CHATS
+    if not assistant: return False
+        
+    if chat_id in ASSISTANT_CHATS: return True
+
+    # 1. Check if already a member
+    try:
+        await assistant.get_chat_member(chat_id, "me")
+        ASSISTANT_CHATS.add(chat_id)
+        return True
+    except Exception:
+        pass
+
+    LOGGER.info(f"🤖 Assistant is not in {chat_id}, attempting to join...")
+    
+    # 2. Try Public Username
+    try:
+        chat = await bot.get_chat(chat_id)
+        if chat.username:
+            try:
+                await assistant.join_chat(chat.username)
+                ASSISTANT_CHATS.add(chat_id)
+                LOGGER.info(f"✅ Assistant joined public chat @{chat.username}")
+                return True
+            except UserAlreadyParticipant:
+                ASSISTANT_CHATS.add(chat_id)
+                return True
+            except Exception:
+                pass
+    except: pass
+
+    # 3. Try Invite Link + Auto-Approve (Fixes the manual approval issue)
+    try:
+        link = await bot.export_chat_invite_link(chat_id)
+        await asyncio.sleep(1)
+        try:
+            await assistant.join_chat(link)
+        except Exception as e:
+            # Sometimes join_chat throws error if request is pending
+            LOGGER.info(f"Join attempt: {e}")
+            
+        await asyncio.sleep(2) # Wait for Telegram to process
+        
+        # Check if joined
+        try:
+            await assistant.get_chat_member(chat_id, "me")
+            ASSISTANT_CHATS.add(chat_id)
+            LOGGER.info(f"✅ Assistant joined via invite link")
+            return True
+        except:
+            # ✅ If still not joined, Bot auto-approves the join request!
+            LOGGER.info("📝 Assistant join request pending. Bot auto-approving...")
+            try:
+                me_ass = await assistant.get_me()
+                await bot.approve_chat_join_request(chat_id, me_ass.id)
+                LOGGER.info("✅ Bot auto-approved Assistant's request!")
+                ASSISTANT_CHATS.add(chat_id)
+                return True
+            except Exception as approve_err:
+                LOGGER.error(f"❌ Auto-approve failed: {approve_err}. Make sure Bot has 'Add Users' permission.")
+    except Exception as e:
+        LOGGER.error(f"❌ Could not create invite link: {e}")
+
+    return False
+
+
+
+### FILE: ./SunloMusic/calls.py
+import asyncio, time, base64, os, random
+import aiohttp
+from pyrogram import enums
+from pyrogram.types import LinkPreviewOptions
+from pyrogram.errors import FloodWait
+from pytgcalls import PyTgCalls, filters as fl
+from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
+import SunloMusic.bot as bot_module
+from SunloMusic.logger import LOGGER
+from SunloMusic.config import config
+from SunloMusic.formatters import format_duration
+from SunloMusic.thumbnails import generate_thumbnail
+from SunloMusic.keyboards import player_keyboard
+from SunloMusic.ytdlp import extract_audio
+from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
+from SunloMusic.lyrics import start_live_karaoke
+
+call = None
+EMPTY_VC_TIMERS = {}
+
+def cleanup_file(url: str):
+    if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a', '.mp3')):
+        try: os.remove(url)
+        except: pass
+
+async def check_empty_vc(chat_id):
+    try:
+        members = await bot_module.bot.get_chat_members(chat_id, filter=enums.ChatMembersFilter.VOICE_CHAT)
+        humans = [m for m in members if not m.user.is_bot]
+        if len(humans) == 0:
+            if chat_id not in EMPTY_VC_TIMERS: EMPTY_VC_TIMERS[chat_id] = time.time()
+            elif time.time() - EMPTY_VC_TIMERS[chat_id] > 180:
+                await bot_module.bot.send_message(chat_id, "💤 <b>No humans in VC for 3 minutes. Leaving...</b>")
+                await stop_stream(chat_id)
+                from SunloMusic.queues import clear_queue
+                clear_queue(chat_id)
+                if chat_id in EMPTY_VC_TIMERS: del EMPTY_VC_TIMERS[chat_id]
+                return True
+        else:
+            if chat_id in EMPTY_VC_TIMERS: del EMPTY_VC_TIMERS[chat_id]
+    except: pass
+    return False
+
+async def update_live_timer(chat_id, msg_id):
+    from SunloMusic.queues import get_queue
+    while True:
+        await asyncio.sleep(5)
+        q = get_queue(chat_id)
+        if not q.now_playing or q.playing_message_id != msg_id: break
+        if q.paused: continue
+        if await check_empty_vc(chat_id): break
+        
+        if q.now_playing.duration <= 0: dur_str = "Live"
+        else: dur_str = format_duration(q.now_playing.duration)
+            
+        elapsed = int(time.time() - q.start_time - q.total_paused)
+        if q.now_playing.duration > 0 and elapsed >= q.now_playing.duration: break
+        
+        try:
+            b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
+            title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+            caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n━━━━━━━━━━━━━"
+            
+            try: 
+                await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+            except: 
+                try: 
+                    await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed), link_preview_options=LinkPreviewOptions(is_disabled=True))
+                except FloodWait as e:
+                    await asyncio.sleep(e.value)
+                except: pass
+        except: pass
+
+async def start_next_song(chat_id, q):
+    from SunloMusic.queues import clear_queue, Track
+    if q.timer_task: q.timer_task.cancel(); q.timer_task = None
+    if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
+    if q.playing_message_id:
+        try: await bot_module.bot.delete_messages(chat_id, q.playing_message_id)
+        except: pass
+        q.playing_message_id = 0
+    if q.now_playing: cleanup_file(q.now_playing.url)
+
+    q.now_playing = None
+    
+    if not q.queue and chat_id in AUTO_DJ_CHATS:
+        try:
+            queries = ["trending hindi songs 2024", "top bollywood hits", "arijit singh best songs", "lofi hindi chill", "punjabi top hits"]
+            random_query = random.choice(queries)
+            info = await extract_audio(random_query)
+            if info: 
+                q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
+        except Exception as e: 
+            LOGGER.error(f"Auto-DJ fetch error: {e}")
+
+    if q.queue:
+        nxt = q.queue.pop(0)
+        q.now_playing = nxt
+        if nxt.message_id:
+            try: await bot_module.bot.delete_messages(chat_id, nxt.message_id)
+            except: pass
+            nxt.message_id = 0
+
+        await play_stream(chat_id, nxt.url, nxt.video)
+        q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
+        
+        thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
+        dur_str = format_duration(nxt.duration) if nxt.duration > 0 else "Live"
+        b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
+        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+        caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
+        
+        if thumb: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+        else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
+        
+        q.playing_message_id = sent_msg.id
+        try: await sent_msg.pin(disable_notification=True)
+        except: pass
+        
+        q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
+
+        if chat_id in KARAOKE_CHATS:
+            q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
+    else:
+        try:
+            if call: await call.leave_call(chat_id)
+        except: pass
+        clear_queue(chat_id)
+        ghost_text = f"👻 <b>G H O S T E D !</b> 👻\n━━━━━━━━━━━━━━━━━━━\n<i>The queue vanished into thin air...</i>\n━━━━━━━━━━━━━━━━━━━\n📭 <b>STATUS:</b> <code>EMPTY</code>\n🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n━━━━━━━━━━━━━━━━━━━\n<blockquote>Boo! Hope you enjoyed the vibes. 👻</blockquote>"
+        try: await bot_module.bot.send_message(chat_id, ghost_text)
+        except: pass
+
+async def stream_end_handler(client, update: StreamEnded):
+    from SunloMusic.queues import get_queue
+    chat_id = update.chat_id
+    q = get_queue(chat_id)
+    if q.loop == 1 and q.now_playing:
+        await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
+        q.start_time = time.time(); q.total_paused = 0; q.paused = False
+        return
+    if q.loop == 2 and q.now_playing: q.queue.append(q.now_playing)
+    await start_next_song(chat_id, q)
+
+def init_calls():
+    global call
+    if bot_module.assistant:
+        call = PyTgCalls(bot_module.assistant, cache_duration=100)
+        call.on_update(fl.stream_end())(stream_end_handler)
+
+async def start_call():
+    if call:
+        await call.start()
+
+# ✅ UPDATED PLAY STREAM (Download Fallback Added)
+async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
+    if not call: return False
+    if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
+    
+    ffmpeg_args = "-af bass=g=10" if effect == "bass" else "-af apulsator=hz=0.1" if effect == "8d" else "-af atempo=1.25,asetrate=44100*1.25" if effect == "nightcore" else None
+    
+    if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
+    else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
+    
+    try:
+        LOGGER.info(f"🎵 Attempting to play URL directly: {url[:80]}")
+        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=20.0)
+        return True
+    except Exception as e:
+        LOGGER.error(f"Direct Play error: {e}")
+        
+        # ✅ Fallback: Agar direct URL fail ho jaye, toh local download karke play karo
+        if "http" in url:
+            LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
+            try:
+                os.makedirs("cache/downloads", exist_ok=True)
+                file_path = f"cache/downloads/{abs(hash(url))}.m4a"
+                
+                # Download file
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as resp:
+                        if resp.status == 200:
+                            with open(file_path, "wb") as f:
+                                f.write(await resp.read())
+                                
+                if os.path.exists(file_path):
+                    LOGGER.info(f"✅ Download successful. Playing local file: {file_path}")
+                    if video: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
+                    else: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
+                    
+                    await asyncio.wait_for(call.play(chat_id, stream2, config=GroupCallConfig(auto_start=True)), timeout=30.0)
+                    return True
+            except Exception as download_err:
+                LOGGER.error(f"Download fallback failed: {download_err}")
+                
+        return True # Even if it fails, return True so card is sent.
+
+async def pause_stream(chat_id: int):
+    if call: await call.pause(chat_id)
+async def resume_stream(chat_id: int):
+    if call: await call.resume(chat_id)
+async def stop_stream(chat_id: int):
+    if call: await call.leave_call(chat_id)
+
+
+
+### FILE: ./SunloMusic/keep_alive.py
+import asyncio, os, time, aiohttp
+from aiohttp import web
+from SunloMusic.logger import LOGGER
+from SunloMusic.config import config
+from SunloMusic.database import get_stats
+from SunloMusic.queues import active_chats
+
+START_TIME = time.time()
+
+async def _handle_ping(request):
+    return web.Response(text="SunloMusic is alive!", status=200)
+
+async def _handle_dashboard(request):
+    try:
+        stats = await get_stats()
+        active = len(active_chats())
+        uptime = int(time.time() - START_TIME)
+        h, rem = divmod(uptime, 3600)
+        m, s = divmod(rem, 60)
+        
+        html = f"""
+        <html>
+            <head><title>SunloMusic Dashboard</title><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+            <body style="background:#111; color:#fff; font-family:sans-serif; text-align:center; padding:50px;">
+                <h1 style="color:#00e0ff;">🎶 SunloMusic Live Dashboard</h1>
+                <div style="background:#222; padding:20px; border-radius:10px; display:inline-block; text-align:left;">
+                    <p><b>Status:</b> <span style="color:lime;">🟢 ONLINE</span></p>
+                    <p><b>Uptime:</b> {h}h {m}m {s}s</p>
+                    <p><b>Total Users:</b> {stats['users']}</p>
+                    <p><b>Total Chats:</b> {stats['chats']}</p>
+                    <p><b>Active VCs:</b> {active}</p>
+                </div>
+            </body>
+        </html>
+        """
+        return web.Response(text=html, content_type="text/html")
+    except Exception as e:
+        return web.Response(text=f"Error loading dashboard: {e}", status=500)
+
+async def _background_pinger():
+    await asyncio.sleep(60)
+    url = os.environ.get("RENDER_EXTERNAL_URL")
+    if not url: return
+    ping_url = f"{url.rstrip('/')}/ping"
+    async with aiohttp.ClientSession() as session:
+        while True:
+            try:
+                async with session.get(ping_url, timeout=10) as resp: await resp.read()
+            except: pass
+            await asyncio.sleep(600)
+
+async def start_keep_alive():
+    app = web.Application()
+    app.router.add_get("/", _handle_dashboard) # ✅ Dashboard
+    app.router.add_get("/ping", _handle_ping)
+    
+    port = int(os.environ.get("PORT", 8080))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    LOGGER.info(f"✅ Keep-Alive Web Server running on port {port}")
+    
+    asyncio.create_task(_background_pinger())
+
+
+
+### FILE: ./SunloMusic/decorators.py
+from functools import wraps
+from pyrogram import enums
+from pyrogram.types import Message, CallbackQuery
+from SunloMusic.config import config
+from SunloMusic.database import is_sudo, get_chat
+from SunloMusic.texts import NO_SUDO_TEXT, NO_ADMIN_TEXT
+from SunloMusic.error_handler import log_error_to_group
+
+def catch_errors(func):
+    @wraps(func)
+    async def wrapper(client, update, *args, **kwargs):
+        try: return await func(client, update, *args, **kwargs)
+        except Exception as e: await log_error_to_group(update, e)
+    return wrapper
+
+def sudo_only(func):
+    @wraps(func)
+    async def wrapper(client, update, *args, **kwargs):
+        user = update.from_user
+        if user and (user.id == config.OWNER_ID or user.id in config.sudo_list):
+            return await func(client, update, *args, **kwargs)
+        if user and await is_sudo(user.id): 
+            return await func(client, update, *args, **kwargs)
+        
+        if isinstance(update, Message): await update.reply_text(NO_SUDO_TEXT)
+        elif isinstance(update, CallbackQuery): await update.answer(NO_SUDO_TEXT, show_alert=True)
+    return wrapper
+
+def admin_only(func):
+    @wraps(func)
+    async def wrapper(client, message: Message, *args, **kwargs):
+        if not message.from_user: return
+        
+        # ✅ Direct Owner/Sudo check (No DB wait)
+        if message.from_user.id == config.OWNER_ID or message.from_user.id in config.sudo_list:
+            return await func(client, message, *args, **kwargs)
+            
+        try:
+            if await is_sudo(message.from_user.id): 
+                return await func(client, message, *args, **kwargs)
+        except: pass
+            
+        if message.chat.type != enums.ChatType.PRIVATE:
+            try:
+                member = await message.chat.get_member(message.from_user.id)
+                if member.privileges:
+                    can_manage = getattr(member.privileges, "can_manage_video_chats", False) or \
+                                 getattr(member.privileges, "can_manage_voice_chats", False) or \
+                                 member.privileges.can_manage_chat
+                    if can_manage: return await func(client, message, *args, **kwargs)
+            except Exception: pass
+        await message.reply_text(NO_ADMIN_TEXT)
+    return wrapper
+
+
+
+### FILE: ./SunloMusic/formatters.py
+def format_duration(seconds: int) -> str:
+    if not seconds: return "00:00"
+    h, rem = divmod(int(seconds), 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+def make_progress_bar(current: int, total: int, length: int = 7) -> str:
+    """Generates a progress bar with a moving music emoji and thick lines."""
+    if total <= 0: return "━" * length
+    pos = int(length * current / total)
+    pos = max(0, min(pos, length - 1))
+    # ✅ Changed from '─' (thin) to '━' (thick)
+    return "━" * pos + "🎵" + "━" * (length - pos - 1)
+
+
+
+### FILE: ./SunloMusic/keyboards.py
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from SunloMusic.config import config
+from SunloMusic.formatters import format_duration, make_progress_bar
+
+def start_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ Add to Group", url=f"https://t.me/{config.BOT_USERNAME.strip('@')}?startgroup=true"), InlineKeyboardButton("📢 Channel", url=config.UPDATES_CHANNEL)],
+        [InlineKeyboardButton("❓ Help", callback_data="help_menu"), InlineKeyboardButton("💬 Support", url=config.SUPPORT_CHAT)]
+    ])
+
+def help_main_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎵 Music", callback_data="help_music"), InlineKeyboardButton("⏯ Controls", callback_data="help_controls")],
+        [InlineKeyboardButton("🎛 Effects", callback_data="help_effects"), InlineKeyboardButton("🛡 Admin", callback_data="help_admin")],
+        [InlineKeyboardButton("📜 All Commands", callback_data="all_commands")],
+        [InlineKeyboardButton("🔙 Back to Start", callback_data="back_start")]
+    ])
+
+def help_back_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back to Help", callback_data="help_menu")]])
+
+def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
+    dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
+    elapsed_str = format_duration(elapsed)
+    
+    bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "━" * 8
+    timer_btn = InlineKeyboardButton(f"{elapsed_str} 🎵 {bar} {dur_str}", callback_data="cb_timer")
+    
+    pause_text = "▶️ ʀᴇsᴜᴍᴇ" if q.paused else "⏸️ ᴘᴀᴜsᴇ"
+    pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause")
+    skip_btn = InlineKeyboardButton("⏭️ sᴋɪᴘ", callback_data="cb_skip")
+    
+    loop_text = "🔁 ʟᴏᴏᴘ ᴏғғ" if q.loop == 0 else ("🔂 ʟᴏᴏᴘ ᴏɴᴇ" if q.loop == 1 else "🔁 ʟᴏᴏᴘ ᴀʟʟ")
+    loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop")
+    stop_btn = InlineKeyboardButton("⏹️ sᴛᴏᴘ", callback_data="cb_stop")
+    more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more")
+    
+    return InlineKeyboardMarkup([
+        [timer_btn],
+        [pause_btn, skip_btn],
+        [loop_btn, stop_btn],
+        [more_btn]
+    ])
+
+def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ ʀᴇᴍᴏᴠᴇ ғʀᴏᴍ ǫᴜᴇᴜᴇ", callback_data=f"cb_del_{track_hash}")]
+    ])
+
+
+
+### FILE: ./SunloMusic/texts.py
+NO_SUDO_TEXT = "🚫 <b>Only sudo users can use this.</b>"
+NO_ADMIN_TEXT = "🚫 <b>Only admins can use this.</b>"
+NOT_PLAYING_TEXT = "❌ <b>Nothing is playing.</b>"
+
+
+
+### FILE: ./SunloMusic/thumbnails.py
+import os, aiohttp, hashlib
+from PIL import Image
+from SunloMusic.logger import LOGGER
+from SunloMusic.database import get_custom_thumb
+import SunloMusic.bot as bot_module
+
+CACHE = "cache/thumbnails"
+os.makedirs(CACHE, exist_ok=True)
+
+async def generate_thumbnail(chat_id: int, url: str, title: str, duration: str, req: str):
+    try:
+        # ✅ Check for Custom Thumbnail
+        custom_thumb = await get_custom_thumb(chat_id)
+        if custom_thumb and bot_module.bot:
+            path = f"{CACHE}/custom_{chat_id}.jpg"
+            if not os.path.exists(path):
+                await bot_module.bot.download_media(custom_thumb, file_name=path)
+            if os.path.exists(path):
+                return path
+
+        if not url: return None
+        file_hash = hashlib.md5(url.encode()).hexdigest()
+        path = f"{CACHE}/{file_hash}.jpg"
+        if os.path.exists(path): return path
+        
+        async with aiohttp.ClientSession() as s:
+            async with s.get(url) as r:
+                if r.status == 200: 
+                    with open(path, "wb") as f: f.write(await r.read())
+                else: return None
+                        
+        img = Image.open(path).convert("RGB").resize((1280, 720))
+        img.save(path, "JPEG", quality=95)
+        return path
+    except Exception as e:
+        LOGGER.error(f"Thumbnail error: {e}")
+        return None
+
+
+
+### FILE: ./SunloMusic/ytdlp.py
+import aiohttp, asyncio, yt_dlp, os
+from urllib.parse import urlparse
+from SunloMusic.config import config
+from SunloMusic.logger import LOGGER
+import SunloMusic.bot as bot_module
+
+API_HEADERS = {"X-API-Key": config.ONEGRAB_API_KEY, "Accept": "application/json"}
+DOWNLOAD_DIR = "cache/downloads"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+def _search_ytdlp_sync(query: str):
+    try:
+        # extract_flat=True makes it super fast
+        ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
+            if info and "entries" in info and len(info["entries"]) > 0:
+                entry = info["entries"][0]
+                thumb = entry.get("thumbnails", [{}])[-1].get("url") if entry.get("thumbnails") else f"https://i.ytimg.com/vi/{entry['id']}/hqdefault.jpg"
+                return {
+                    "title": entry.get("title", query),
+                    "url": f"https://www.youtube.com/watch?v={entry['id']}",
+                    "duration": int(entry.get("duration") or 0),
+                    "thumbnail": thumb
+                }
+    except Exception as e: 
+        LOGGER.error(f"yt-dlp search error: {e}")
+    return None
+
+async def _api_request(endpoint: str, params: dict) -> dict | None:
+    url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=API_HEADERS, params=params, timeout=20) as resp:
+                if resp.status != 200: return None
+                return await resp.json()
+    except: return None
+
+async def _download_telegram_cdn(cdnurl: str) -> str | None:
+    if not bot_module.assistant: return None
+    link = urlparse(cdnurl)
+    parts = link.path.strip("/").split("/")
+    if len(parts) != 2 or not parts[1].isdigit(): return None
+    channel, message_id = parts[0], int(parts[1])
+    try:
+        message = await bot_module.assistant.get_messages(channel, message_id)
+        if not message or not message.media: return None
+        return await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
+    except: return None
+
+async def extract_audio(query: str, video: bool = False) -> dict | None:
+    if not config.ONEGRAB_API_KEY: return None
+    if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
+        return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
+
+    webpage_url = query
+    fallback_meta = {}
+
+    if not query.startswith("http"):
+        # ✅ 1. yt-dlp Fast Search
+        LOGGER.info(f"🔎 Searching via yt-dlp: {query}")
+        loop = asyncio.get_running_loop()
+        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
+        except: ytdlp_info = None
+            
+        if ytdlp_info and ytdlp_info.get("url"):
+            webpage_url = ytdlp_info["url"]
+            fallback_meta = ytdlp_info
+            LOGGER.info(f"✅ yt-dlp found: {fallback_meta['title']} ({fallback_meta['duration']}s)")
+        else:
+            LOGGER.warning("⚠️ yt-dlp search failed, using OneGrab fallback.")
+            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
+            if search_data and search_data.get("results"):
+                track = search_data["results"][0]
+                webpage_url = track.get("url")
+                fallback_meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": track.get("thumbnail", "")}
+
+    if not webpage_url: return None
+
+    # ✅ 2. OneGrab Stream Link
+    req_type = "video" if video else "audio"
+    LOGGER.info(f"🌐 Fetching {req_type} stream via OneGrab...")
+    track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
+    
+    if track_data:
+        result = track_data
+        if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
+            result = track_data["results"][0]
+
+        cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
+        
+        if cdnurl:
+            # ✅ ALWAYS prioritize yt-dlp metadata
+            final_thumb = fallback_meta.get("thumbnail") or result.get("thumbnail", "")
+            final_dur = fallback_meta.get("duration") or int(result.get("duration") or 0)
+            final_title = fallback_meta.get("title") or result.get("title", "Unknown")
+            
+            if "t.me" in cdnurl or "telegram.me" in cdnurl:
+                local_path = await _download_telegram_cdn(cdnurl)
+                if local_path:
+                    return {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+            else:
+                return {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+    return None
+
+
+
+### FILE: ./SunloMusic/queues.py
+import time
+import asyncio
+from dataclasses import dataclass, field
+from typing import Optional
+
+@dataclass
+class Track:
+    title: str
+    url: str
+    duration: int
+    thumbnail: str
+    requester: str
+    requester_id: int
+    video: bool = False
+    message_id: int = 0
+
+@dataclass
+class ChatQueue:
+    chat_id: int
+    now_playing: Optional[Track] = None
+    queue: list[Track] = field(default_factory=list)
+    loop: int = 0
+    paused: bool = False
+    start_time: float = 0.0
+    paused_at: float = 0.0
+    total_paused: float = 0.0
+    playing_message_id: int = 0
+    timer_task: Optional[asyncio.Task] = None
+    votes: set = field(default_factory=set)
+    karaoke_task: Optional[asyncio.Task] = None
+    karaoke_msg_id: int = 0
+
+_queues: dict[int, ChatQueue] = {}
+
+# ✅ Global Sets
+KARAOKE_CHATS = set()
+AUTO_DJ_CHATS = set()
+
+def get_queue(chat_id: int) -> ChatQueue:
+    if chat_id not in _queues: _queues[chat_id] = ChatQueue(chat_id=chat_id)
+    return _queues[chat_id]
+
+def clear_queue(chat_id: int):
+    q = _queues.pop(chat_id, None)
+    if q and q.karaoke_task: q.karaoke_task.cancel()
+
+def active_chats() -> list[int]:
+    return list(_queues.keys())
+
+
+
+### FILE: ./SunloMusic/error_handler.py
+import traceback
+from pyrogram.types import Message, CallbackQuery
+from SunloMusic.config import config
+from SunloMusic.logger import LOGGER
+
+async def log_error_to_group(update, error: Exception):
+    error_msg = traceback.format_exc()
+    LOGGER.error(error_msg)
+    
+    user = update.from_user if hasattr(update, 'from_user') else None
+    user_mention = user.mention if user else "Unknown"
+    user_id = user.id if user else 0
+    
+    if isinstance(update, Message):
+        chat_title = update.chat.title or update.chat.first_name
+        chat_id = update.chat.id
+        cmd = update.text or update.caption or "Unknown Command"
+    elif isinstance(update, CallbackQuery):
+        chat_title = update.message.chat.title or update.message.chat.first_name
+        chat_id = update.message.chat.id
+        cmd = update.data
+    else:
+        chat_title = "Unknown"
+        chat_id = 0
+        cmd = "Unknown"
+
+    text = (
+        f"<b>🚨 EMERGENCY ERROR 🚨</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏷 <b>Owner:</b> <a href='tg://user?id={config.OWNER_ID}'>Sakil</a>\n"
+        f"👤 <b>User:</b> {user_mention} (<code>{user_id}</code>)\n"
+        f"💬 <b>Chat:</b> {chat_title} (<code>{chat_id}</code>)\n"
+        f"🛠 <b>Action:</b> <code>{cmd}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"<b>Error Details:</b>\n"
+        f"<pre>{error_msg[-3000:]}</pre>" # Show last 3000 chars
+    )
+
+    try:
+        if config.LOGGER_ID:
+            from SunloMusic.bot import bot
+            if bot:
+                await bot.send_message(config.LOGGER_ID, text)
+    except Exception as e:
+        LOGGER.error(f"Failed to send error log: {e}")
+
+    try:
+        user_text = (
+            f"🚨 <b>Oops! An unexpected error occurred.</b>\n\n"
+            f"Don't worry, the Owner (<a href='tg://user?id={config.OWNER_ID}'>Sakil</a>) has been tagged and "
+            f"the error details have been sent to the Log Group automatically."
+        )
+        if isinstance(update, Message):
+            await update.reply_text(user_text)
+        elif isinstance(update, CallbackQuery):
+            await update.answer("🚨 Error occurred! Owner has been notified.", show_alert=True)
+    except: pass
+
+
+
+### FILE: ./SunloMusic/lyrics.py
+import aiohttp
+import re
+import asyncio
+from urllib.parse import quote
+from pyrogram.errors import FloodWait
+from SunloMusic.logger import LOGGER
+
+async def _api_get(url, headers, timeout=10):
+    try:
+        conn = aiohttp.TCPConnector(family=2) # Force IPv4
+        async with aiohttp.ClientSession(headers=headers, connector=conn) as s:
+            async with s.get(url, timeout=timeout) as r:
+                if r.status == 200: return await r.json()
+    except Exception as e: LOGGER.error(f"API Error: {e}")
+    return None
+
+def _parse_song_info(query: str):
+    clean = re.sub(r'[\(\[].*?[\)\]]', '', query)
+    parts = [p.strip() for p in re.split(r'[|\-]', clean) if p.strip()]
+    if not parts: return query, ""
+    title = parts[0]
+    artist = parts[1] if len(parts) > 1 else ""
+    if " by " in title.lower():
+        t_parts = re.split(r' by ', title, flags=re.IGNORECASE)
+        title = t_parts[0].strip()
+        artist = t_parts[1].strip() if len(t_parts) > 1 else artist
+    return title.strip(), artist.strip()
+
+async def fetch_lyrics_text(query: str, duration: int = 0) -> str | None:
+    title, artist = _parse_song_info(query)
+    headers = {"User-Agent": "SunloMusic/1.0"}
+    
+    # LRCLIB
+    try:
+        url = f"https://lrclib.net/api/get?track_name={quote(title)}"
+        if artist: url += f"&artist_name={quote(artist)}"
+        if duration > 0: url += f"&duration={duration}"
+        data = await _api_get(url, headers)
+        if data and "plainLyrics" in data and data["plainLyrics"]: return data["plainLyrics"]
+        
+        search_url = f"https://lrclib.net/api/search?q={quote(title)}"
+        if artist: search_url += f"+{quote(artist)}"
+        search_data = await _api_get(search_url, headers)
+        if search_data and isinstance(search_data, list) and len(search_data) > 0:
+            for track in search_data:
+                if "plainLyrics" in track and track["plainLyrics"]: return track["plainLyrics"]
+    except: pass
+
+    # JioSaavn
+    try:
+        search_url = f"https://saavnapi-nine.vercel.app/result/?query={quote(title)}"
+        data = await _api_get(search_url, headers)
+        if data and "songs" in data and "results" in data["songs"] and len(data["songs"]["results"]) > 0:
+            lyrics_url = f"https://saavnapi-nine.vercel.app/lyrics/?id={data['songs']['results'][0]['id']}"
+            lyrics_data = await _api_get(lyrics_url, headers)
+            if lyrics_data and "lyrics" in lyrics_data and lyrics_data["lyrics"]:
+                lyrics = re.sub(r'<br\s*/?>', '\n', lyrics_data["lyrics"])
+                return re.sub(r'<.*?>', '', lyrics).strip()
+    except: pass
+
+    # Lyrics.ovh
+    if artist and title:
+        try:
+            url = f"https://api.lyrics.ovh/v1/{quote(artist)}/{quote(title)}"
+            data = await _api_get(url, headers)
+            if data and "lyrics" in data and data["lyrics"]: return data["lyrics"]
+        except: pass
+
+    return None
+
+async def start_live_karaoke(bot, chat_id, title, duration, q):
+    msg = await bot.send_message(chat_id, f"🎤 <b>Fetching live lyrics for:</b> <i>{title}</i>...")
+    
+    try:
+        lyrics = await asyncio.wait_for(fetch_lyrics_text(title, duration), timeout=20.0)
+        
+        if not lyrics:
+            await msg.edit_text(f"🎤 <b>Karaoke:</b> Lyrics not found for <i>{title}</i>.")
+            return
+
+        lines = [line.strip() for line in lyrics.split('\n') if line.strip()]
+        if not lines: return
+
+        # ✅ Fixed 5 second delay as requested
+        delay = 5.0
+        header = "🎤 <b>Live Karaoke</b>\n\n<blockquote>"
+        accumulated = lines[0]
+        
+        await msg.edit_text(f"{header}{accumulated}</blockquote>")
+        q.karaoke_msg_id = msg.id
+
+        for i in range(1, len(lines)):
+            if not q.now_playing or q.now_playing.title != title or q.paused: break
+            
+            await asyncio.sleep(delay)
+            next_line = lines[i]
+            
+            if len(accumulated) + len(next_line) + len(header) > 4000:
+                try: await msg.edit_text(f"{header}{accumulated}</blockquote>")
+                except: pass
+                accumulated = next_line
+                msg = await bot.send_message(chat_id, f"{header}{accumulated}</blockquote>")
+                q.karaoke_msg_id = msg.id
+            else:
+                accumulated += f"\n{next_line}"
+                try:
+                    await msg.edit_text(f"{header}{accumulated}</blockquote>")
+                except FloodWait as e:
+                    await asyncio.sleep(e.value)
+                    try: await msg.edit_text(f"{header}{accumulated}</blockquote>")
+                    except: pass
+                except Exception:
+                    pass
+
+    except asyncio.TimeoutError:
+        await msg.edit_text("❌ <b>Karaoke Error:</b> Timed out.")
+    except asyncio.CancelledError: pass
+    except Exception as e:
+        try: await msg.edit_text(f"❌ <b>Karaoke Error:</b> <code>{e}</code>")
+        except: pass
+
+
+

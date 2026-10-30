@@ -1,6 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from SunloMusic.config import config
 from SunloMusic.logger import LOGGER
+import time
 
 client = AsyncIOMotorClient(config.MONGO_URL)
 db = client["SunloMusic"]
@@ -13,6 +14,14 @@ lb_col = db["leaderboard"]
 gplaylists_col = db["gplaylists"]
 afk_col = db["afk"]
 settings_col = db["settings"]
+# ✅ NEW COLLECTIONS
+favorites_col = db["favorites"]
+coins_col = db["coins"]
+daily_col = db["daily"]
+recent_col = db["recent"]
+quiz_col = db["quiz"]
+voteplay_col = db["voteplay"]
+shop_col = db["shop_purchases"]
 
 SPAM_DICT = {}
 
@@ -41,13 +50,19 @@ async def get_stats() -> dict:
 async def get_all_chats() -> list:
     return [c["chat_id"] async for c in chats_col.find({}, {"chat_id": 1})]
 
-# ✅ Purane Working Functions (Wapas add kiye)
 async def save_playlist(user_id: int, name: str, queue_data: list):
     await playlists_col.update_one({"user_id": user_id, "name": name}, {"$set": {"queue": queue_data}}, upsert=True)
 
 async def get_playlist(user_id: int, name: str) -> list:
     data = await playlists_col.find_one({"user_id": user_id, "name": name})
     return data["queue"] if data else None
+
+async def get_all_user_playlists(user_id: int) -> list:
+    cursor = playlists_col.find({"user_id": user_id}, {"name": 1, "queue": 1})
+    return [{"name": d["name"], "count": len(d.get("queue", []))} async for d in cursor]
+
+async def delete_user_playlist(user_id: int, name: str):
+    await playlists_col.delete_one({"user_id": user_id, "name": name})
 
 async def set_custom_thumb(chat_id: int, file_id: str):
     await thumbs_col.update_one({"chat_id": chat_id}, {"$set": {"file_id": file_id}}, upsert=True)
@@ -59,7 +74,6 @@ async def get_custom_thumb(chat_id: int) -> str:
 async def del_custom_thumb(chat_id: int):
     await thumbs_col.delete_one({"chat_id": chat_id})
 
-# ✅ Naye Functions (Leaderboard, Group Settings, etc.)
 async def set_group_setting(chat_id: int, key: str, value: any):
     await settings_col.update_one({"chat_id": chat_id}, {"$set": {key: value}}, upsert=True)
 
@@ -78,11 +92,7 @@ async def get_leaderboard(chat_id: int, limit: int = 5):
     return await lb_col.find({"chat_id": chat_id}).sort("points", -1).limit(limit).to_list(limit)
 
 async def save_gplaylist(chat_id: int, name: str, queue_data: list):
-    await gplaylists_col.update_one(
-        {"chat_id": chat_id, "name": name},
-        {"$set": {"queue": queue_data}},
-        upsert=True
-    )
+    await gplaylists_col.update_one({"chat_id": chat_id, "name": name}, {"$set": {"queue": queue_data}}, upsert=True)
 
 async def get_gplaylist(chat_id: int, name: str):
     data = await gplaylists_col.find_one({"chat_id": chat_id, "name": name})
@@ -97,3 +107,115 @@ async def get_afk(user_id: int):
 
 async def remove_afk(user_id: int):
     await afk_col.delete_one({"user_id": user_id})
+
+# ═══════════════════════════════════════════
+# ✅ NEW: FAVORITES
+# ═══════════════════════════════════════════
+async def add_favorite(user_id: int, song: dict):
+    await favorites_col.update_one(
+        {"user_id": user_id, "url": song["url"]},
+        {"$set": song},
+        upsert=True
+    )
+
+async def remove_favorite(user_id: int, url: str):
+    await favorites_col.delete_one({"user_id": user_id, "url": url})
+
+async def get_favorites(user_id: int, limit: int = 50):
+    return await favorites_col.find({"user_id": user_id}).limit(limit).to_list(limit)
+
+async def is_favorite(user_id: int, url: str) -> bool:
+    return await favorites_col.find_one({"user_id": user_id, "url": url}) is not None
+
+# ═══════════════════════════════════════════
+# ✅ NEW: COINS
+# ═══════════════════════════════════════════
+async def add_coins(user_id: int, amount: int):
+    result = await coins_col.find_one_and_update(
+        {"user_id": user_id},
+        {"$inc": {"coins": amount}},
+        upsert=True,
+        return_document=True
+    )
+    return result.get("coins", amount) if result else amount
+
+async def get_coins(user_id: int) -> int:
+    data = await coins_col.find_one({"user_id": user_id})
+    return data["coins"] if data else 0
+
+async def spend_coins(user_id: int, amount: int) -> bool:
+    data = await coins_col.find_one({"user_id": user_id})
+    if not data or data.get("coins", 0) < amount:
+        return False
+    await coins_col.update_one({"user_id": user_id}, {"$inc": {"coins": -amount}})
+    return True
+
+# ═══════════════════════════════════════════
+# ✅ NEW: DAILY REWARD
+# ═══════════════════════════════════════════
+async def claim_daily(user_id: int):
+    now = time.time()
+    data = await daily_col.find_one({"user_id": user_id})
+    if data and now - data.get("last_claim", 0) < 86400:
+        return None
+    await daily_col.update_one({"user_id": user_id}, {"$set": {"last_claim": now}}, upsert=True)
+    return now
+
+async def get_daily_cooldown(user_id: int) -> int:
+    data = await daily_col.find_one({"user_id": user_id})
+    if not data: return 0
+    elapsed = time.time() - data.get("last_claim", 0)
+    return max(0, int(86400 - elapsed))
+
+# ═══════════════════════════════════════════
+# ✅ NEW: RECENT
+# ═══════════════════════════════════════════
+async def add_recent(chat_id: int, track: dict):
+    await recent_col.update_one(
+        {"chat_id": chat_id},
+        {"$push": {"tracks": {"$each": [track], "$slice": -15}}},
+        upsert=True
+    )
+
+async def get_recent(chat_id: int) -> list:
+    data = await recent_col.find_one({"chat_id": chat_id})
+    return data["tracks"] if data else []
+
+# ═══════════════════════════════════════════
+# ✅ NEW: QUIZ
+# ═══════════════════════════════════════════
+async def add_quiz_score(user_id: int, name: str):
+    await quiz_col.update_one(
+        {"user_id": user_id},
+        {"$inc": {"wins": 1}, "$set": {"name": name}},
+        upsert=True
+    )
+
+async def get_quiz_leaderboard(limit: int = 10):
+    return await quiz_col.find().sort("wins", -1).limit(limit).to_list(limit)
+
+# ═══════════════════════════════════════════
+# ✅ NEW: VOTEPLAY
+# ═══════════════════════════════════════════
+async def add_voteplay(chat_id: int, data: dict):
+    await voteplay_col.update_one({"chat_id": chat_id}, {"$set": data}, upsert=True)
+
+async def get_voteplay(chat_id: int):
+    return await voteplay_col.find_one({"chat_id": chat_id})
+
+async def remove_voteplay(chat_id: int):
+    await voteplay_col.delete_one({"chat_id": chat_id})
+
+# ═══════════════════════════════════════════
+# ✅ NEW: SHOP PURCHASES
+# ═══════════════════════════════════════════
+async def add_purchase(user_id: int, item: str):
+    await shop_col.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"items": item}},
+        upsert=True
+    )
+
+async def get_purchases(user_id: int) -> list:
+    data = await shop_col.find_one({"user_id": user_id})
+    return data.get("items", []) if data else []

@@ -17,11 +17,45 @@ from SunloMusic.lyrics import start_live_karaoke
 
 call = None
 EMPTY_VC_TIMERS = {}
+# ✅ NEW: per-chat audio controls
+AUDIO_CONTROLS = {}  # chat_id -> {"speed": 1.0, "volume": 1.0, "eq": "none"}
 
 def cleanup_file(url: str):
     if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a', '.mp3')):
         try: os.remove(url)
         except: pass
+
+def _build_audio_filters(chat_id: int, effect: str = "none") -> str | None:
+    ctrl = AUDIO_CONTROLS.get(chat_id, {})
+    speed = ctrl.get("speed", 1.0)
+    volume = ctrl.get("volume", 1.0)
+    eq = ctrl.get("eq", "none")
+
+    filters = []
+    if effect == "bass":
+        filters.append("bass=g=10")
+    elif effect == "8d":
+        filters.append("apulsator=hz=0.1")
+    elif effect == "nightcore":
+        filters.append("atempo=1.25,asetrate=44100*1.25")
+    else:
+        if eq != "none":
+            eq_map = {
+                "bass": "bass=g=12",
+                "pop": "equalizer=f=1000:width_type=h:width=200:g=5",
+                "rock": "equalizer=f=100:width_type=h:width=200:g=3,equalizer=f=3000:width_type=h:width=200:g=4",
+                "jazz": "equalizer=f=200:width_type=h:width=200:g=2,equalizer=f=2000:width_type=h:width=200:g=3",
+                "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5",
+            }
+            if eq in eq_map:
+                filters.append(eq_map[eq])
+    
+    if speed != 1.0:
+        filters.append(f"atempo={speed}")
+    if volume != 1.0:
+        filters.append(f"volume={volume}")
+    
+    return "-af " + ",".join(filters) if filters else None
 
 async def check_empty_vc(chat_id):
     try:
@@ -75,6 +109,7 @@ async def update_live_timer(chat_id, msg_id):
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import clear_queue, Track
+    from SunloMusic.database import add_recent
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
     if q.playing_message_id:
@@ -105,6 +140,16 @@ async def start_next_song(chat_id, q):
 
         await play_stream(chat_id, nxt.url, nxt.video)
         q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
+        
+        # ✅ Save to recent
+        try:
+            await add_recent(chat_id, {
+                "title": nxt.title, "url": nxt.url,
+                "duration": nxt.duration, "thumbnail": nxt.thumbnail,
+                "requester": nxt.requester, "requester_id": nxt.requester_id,
+                "video": nxt.video
+            })
+        except: pass
         
         thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
         dur_str = format_duration(nxt.duration) if nxt.duration > 0 else "Live"
@@ -153,12 +198,12 @@ async def start_call():
     if call:
         await call.start()
 
-# ✅ UPDATED PLAY STREAM (Download Fallback Added)
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
     if not call: return False
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
     
-    ffmpeg_args = "-af bass=g=10" if effect == "bass" else "-af apulsator=hz=0.1" if effect == "8d" else "-af atempo=1.25,asetrate=44100*1.25" if effect == "nightcore" else None
+    # ✅ Build ffmpeg args from AUDIO_CONTROLS + effect
+    ffmpeg_args = _build_audio_filters(chat_id, effect)
     
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
@@ -170,14 +215,12 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     except Exception as e:
         LOGGER.error(f"Direct Play error: {e}")
         
-        # ✅ Fallback: Agar direct URL fail ho jaye, toh local download karke play karo
         if "http" in url:
             LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
             try:
                 os.makedirs("cache/downloads", exist_ok=True)
                 file_path = f"cache/downloads/{abs(hash(url))}.m4a"
                 
-                # Download file
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url) as resp:
                         if resp.status == 200:
@@ -194,7 +237,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
             except Exception as download_err:
                 LOGGER.error(f"Download fallback failed: {download_err}")
                 
-        return True # Even if it fails, return True so card is sent.
+        return True
 
 async def pause_stream(chat_id: int):
     if call: await call.pause(chat_id)
