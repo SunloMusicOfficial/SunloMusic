@@ -19,7 +19,6 @@ def _search_ytdlp_sync(query: str):
             if info and "entries" in info and len(info["entries"]) > 0:
                 entry = info["entries"][0]
                 vid_id = entry.get("id")
-                # ✅ Force i.ytimg.com (Most reliable URL, never fails)
                 thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
                 return {
                     "title": entry.get("title", query),
@@ -150,11 +149,12 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600):
     try:
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "nocheckcertificate": True, "match_filter": yt_dlp.utils.match_filter_func(f"duration < {max_duration}")}
+        # ✅ FIX: Force .m4a / .mp4 (Never .webm) to avoid PyTgCalls crash
         if video:
             ydl_opts["format"] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
             ydl_opts["merge_output_format"] = "mp4"
         else:
-            ydl_opts["format"] = "bestaudio/best"
+            ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best"
             ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
         
         ydl_opts["outtmpl"] = f"{DOWNLOAD_DIR}/%(id)s.%(ext)s"
@@ -165,6 +165,7 @@ def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600)
             if not video:
                 base = os.path.splitext(final_path)[0]
                 if os.path.exists(base + ".mp3"): final_path = base + ".mp3"
+                elif os.path.exists(base + ".m4a"): final_path = base + ".m4a"
             return {"path": final_path, "title": info.get("title", "Unknown"), "duration": int(info.get("duration") or 0), "thumbnail": info.get("thumbnail", "")}
     except Exception as e:
         LOGGER.error(f"File download error: {e}")

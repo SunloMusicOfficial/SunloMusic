@@ -151,7 +151,6 @@ async def start_next_song(chat_id, q):
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
         
-        # ✅ THUMBNAIL GUARANTEE (Auto-play)
         sent_msg = None
         if thumb:
             try: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
@@ -208,7 +207,8 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=20.0)
         return True
     except Exception as e:
-        LOGGER.error(f"Direct Play error: {e}")
+        # ✅ Log the error properly
+        LOGGER.error(f"Direct Play error: {type(e).__name__} - {str(e)}")
         
         if "http" in url:
             LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
