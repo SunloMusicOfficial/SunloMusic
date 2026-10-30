@@ -1,4 +1,4 @@
-import aiohttp, asyncio, yt_dlp, os
+import aiohttp, asyncio, yt_dlp, os, time
 from urllib.parse import urlparse
 from SunloMusic.config import config
 from SunloMusic.logger import LOGGER
@@ -7,6 +7,10 @@ import SunloMusic.bot as bot_module
 API_HEADERS = {"X-API-Key": config.ONEGRAB_API_KEY, "Accept": "application/json"}
 DOWNLOAD_DIR = "cache/downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# ✅ SUPER FAST MEMORY CACHE (Saves 2-4 seconds on repeat songs)
+_SEARCH_CACHE = {}
+_CACHE_TTL = 3600 # 1 hour tak yaad rahega
 
 def _search_ytdlp_sync(query: str):
     try:
@@ -45,7 +49,7 @@ async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=API_HEADERS, params=params, timeout=10) as resp: # Timeout 10s
+            async with session.get(url, headers=API_HEADERS, params=params, timeout=10) as resp:
                 if resp.status != 200: return None
                 return await resp.json()
     except: return None
@@ -67,34 +71,44 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
         return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
 
+    # ✅ CACHE CHECK
+    cache_key = f"{query}_{video}"
+    if cache_key in _SEARCH_CACHE:
+        data, t = _SEARCH_CACHE[cache_key]
+        if time.time() - t < _CACHE_TTL:
+            LOGGER.info(f"⚡ Cache HIT for {query}")
+            return data
+
     webpage_url = query
     fallback_meta = {}
-    loop = asyncio.get_running_loop()
 
     if query.startswith("http"):
         try:
             def _get_info(url):
-                with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}) as ydl:
+                with yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True, "nocheckcertificate": True}) as ydl:
                     return ydl.extract_info(url, download=False)
+            loop = asyncio.get_running_loop()
             info = await loop.run_in_executor(None, _get_info, query)
             if info:
-                thumb = info.get("thumbnail") or (info.get("thumbnails", [{}])[-1].get("url") if info.get("thumbnails") else "")
+                thumb = info.get("thumbnail") or ""
                 fallback_meta = {"title": info.get("title", "Unknown"), "duration": int(info.get("duration") or 0), "thumbnail": thumb}
                 webpage_url = info.get("webpage_url", query)
-        except Exception: pass
+        except: pass
     else:
-        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=6.0) # 6 sec timeout
-        except: ytdlp_info = None
-            
-        if ytdlp_info and ytdlp_info.get("url"):
-            webpage_url = ytdlp_info["url"]
-            fallback_meta = ytdlp_info
+        # ✅ ONEGRAB SEARCH FIRST (Fastest)
+        search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
+        if search_data and search_data.get("results"):
+            track = search_data["results"][0]
+            webpage_url = track.get("url")
+            fallback_meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": track.get("thumbnail", "")}
         else:
-            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
-            if search_data and search_data.get("results"):
-                track = search_data["results"][0]
-                webpage_url = track.get("url")
-                fallback_meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": track.get("thumbnail", "")}
+            # Fallback to yt-dlp
+            loop = asyncio.get_running_loop()
+            try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=6.0)
+            except: ytdlp_info = None
+            if ytdlp_info:
+                webpage_url = ytdlp_info["url"]
+                fallback_meta = ytdlp_info
 
     if not webpage_url: return None
 
@@ -115,12 +129,19 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             
             if "t.me" in cdnurl or "telegram.me" in cdnurl:
                 local_path = await _download_telegram_cdn(cdnurl)
-                if local_path: return {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                if local_path: 
+                    res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                    _SEARCH_CACHE[cache_key] = (res, time.time())
+                    return res
             else:
-                return {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                _SEARCH_CACHE[cache_key] = (res, time.time())
+                return res
     
     if fallback_meta.get("title"):
-        return {"title": fallback_meta.get("title"), "url": webpage_url, "duration": fallback_meta.get("duration", 0), "thumbnail": fallback_meta.get("thumbnail", ""), "webpage_url": webpage_url}
+        res = {"title": fallback_meta["title"], "url": webpage_url, "duration": fallback_meta.get("duration", 0), "thumbnail": fallback_meta.get("thumbnail", ""), "webpage_url": webpage_url}
+        _SEARCH_CACHE[cache_key] = (res, time.time())
+        return res
     return None
 
 def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600):
