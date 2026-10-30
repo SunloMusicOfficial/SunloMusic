@@ -34,7 +34,6 @@ async def purge_cmd(_, m: Message):
     try: await m.reply_text(f"🧹 <b>Purged {len(msg_ids)} messages.</b>")
     except: pass
 
-# ✅ No admin restriction (Everyone can use)
 @bot.on_message(filters.command("tagall") & filters.group)
 @catch_errors
 async def tagall_cmd(_, m: Message):
@@ -50,10 +49,12 @@ async def tagall_cmd(_, m: Message):
         try: await m.reply_to_message.copy(m.chat.id)
         except: pass
 
-    # ✅ Option 20: Peaceful Pings
+    # ✅ Highlight Message Format (Blockquote)
+    msg_text = f"<blockquote><b>{custom_msg}</b></blockquote>" if custom_msg else ""
+
     header = (
         f"✨ ─── 𝓐𝓽𝓽𝓮𝓷𝓽𝓲𝓸𝓷 ─── ✨\n\n"
-        f"🌸 <i>{custom_msg if custom_msg else 'Please read the above message.'}</i>\n\n"
+        f"🌸 {msg_text}\n\n"
         f"🕊️ <b>With regards,</b> {m.from_user.mention}\n"
         f"━━━━━━━━━━━━━\n"
         f"🕊️ <b>Peaceful Pings:</b>\n\n"
@@ -61,6 +62,7 @@ async def tagall_cmd(_, m: Message):
 
     current_text = header
     count = 0
+    member_count = 0 # ✅ Track members for 20-page limit
     
     async for member in m.chat.get_members():
         if member.user.is_bot or member.user.is_deleted:
@@ -69,18 +71,22 @@ async def tagall_cmd(_, m: Message):
         emoji = random.choice(EMOJIS)
         line = f"{emoji} {member.user.mention}\n"
         
-        if len(current_text) + len(line) > 3900:
+        current_text += line
+        member_count += 1
+        
+        # ✅ 20 members per message
+        if member_count == 20:
             try: 
                 await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
             except Exception as e: 
                 LOGGER.error(f"Tagall send error: {e}")
                 
-            current_text = line
+            current_text = "" # Reset for next page
+            member_count = 0
             count += 1
-            await asyncio.sleep(1)
-        else:
-            current_text += line
+            await asyncio.sleep(1) # Anti-flood delay
 
+    # Send remaining members if any
     if current_text:
         try: 
             await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
