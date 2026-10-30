@@ -1,9 +1,14 @@
 import asyncio
+import random
 from pyrogram import filters, enums
 from pyrogram.types import Message
 from SunloMusic.bot import bot
 from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import set_group_setting, get_group_setting
+from SunloMusic.logger import LOGGER
+
+# ✅ Random Premium Emojis List
+EMOJIS = ["🍃", "🌿", "🌺", "🌸", "🦋", "✨", "💎", "🪐", "🌌", "🔥", "🎵", "🎶", "🌟", "👑", "🥂", "🎧", "⚜️"]
 
 @bot.on_message(filters.command("id") & filters.group)
 @catch_errors
@@ -38,53 +43,54 @@ async def tagall_cmd(_, m: Message):
     if not custom_msg and not m.reply_to_message:
         return await m.reply_text("❌ <b>Usage:</b> <code>/tagall [message]</code> or reply to a message.")
 
-    status = await m.reply_text("⏳ <b>Gathering members...</b>")
+    status = await m.reply_text("⏳ <b>Preparing premium tags...</b>")
     try: await m.delete()
     except: pass
 
-    members = []
-    async for member in m.chat.get_members():
-        if not member.user.is_bot and not member.user.is_deleted:
-            members.append(member.user.mention)
-
-    if not members:
-        return await status.edit_text("❌ <b>No members found to tag.</b>")
-
-    # Premium Tagall Card
-    text = (
-        f"<b>📢 ATTENTION EVERYONE 📢</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👑 <b>Admin:</b> {m.from_user.mention}\n"
-        f"💬 <b>Message:</b> {custom_msg if custom_msg else 'Please read the above message.'}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-    )
-    
+    # Reply message copy karega agar diya gaya ho
     if m.reply_to_message:
         try: await m.reply_to_message.copy(m.chat.id)
         except: pass
 
-    # Split tags into chunks of 50 to avoid Telegram limit, but keep it in one visual card style
-    chunk_size = 50
-    first_chunk = True
+    # ✅ Header (Option 9 + Aesthetic Style)
+    header = (
+        f"✨ ─── 𝓐𝓽𝓽𝓮𝓷𝓽𝓲𝓸𝓷 ─── ✨\n\n"
+        f"🌸 <i>{custom_msg if custom_msg else 'Please read the above message.'}</i>\n\n"
+        f"🕊️ <b>With regards,</b> {m.from_user.mention}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"🔔 <b>Notifications:</b>\n\n"
+    )
+
+    current_text = header
+    count = 0
     
-    for i in range(0, len(members), chunk_size):
-        chunk = members[i:i+chunk_size]
-        tags = " ".join(chunk)
-        
-        if first_chunk:
-            full_text = text + f"👇 <b>Tags:</b>\n{tags}"
-            first_chunk = False
-        else:
-            full_text = tags
+    async for member in m.chat.get_members():
+        if member.user.is_bot or member.user.is_deleted:
+            continue
             
-        try:
-            await bot.send_message(
-                chat_id=m.chat.id,
-                text=full_text,
-                disable_notification=(i != 0) # Only ping for the first message
-            )
-        except: pass
-        await asyncio.sleep(2)
+        # ✅ Har user ke liye random emoji select karega
+        emoji = random.choice(EMOJIS)
+        line = f"{emoji} {member.user.mention}\n"
+        
+        # Telegram limit check (3900 chars to be safe)
+        if len(current_text) + len(line) > 3900:
+            try: 
+                await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
+            except Exception as e: 
+                LOGGER.error(f"Tagall send error: {e}")
+            # Naya message start
+            current_text = line
+            count += 1
+            await asyncio.sleep(1) # Delay to prevent flood
+        else:
+            current_text += line
+
+    # Last chunk send
+    if current_text:
+        try: 
+            await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
+        except Exception as e: 
+            LOGGER.error(f"Tagall final error: {e}")
 
     await status.delete()
 
