@@ -29,6 +29,24 @@ def _search_ytdlp_sync(query: str):
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
+# ✅ Added missing function for trending.py
+def _search_ytdlp_multi_sync(query: str, limit: int = 10):
+    try:
+        ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            results = []
+            if info and "entries" in info:
+                for e in info["entries"]:
+                    if e:
+                        vid_id = e.get("id")
+                        thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
+            return results
+    except Exception as e:
+        LOGGER.error(f"yt-dlp multi search error: {e}")
+        return []
+
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
@@ -97,6 +115,27 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
+    # ✅ FORCE MP4 FOR VIDEO (Fix Audio-only bug)
+    if video:
+        try:
+            def _get_video_url(url):
+                ydl_opts = {
+                    "quiet": True, "no_warnings": True, "noplaylist": True, "nocheckcertificate": True,
+                    "format": "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    return ydl.extract_info(url, download=False)
+            v_info = await loop.run_in_executor(None, _get_video_url, webpage_url)
+            if v_info and v_info.get("url"):
+                final_title = v_info.get("title") or fallback_meta.get("title", "Unknown")
+                final_dur = int(v_info.get("duration") or 0)
+                final_thumb = v_info.get("thumbnail") or fallback_meta.get("thumbnail", "")
+                res = {"title": final_title, "url": v_info["url"], "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                _SEARCH_CACHE[cache_key] = (res, time.time())
+                return res
+        except Exception as e:
+            LOGGER.error(f"yt-dlp video direct url error: {e}")
+
     req_type = "video" if video else "audio"
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
     
@@ -123,7 +162,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                 _SEARCH_CACHE[cache_key] = (res, time.time())
                 return res
     
-    # ✅ FIX: Instead of returning webpage_url (which downloads HTML), download via yt-dlp locally
+    # ✅ Fallback: If all else fails, download locally via yt-dlp to guarantee MP4
     if fallback_meta.get("title"):
         LOGGER.info("⚠️ OneGrab API failed, trying local yt-dlp download fallback...")
         dl_res = await download_media_file(webpage_url, video)
@@ -137,7 +176,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600):
     try:
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "nocheckcertificate": True, "match_filter": yt_dlp.utils.match_filter_func(f"duration < {max_duration}")}
-        # ✅ FORCE .mp4 AND .m4a
+        # ✅ FORCE M4A/MP4 (NEVER WEBM)
         if video:
             ydl_opts["format"] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
             ydl_opts["merge_output_format"] = "mp4"
@@ -154,6 +193,11 @@ def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600)
                 base = os.path.splitext(final_path)[0]
                 if os.path.exists(base + ".mp3"): final_path = base + ".mp3"
                 elif os.path.exists(base + ".m4a"): final_path = base + ".m4a"
+            else:
+                # Ensure it's .mp4
+                base = os.path.splitext(final_path)[0]
+                if os.path.exists(base + ".mp4"): final_path = base + ".mp4"
+                
             return {"path": final_path, "title": info.get("title", "Unknown"), "duration": int(info.get("duration") or 0), "thumbnail": info.get("thumbnail", "")}
     except Exception as e:
         LOGGER.error(f"File download error: {e}")

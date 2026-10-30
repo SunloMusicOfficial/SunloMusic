@@ -195,8 +195,17 @@ async def start_call():
 
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
     if not call: return False
-    if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
     
+    # ✅ FIX: If video is requested but URL is .m4a or .mp3, disable video
+    if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
+        video = False
+    
+    # ✅ FIX: If URL is .webm, do not stream it as video (Telegram requires H264/MP4)
+    # This prevents audio-only playback.
+    if video and url.endswith('.webm'):
+        LOGGER.info("⚠️ .webm video detected, forcing audio mode.")
+        video = False
+
     ffmpeg_args = _build_audio_filters(chat_id, effect)
     
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
@@ -209,7 +218,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     except Exception as e:
         LOGGER.error(f"Direct Play error: {type(e).__name__} - {str(e)}")
         
-        # ✅ FIX: Don't attempt fallback on YouTube HTML pages
         if "http" in url and "youtube.com" not in url and "youtu.be" not in url:
             LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
             try:
