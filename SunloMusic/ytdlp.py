@@ -114,6 +114,27 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
+    # ✅ FORCE VIDEO EXTRACTION FOR /VPLAY
+    if video:
+        try:
+            def _get_video_url(url):
+                ydl_opts = {
+                    "quiet": True, "no_warnings": True, "noplaylist": True, "nocheckcertificate": True,
+                    "format": "best[height<=720][ext=mp4]/best[height<=720]/best"
+                }
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    return ydl.extract_info(url, download=False)
+            v_info = await loop.run_in_executor(None, _get_video_url, webpage_url)
+            if v_info and v_info.get("url"):
+                final_title = v_info.get("title") or fallback_meta.get("title", "Unknown")
+                final_dur = int(v_info.get("duration") or 0)
+                final_thumb = v_info.get("thumbnail") or fallback_meta.get("thumbnail", "")
+                res = {"title": final_title, "url": v_info["url"], "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                _SEARCH_CACHE[cache_key] = (res, time.time())
+                return res
+        except Exception as e:
+            LOGGER.error(f"yt-dlp video direct url error: {e}")
+
     req_type = "video" if video else "audio"
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
     
@@ -149,7 +170,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600):
     try:
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "nocheckcertificate": True, "match_filter": yt_dlp.utils.match_filter_func(f"duration < {max_duration}")}
-        # ✅ FIX: Force .m4a / .mp4 (Never .webm) to avoid PyTgCalls crash
+        # ✅ FORCE M4A/MP4 (Never .webm)
         if video:
             ydl_opts["format"] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
             ydl_opts["merge_output_format"] = "mp4"

@@ -207,14 +207,15 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=20.0)
         return True
     except Exception as e:
-        # ✅ Log the error properly
         LOGGER.error(f"Direct Play error: {type(e).__name__} - {str(e)}")
         
         if "http" in url:
             LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
             try:
                 os.makedirs("cache/downloads", exist_ok=True)
-                file_path = f"cache/downloads/{abs(hash(url))}.m4a"
+                # ✅ FIX: Save as .mp4 for videos, .m4a for audio
+                ext = ".mp4" if video else ".m4a"
+                file_path = f"cache/downloads/{abs(hash(url))}{ext}"
                 
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url) as resp:
@@ -222,8 +223,10 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
                             with open(file_path, "wb") as f: f.write(await resp.read())
                                 
                 if os.path.exists(file_path):
-                    if video: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720P, ffmpeg_parameters=ffmpeg_args)
-                    else: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
+                    if video: 
+                        stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
+                    else: 
+                        stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
                     
                     await asyncio.wait_for(call.play(chat_id, stream2, config=GroupCallConfig(auto_start=True)), timeout=30.0)
                     return True
