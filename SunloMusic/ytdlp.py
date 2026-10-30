@@ -75,17 +75,34 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     webpage_url = query
     fallback_meta = {}
+    loop = asyncio.get_running_loop()
 
-    if not query.startswith("http"):
-        LOGGER.info(f"🔎 Searching via yt-dlp: {query}")
-        loop = asyncio.get_running_loop()
+    # ✅ 1. Fetch Metadata (Title, Thumbnail, Duration)
+    if query.startswith("http"):
+        try:
+            def _get_info(url):
+                with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}) as ydl:
+                    return ydl.extract_info(url, download=False)
+            info = await loop.run_in_executor(None, _get_info, query)
+            if info:
+                thumb = info.get("thumbnail") or (info.get("thumbnails", [{}])[-1].get("url") if info.get("thumbnails") else "")
+                fallback_meta = {"title": info.get("title", "Unknown"), "duration": int(info.get("duration") or 0), "thumbnail": thumb}
+                webpage_url = info.get("webpage_url", query)
+        except Exception as e:
+            LOGGER.error(f"yt-dlp url meta error: {e}")
+            
+        if not fallback_meta.get("title") or fallback_meta.get("title") == "Unknown":
+            search_data = await _api_request("/api/search", {"query": webpage_url, "platform": "youtube"})
+            if search_data and search_data.get("results"):
+                track = search_data["results"][0]
+                fallback_meta = {"title": track.get("title", "Unknown"), "duration": int(track.get("duration") or 0), "thumbnail": track.get("thumbnail", "")}
+    else:
         try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
         except: ytdlp_info = None
             
         if ytdlp_info and ytdlp_info.get("url"):
             webpage_url = ytdlp_info["url"]
             fallback_meta = ytdlp_info
-            LOGGER.info(f"✅ yt-dlp found: {fallback_meta['title']} ({fallback_meta['duration']}s)")
         else:
             LOGGER.warning("⚠️ yt-dlp search failed, using OneGrab fallback.")
             search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
@@ -96,8 +113,8 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
+    # ✅ 2. OneGrab Stream Link
     req_type = "video" if video else "audio"
-    LOGGER.info(f"🌐 Fetching {req_type} stream via OneGrab...")
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
     
     if track_data:
@@ -118,11 +135,12 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                     return {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
             else:
                 return {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+    
+    # Agar OneGrab stream fail ho jaye par metadata mila ho
+    if fallback_meta.get("title"):
+        return {"title": fallback_meta.get("title"), "url": webpage_url, "duration": fallback_meta.get("duration", 0), "thumbnail": fallback_meta.get("thumbnail", ""), "webpage_url": webpage_url}
     return None
 
-# ═══════════════════════════════════════════
-# ✅ NEW: File Download (for /song and /video)
-# ═══════════════════════════════════════════
 def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600):
     try:
         ydl_opts = {
