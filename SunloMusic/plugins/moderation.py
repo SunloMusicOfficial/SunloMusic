@@ -21,32 +21,25 @@ async def id_cmd(_, m: Message):
 async def purge_cmd(_, m: Message):
     if not m.reply_to_message:
         return await m.reply_text("❌ <b>Reply to a message to start purging from.</b>")
-    
     start_id = m.reply_to_message.id
     end_id = m.id
     msg_ids = list(range(start_id, end_id + 1))
-    
     for i in range(0, len(msg_ids), 100):
         try: await bot.delete_messages(m.chat.id, msg_ids[i:i+100])
         except: pass
     try: await m.reply_text(f"🧹 <b>Purged {len(msg_ids)} messages.</b>")
     except: pass
 
-# ✅ ADVANCED & PREMIUM /tagall
 @bot.on_message(filters.command("tagall") & filters.group)
 @catch_errors
 @admin_only
 async def tagall_cmd(_, m: Message):
-    # Get custom message (from command or replied message)
     custom_msg = " ".join(m.command[1:]) if len(m.command) > 1 else None
-    
     if not custom_msg and not m.reply_to_message:
         return await m.reply_text("❌ <b>Usage:</b> <code>/tagall [message]</code> or reply to a message.")
 
-    status = await m.reply_text("⏳ <b>Gathering members & preparing tags...</b>")
-    
-    try:
-        await m.delete() # Delete command
+    status = await m.reply_text("⏳ <b>Gathering members...</b>")
+    try: await m.delete()
     except: pass
 
     members = []
@@ -57,41 +50,43 @@ async def tagall_cmd(_, m: Message):
     if not members:
         return await status.edit_text("❌ <b>No members found to tag.</b>")
 
-    # Premium Intro Card
-    header = (
+    # Premium Tagall Card
+    text = (
         f"<b>📢 ATTENTION EVERYONE 📢</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"👑 <b>Admin:</b> {m.from_user.mention}\n"
         f"💬 <b>Message:</b> {custom_msg if custom_msg else 'Please read the above message.'}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👇 <b>Tagging {len(members)} members...</b>"
     )
-    await status.edit_text(header)
-
-    # If it's a reply, send that message first
+    
     if m.reply_to_message:
-        try:
-            await m.reply_to_message.copy(m.chat.id)
+        try: await m.reply_to_message.copy(m.chat.id)
         except: pass
 
-    # Send tags in chunks of 20 (to make it look like a clean list)
-    chunk_size = 20
+    # Split tags into chunks of 50 to avoid Telegram limit, but keep it in one visual card style
+    chunk_size = 50
+    first_chunk = True
+    
     for i in range(0, len(members), chunk_size):
         chunk = members[i:i+chunk_size]
+        tags = " ".join(chunk)
         
-        # Formatting each tag on a new line or joined with spaces
-        tags_text = " ".join(chunk)
-        
-        try:
-            await m.reply_text(
-                f"<b>🔔 Tag Group {int(i/chunk_size) + 1}:</b>\n{tags_text}", 
-                disable_notification=(i != 0) # Only notify on first chunk to avoid extreme spam
-            )
-        except Exception as e:
-            LOGGER.error(f"Tagall error: {e}")
-            break
+        if first_chunk:
+            full_text = text + f"👇 <b>Tags:</b>\n{tags}"
+            first_chunk = False
+        else:
+            full_text = tags
             
-        await asyncio.sleep(2) # 2 second delay to prevent Telegram FloodWait
+        try:
+            await bot.send_message(
+                chat_id=m.chat.id,
+                text=full_text,
+                disable_notification=(i != 0) # Only ping for the first message
+            )
+        except: pass
+        await asyncio.sleep(2)
+
+    await status.delete()
 
 @bot.on_message(filters.command("welcome") & filters.group)
 @catch_errors
@@ -99,7 +94,6 @@ async def tagall_cmd(_, m: Message):
 async def welcome_cmd(_, m: Message):
     if len(m.command) < 2:
         return await m.reply_text("❌ <b>Usage:</b> <code>/welcome on</code> or <code>/welcome off</code>")
-    
     state = m.command[1].lower()
     if state == "on":
         await set_group_setting(m.chat.id, "welcome", True)
@@ -113,10 +107,8 @@ async def welcome_cmd(_, m: Message):
 async def welcome_new_member(_, m: Message):
     is_welcome = await get_group_setting(m.chat.id, "welcome", False)
     if not is_welcome: return
-    
     for user in m.new_chat_members:
         if user.is_bot: continue
-        
         caption = (
             f"<b>✨ Welcome to {m.chat.title}!</b>\n"
             f"━━━━━━━━━━━━━\n"
@@ -125,6 +117,5 @@ async def welcome_new_member(_, m: Message):
             f"━━━━━━━━━━━━━\n"
             f"<i>Hope you enjoy your stay here. Use /play to listen to music!</i>"
         )
-        try:
-            await m.reply_text(caption)
+        try: await m.reply_text(caption)
         except: pass
