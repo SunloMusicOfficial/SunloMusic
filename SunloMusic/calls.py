@@ -17,8 +17,7 @@ from SunloMusic.lyrics import start_live_karaoke
 
 call = None
 EMPTY_VC_TIMERS = {}
-# ✅ NEW: per-chat audio controls
-AUDIO_CONTROLS = {}  # chat_id -> {"speed": 1.0, "volume": 1.0, "eq": "none"}
+AUDIO_CONTROLS = {}
 
 def cleanup_file(url: str):
     if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a', '.mp3')):
@@ -32,12 +31,9 @@ def _build_audio_filters(chat_id: int, effect: str = "none") -> str | None:
     eq = ctrl.get("eq", "none")
 
     filters = []
-    if effect == "bass":
-        filters.append("bass=g=10")
-    elif effect == "8d":
-        filters.append("apulsator=hz=0.1")
-    elif effect == "nightcore":
-        filters.append("atempo=1.25,asetrate=44100*1.25")
+    if effect == "bass": filters.append("bass=g=10")
+    elif effect == "8d": filters.append("apulsator=hz=0.1")
+    elif effect == "nightcore": filters.append("atempo=1.25,asetrate=44100*1.25")
     else:
         if eq != "none":
             eq_map = {
@@ -47,13 +43,10 @@ def _build_audio_filters(chat_id: int, effect: str = "none") -> str | None:
                 "jazz": "equalizer=f=200:width_type=h:width=200:g=2,equalizer=f=2000:width_type=h:width=200:g=3",
                 "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5",
             }
-            if eq in eq_map:
-                filters.append(eq_map[eq])
+            if eq in eq_map: filters.append(eq_map[eq])
     
-    if speed != 1.0:
-        filters.append(f"atempo={speed}")
-    if volume != 1.0:
-        filters.append(f"volume={volume}")
+    if speed != 1.0: filters.append(f"atempo={speed}")
+    if volume != 1.0: filters.append(f"volume={volume}")
     
     return "-af " + ",".join(filters) if filters else None
 
@@ -84,10 +77,9 @@ async def update_live_timer(chat_id, msg_id):
         if q.paused: continue
         if await check_empty_vc(chat_id): break
         
-        if q.now_playing.duration <= 0: dur_str = "Live"
-        else: dur_str = format_duration(q.now_playing.duration)
-            
+        dur_str = "Live" if q.now_playing.duration <= 0 else format_duration(q.now_playing.duration)
         elapsed = int(time.time() - q.start_time - q.total_paused)
+        
         if q.now_playing.duration > 0 and elapsed >= q.now_playing.duration: break
         
         try:
@@ -102,13 +94,25 @@ async def update_live_timer(chat_id, msg_id):
             except: 
                 try: 
                     await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed), link_preview_options=LinkPreviewOptions(is_disabled=True))
-                except FloodWait as e:
-                    await asyncio.sleep(e.value)
                 except: pass
         except: pass
 
+# ✅ DELAYED LEAVE LOGIC
+async def delayed_leave(chat_id):
+    await asyncio.sleep(60) # 60 sec wait
+    from SunloMusic.queues import get_queue, clear_queue
+    q = get_queue(chat_id)
+    if not q.now_playing:
+        try:
+            if call: await call.leave_call(chat_id)
+        except: pass
+        clear_queue(chat_id)
+        ghost_text = f"👻 <b>G H O S T E D !</b> 👻\n━━━━━━━━━━━━━━━━━━━\n<i>The queue vanished into thin air...</i>\n━━━━━━━━━━━━━━━━━━━\n📭 <b>STATUS:</b> <code>EMPTY</code>\n🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n━━━━━━━━━━━━━━━━━━━"
+        try: await bot_module.bot.send_message(chat_id, ghost_text)
+        except: pass
+
 async def start_next_song(chat_id, q):
-    from SunloMusic.queues import clear_queue, Track
+    from SunloMusic.queues import Track
     from SunloMusic.database import add_recent
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
@@ -123,12 +127,9 @@ async def start_next_song(chat_id, q):
     if not q.queue and chat_id in AUTO_DJ_CHATS:
         try:
             queries = ["trending hindi songs 2024", "top bollywood hits", "arijit singh best songs", "lofi hindi chill", "punjabi top hits"]
-            random_query = random.choice(queries)
-            info = await extract_audio(random_query)
-            if info: 
-                q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
-        except Exception as e: 
-            LOGGER.error(f"Auto-DJ fetch error: {e}")
+            info = await extract_audio(random.choice(queries))
+            if info: q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
+        except: pass
 
     if q.queue:
         nxt = q.queue.pop(0)
@@ -141,14 +142,8 @@ async def start_next_song(chat_id, q):
         await play_stream(chat_id, nxt.url, nxt.video)
         q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
         
-        # ✅ Save to recent
         try:
-            await add_recent(chat_id, {
-                "title": nxt.title, "url": nxt.url,
-                "duration": nxt.duration, "thumbnail": nxt.thumbnail,
-                "requester": nxt.requester, "requester_id": nxt.requester_id,
-                "video": nxt.video
-            })
+            await add_recent(chat_id, {"title": nxt.title, "url": nxt.url, "duration": nxt.duration, "thumbnail": nxt.thumbnail, "requester": nxt.requester, "requester_id": nxt.requester_id, "video": nxt.video})
         except: pass
         
         thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
@@ -163,19 +158,11 @@ async def start_next_song(chat_id, q):
         q.playing_message_id = sent_msg.id
         try: await sent_msg.pin(disable_notification=True)
         except: pass
-        
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
-
-        if chat_id in KARAOKE_CHATS:
-            q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
+        if chat_id in KARAOKE_CHATS: q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
-        try:
-            if call: await call.leave_call(chat_id)
-        except: pass
-        clear_queue(chat_id)
-        ghost_text = f"👻 <b>G H O S T E D !</b> 👻\n━━━━━━━━━━━━━━━━━━━\n<i>The queue vanished into thin air...</i>\n━━━━━━━━━━━━━━━━━━━\n📭 <b>STATUS:</b> <code>EMPTY</code>\n🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n━━━━━━━━━━━━━━━━━━━\n<blockquote>Boo! Hope you enjoyed the vibes. 👻</blockquote>"
-        try: await bot_module.bot.send_message(chat_id, ghost_text)
-        except: pass
+        # ✅ Start delayed leave instead of instant leave
+        asyncio.create_task(delayed_leave(chat_id))
 
 async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue
@@ -195,16 +182,15 @@ def init_calls():
         call.on_update(fl.stream_end())(stream_end_handler)
 
 async def start_call():
-    if call:
-        await call.start()
+    if call: await call.start()
 
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
     if not call: return False
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
     
-    # ✅ Build ffmpeg args from AUDIO_CONTROLS + effect
     ffmpeg_args = _build_audio_filters(chat_id, effect)
     
+    # ✅ PyTgCalls Fast Setup
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
     
@@ -224,11 +210,9 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url) as resp:
                         if resp.status == 200:
-                            with open(file_path, "wb") as f:
-                                f.write(await resp.read())
+                            with open(file_path, "wb") as f: f.write(await resp.read())
                                 
                 if os.path.exists(file_path):
-                    LOGGER.info(f"✅ Download successful. Playing local file: {file_path}")
                     if video: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
                     else: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
                     
