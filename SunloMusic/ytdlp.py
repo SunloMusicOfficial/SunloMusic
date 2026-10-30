@@ -8,22 +8,22 @@ API_HEADERS = {"X-API-Key": config.ONEGRAB_API_KEY, "Accept": "application/json"
 DOWNLOAD_DIR = "cache/downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# ✅ SUPER FAST MEMORY CACHE
 _SEARCH_CACHE = {}
-_CACHE_TTL = 3600 # 1 hour
+_CACHE_TTL = 3600
 
 def _search_ytdlp_sync(query: str):
     try:
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # ✅ Tera purana filter wapas laga diya (sahi song ke liye)
             info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
             if info and "entries" in info and len(info["entries"]) > 0:
                 entry = info["entries"][0]
-                thumb = entry.get("thumbnails", [{}])[-1].get("url") if entry.get("thumbnails") else f"https://i.ytimg.com/vi/{entry['id']}/hqdefault.jpg"
+                vid_id = entry.get("id")
+                # ✅ Force i.ytimg.com (Most reliable URL, never fails)
+                thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
                 return {
                     "title": entry.get("title", query),
-                    "url": f"https://www.youtube.com/watch?v={entry['id']}",
+                    "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else entry.get("url"),
                     "duration": int(entry.get("duration") or 0),
                     "thumbnail": thumb
                 }
@@ -39,8 +39,9 @@ def _search_ytdlp_multi_sync(query: str, limit: int = 10):
             if info and "entries" in info:
                 for e in info["entries"]:
                     if e:
-                        thumb = f"https://i.ytimg.com/vi/{e.get('id')}/hqdefault.jpg" if e.get("id") else ""
-                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={e.get('id')}" if e.get("id") else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
+                        vid_id = e.get("id")
+                        thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
             return results
     except Exception as e:
         LOGGER.error(f"yt-dlp multi search error: {e}")
@@ -76,27 +77,25 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if cache_key in _SEARCH_CACHE:
         data, t = _SEARCH_CACHE[cache_key]
         if time.time() - t < _CACHE_TTL:
-            LOGGER.info(f"⚡ Cache HIT for {query}")
             return data
 
     webpage_url = query
     fallback_meta = {}
+    loop = asyncio.get_running_loop()
 
     if query.startswith("http"):
         try:
             def _get_info(url):
                 with yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True, "nocheckcertificate": True}) as ydl:
                     return ydl.extract_info(url, download=False)
-            loop = asyncio.get_running_loop()
             info = await loop.run_in_executor(None, _get_info, query)
             if info:
-                thumb = info.get("thumbnail") or ""
+                vid_id = info.get("id")
+                thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
                 fallback_meta = {"title": info.get("title", "Unknown"), "duration": int(info.get("duration") or 0), "thumbnail": thumb}
                 webpage_url = info.get("webpage_url", query)
         except: pass
     else:
-        # ✅ YT-DLP FIRST (Tera purana sahi search)
-        loop = asyncio.get_running_loop()
         try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=8.0)
         except: ytdlp_info = None
             
@@ -104,12 +103,15 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             webpage_url = ytdlp_info["url"]
             fallback_meta = ytdlp_info
         else:
-            # Fallback to API if yt-dlp fails
             search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
                 webpage_url = track.get("url")
-                fallback_meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": track.get("thumbnail", "")}
+                vid_id = ""
+                if "v=" in webpage_url:
+                    vid_id = webpage_url.split("v=")[1].split("&")[0]
+                thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else track.get("thumbnail", "")
+                fallback_meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": thumb}
 
     if not webpage_url: return None
 

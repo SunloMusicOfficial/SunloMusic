@@ -9,7 +9,7 @@ import SunloMusic.bot as bot_module
 from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration
-from SunloMusic.thumbnails import generate_thumbnail
+from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
 from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
@@ -151,13 +151,17 @@ async def start_next_song(chat_id, q):
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
         
-        # ✅ FIXED: Photo Error Try/Except
+        # ✅ THUMBNAIL GUARANTEE (Auto-play)
         sent_msg = None
         if thumb:
-            try:
-                sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-            except Exception as e:
-                LOGGER.error(f"Next song photo error: {e}")
+            try: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+            except Exception: pass
+            
+        if not sent_msg:
+            local_thumb = get_default_thumb()
+            if local_thumb:
+                try: sent_msg = await bot_module.bot.send_photo(chat_id, local_thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+                except Exception: pass
                 
         if not sent_msg:
             sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
@@ -218,7 +222,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
                             with open(file_path, "wb") as f: f.write(await resp.read())
                                 
                 if os.path.exists(file_path):
-                    if video: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
+                    if video: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720P, ffmpeg_parameters=ffmpeg_args)
                     else: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
                     
                     await asyncio.wait_for(call.play(chat_id, stream2, config=GroupCallConfig(auto_start=True)), timeout=30.0)
