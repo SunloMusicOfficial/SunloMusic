@@ -97,9 +97,8 @@ async def update_live_timer(chat_id, msg_id):
                 except: pass
         except: pass
 
-# ✅ DELAYED LEAVE LOGIC
 async def delayed_leave(chat_id):
-    await asyncio.sleep(60) # 60 sec wait
+    await asyncio.sleep(60) 
     from SunloMusic.queues import get_queue, clear_queue
     q = get_queue(chat_id)
     if not q.now_playing:
@@ -152,16 +151,23 @@ async def start_next_song(chat_id, q):
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
         
-        if thumb: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-        else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
-        
+        # ✅ FIXED: Photo Error Try/Except
+        sent_msg = None
+        if thumb:
+            try:
+                sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+            except Exception as e:
+                LOGGER.error(f"Next song photo error: {e}")
+                
+        if not sent_msg:
+            sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
+            
         q.playing_message_id = sent_msg.id
         try: await sent_msg.pin(disable_notification=True)
         except: pass
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         if chat_id in KARAOKE_CHATS: q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
-        # ✅ Start delayed leave instead of instant leave
         asyncio.create_task(delayed_leave(chat_id))
 
 async def stream_end_handler(client, update: StreamEnded):
@@ -190,7 +196,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     
     ffmpeg_args = _build_audio_filters(chat_id, effect)
     
-    # ✅ PyTgCalls Fast Setup
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
     

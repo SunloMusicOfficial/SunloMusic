@@ -12,6 +12,7 @@ from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
 from SunloMusic.lyrics import start_live_karaoke
+from SunloMusic.logger import LOGGER
 
 async def _check_admin(m):
     if m.from_user.id == config.OWNER_ID or m.from_user.id in config.sudo_list: return True
@@ -53,7 +54,7 @@ async def play_cmd(_, m):
     status = await m.reply_text("⚡ <b>Turbo Loading...</b>")
     video = "vplay" in m.command[0].lower()
     
-    # ✅ PARALLEL EXECUTION (Saves 2-3 seconds)
+    # ✅ PARALLEL EXECUTION
     admin_task = _check_admin(m)
     assist_task = ensure_assistant_in_chat(m.chat.id)
     db_task = asyncio.gather(add_user(uid, m.from_user.first_name), add_lb_point(m.chat.id, uid, m.from_user.first_name))
@@ -82,12 +83,21 @@ async def play_cmd(_, m):
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
         
-        if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
-        else: sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=queue_add_keyboard(track_hash), link_preview_options=LinkPreviewOptions(is_disabled=True))
+        # ✅ FIXED: Photo Error Try/Except
+        sent_msg = None
+        if thumb:
+            try:
+                sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
+            except Exception as e:
+                LOGGER.error(f"Queue photo error: {e}")
+                
+        if not sent_msg:
+            sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=queue_add_keyboard(track_hash), link_preview_options=LinkPreviewOptions(is_disabled=True))
+            
         track.message_id = sent_msg.id
         return
     
-    # ✅ OPTIMISTIC UI (Send Message while VC connects)
+    # ✅ OPTIMISTIC UI
     await status.delete()
     
     q.now_playing = track
@@ -105,12 +115,15 @@ async def play_cmd(_, m):
     play_task = asyncio.create_task(play_stream(m.chat.id, track.url, track.video))
     
     # 2. Send player card instantly
-    try:
-        if thumb: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-        else: sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
-    except Exception as e:
-        LOGGER.error(f"Failed to send player message: {e}")
-        return
+    sent_msg = None
+    if thumb:
+        try:
+            sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+        except Exception as e:
+            LOGGER.error(f"Player photo error: {e}")
+            
+    if not sent_msg:
+        sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
     
     q.playing_message_id = sent_msg.id
     
@@ -123,7 +136,7 @@ async def play_cmd(_, m):
     if m.chat.id in KARAOKE_CHATS:
         q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, track.title, track.duration, q))
         
-    # 3. Wait for VC to finish joining (if it hasn't already)
+    # 3. Wait for VC to finish joining
     await play_task
 
     # 4. Save recent (in background)

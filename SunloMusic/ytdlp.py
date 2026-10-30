@@ -8,14 +8,15 @@ API_HEADERS = {"X-API-Key": config.ONEGRAB_API_KEY, "Accept": "application/json"
 DOWNLOAD_DIR = "cache/downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# ✅ SUPER FAST MEMORY CACHE (Saves 2-4 seconds on repeat songs)
+# ✅ SUPER FAST MEMORY CACHE
 _SEARCH_CACHE = {}
-_CACHE_TTL = 3600 # 1 hour tak yaad rahega
+_CACHE_TTL = 3600 # 1 hour
 
 def _search_ytdlp_sync(query: str):
     try:
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # ✅ Tera purana filter wapas laga diya (sahi song ke liye)
             info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
             if info and "entries" in info and len(info["entries"]) > 0:
                 entry = info["entries"][0]
@@ -71,7 +72,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
         return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
 
-    # ✅ CACHE CHECK
     cache_key = f"{query}_{video}"
     if cache_key in _SEARCH_CACHE:
         data, t = _SEARCH_CACHE[cache_key]
@@ -95,20 +95,21 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                 webpage_url = info.get("webpage_url", query)
         except: pass
     else:
-        # ✅ ONEGRAB SEARCH FIRST (Fastest)
-        search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
-        if search_data and search_data.get("results"):
-            track = search_data["results"][0]
-            webpage_url = track.get("url")
-            fallback_meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": track.get("thumbnail", "")}
+        # ✅ YT-DLP FIRST (Tera purana sahi search)
+        loop = asyncio.get_running_loop()
+        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=8.0)
+        except: ytdlp_info = None
+            
+        if ytdlp_info and ytdlp_info.get("url"):
+            webpage_url = ytdlp_info["url"]
+            fallback_meta = ytdlp_info
         else:
-            # Fallback to yt-dlp
-            loop = asyncio.get_running_loop()
-            try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=6.0)
-            except: ytdlp_info = None
-            if ytdlp_info:
-                webpage_url = ytdlp_info["url"]
-                fallback_meta = ytdlp_info
+            # Fallback to API if yt-dlp fails
+            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
+            if search_data and search_data.get("results"):
+                track = search_data["results"][0]
+                webpage_url = track.get("url")
+                fallback_meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": track.get("thumbnail", "")}
 
     if not webpage_url: return None
 
