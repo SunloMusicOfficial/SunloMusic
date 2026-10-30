@@ -29,7 +29,6 @@ def _search_ytdlp_sync(query: str):
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
-# ✅ Added missing function for trending.py
 def _search_ytdlp_multi_sync(query: str, limit: int = 10):
     try:
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
@@ -115,7 +114,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
-    # ✅ FORCE MP4 FOR VIDEO (Fix Audio-only bug)
     if video:
         try:
             def _get_video_url(url):
@@ -158,11 +156,19 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                     _SEARCH_CACHE[cache_key] = (res, time.time())
                     return res
             else:
-                res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-                _SEARCH_CACHE[cache_key] = (res, time.time())
-                return res
+                # ✅ If OneGrab gives .webm for video, force download and convert to .mp4
+                if video and cdnurl.endswith(".webm"):
+                    LOGGER.info("⚠️ OneGrab returned .webm, downloading and converting to .mp4...")
+                    dl_res = await download_media_file(cdnurl, video=True)
+                    if dl_res and dl_res.get("path"):
+                        res = {"title": final_title, "url": dl_res["path"], "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                        _SEARCH_CACHE[cache_key] = (res, time.time())
+                        return res
+                else:
+                    res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                    _SEARCH_CACHE[cache_key] = (res, time.time())
+                    return res
     
-    # ✅ Fallback: If all else fails, download locally via yt-dlp to guarantee MP4
     if fallback_meta.get("title"):
         LOGGER.info("⚠️ OneGrab API failed, trying local yt-dlp download fallback...")
         dl_res = await download_media_file(webpage_url, video)
@@ -176,12 +182,14 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600):
     try:
         ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "nocheckcertificate": True, "match_filter": yt_dlp.utils.match_filter_func(f"duration < {max_duration}")}
-        # ✅ FORCE M4A/MP4 (NEVER WEBM)
+        
         if video:
-            ydl_opts["format"] = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best"
+            ydl_opts["format"] = "bestvideo[height<=720]+bestaudio/best"
             ydl_opts["merge_output_format"] = "mp4"
+            # ✅ FORCE MP4 CONVERSION (H264) for Telegram VC Compatibility
+            ydl_opts["postprocessors"] = [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}]
         else:
-            ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=mp3]/bestaudio/best"
+            ydl_opts["format"] = "bestaudio/best"
             ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
         
         ydl_opts["outtmpl"] = f"{DOWNLOAD_DIR}/%(id)s.%(ext)s"
@@ -189,14 +197,13 @@ def _download_file_sync(url: str, video: bool = False, max_duration: int = 3600)
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             final_path = ydl.prepare_filename(info)
-            if not video:
-                base = os.path.splitext(final_path)[0]
+            base = os.path.splitext(final_path)[0]
+            
+            if video:
+                if os.path.exists(base + ".mp4"): final_path = base + ".mp4"
+            else:
                 if os.path.exists(base + ".mp3"): final_path = base + ".mp3"
                 elif os.path.exists(base + ".m4a"): final_path = base + ".m4a"
-            else:
-                # Ensure it's .mp4
-                base = os.path.splitext(final_path)[0]
-                if os.path.exists(base + ".mp4"): final_path = base + ".mp4"
                 
             return {"path": final_path, "title": info.get("title", "Unknown"), "duration": int(info.get("duration") or 0), "thumbnail": info.get("thumbnail", "")}
     except Exception as e:

@@ -11,7 +11,7 @@ from SunloMusic.config import config
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
 from SunloMusic.keyboards import player_keyboard
-from SunloMusic.ytdlp import extract_audio
+from SunloMusic.ytdlp import extract_audio, download_media_file
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
 from SunloMusic.lyrics import start_live_karaoke
 
@@ -196,15 +196,18 @@ async def start_call():
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
     if not call: return False
     
-    # ✅ FIX: If video is requested but URL is .m4a or .mp3, disable video
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
     
-    # ✅ FIX: If URL is .webm, do not stream it as video (Telegram requires H264/MP4)
-    # This prevents audio-only playback.
+    # ✅ FORCE CONVERSION FOR .webm VIDEOS
     if video and url.endswith('.webm'):
-        LOGGER.info("⚠️ .webm video detected, forcing audio mode.")
-        video = False
+        LOGGER.info("⚠️ .webm video detected. Downloading and converting to .mp4 for VC...")
+        dl_res = await download_media_file(url, video=True)
+        if dl_res and dl_res.get("path"):
+            url = dl_res["path"]
+        else:
+            LOGGER.error("❌ Failed to convert .webm, forcing audio mode.")
+            video = False
 
     ffmpeg_args = _build_audio_filters(chat_id, effect)
     
