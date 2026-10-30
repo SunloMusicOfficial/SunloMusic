@@ -1,4 +1,5 @@
 import asyncio, time, base64, os, random
+import aiohttp
 from pyrogram import enums
 from pyrogram.types import LinkPreviewOptions
 from pyrogram.errors import FloodWait
@@ -18,7 +19,7 @@ call = None
 EMPTY_VC_TIMERS = {}
 
 def cleanup_file(url: str):
-    if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a')):
+    if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a', '.mp3')):
         try: os.remove(url)
         except: pass
 
@@ -115,8 +116,6 @@ async def start_next_song(chat_id, q):
         else: sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
         
         q.playing_message_id = sent_msg.id
-        
-        # ✅ AUTO-PIN FOR AUTO-PLAY
         try: await sent_msg.pin(disable_notification=True)
         except: pass
         
@@ -154,18 +153,48 @@ async def start_call():
     if call:
         await call.start()
 
+# ✅ UPDATED PLAY STREAM (Download Fallback Added)
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
     if not call: return False
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
+    
     ffmpeg_args = "-af bass=g=10" if effect == "bass" else "-af apulsator=hz=0.1" if effect == "8d" else "-af atempo=1.25,asetrate=44100*1.25" if effect == "nightcore" else None
+    
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
+    
     try:
-        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=30.0)
+        LOGGER.info(f"🎵 Attempting to play URL directly: {url[:80]}")
+        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=20.0)
         return True
     except Exception as e:
-        if "already" in str(e).lower() or "stream" in str(e).lower(): return True
-        return True
+        LOGGER.error(f"Direct Play error: {e}")
+        
+        # ✅ Fallback: Agar direct URL fail ho jaye, toh local download karke play karo
+        if "http" in url:
+            LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
+            try:
+                os.makedirs("cache/downloads", exist_ok=True)
+                file_path = f"cache/downloads/{abs(hash(url))}.m4a"
+                
+                # Download file
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url) as resp:
+                        if resp.status == 200:
+                            with open(file_path, "wb") as f:
+                                f.write(await resp.read())
+                                
+                if os.path.exists(file_path):
+                    LOGGER.info(f"✅ Download successful. Playing local file: {file_path}")
+                    if video: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
+                    else: stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
+                    
+                    await asyncio.wait_for(call.play(chat_id, stream2, config=GroupCallConfig(auto_start=True)), timeout=30.0)
+                    return True
+            except Exception as download_err:
+                LOGGER.error(f"Download fallback failed: {download_err}")
+                
+        return True # Even if it fails, return True so card is sent.
 
 async def pause_stream(chat_id: int):
     if call: await call.pause(chat_id)
