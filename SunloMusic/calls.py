@@ -209,11 +209,11 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     except Exception as e:
         LOGGER.error(f"Direct Play error: {type(e).__name__} - {str(e)}")
         
-        if "http" in url:
+        # ✅ FIX: Don't attempt fallback on YouTube HTML pages
+        if "http" in url and "youtube.com" not in url and "youtu.be" not in url:
             LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
             try:
                 os.makedirs("cache/downloads", exist_ok=True)
-                # ✅ FIX: Save as .mp4 for videos, .m4a for audio
                 ext = ".mp4" if video else ".m4a"
                 file_path = f"cache/downloads/{abs(hash(url))}{ext}"
                 

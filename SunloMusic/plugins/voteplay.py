@@ -1,4 +1,4 @@
-import time, base64
+import asyncio, time, base64
 from pyrogram import filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LinkPreviewOptions
 from SunloMusic.bot import bot
@@ -123,7 +123,6 @@ async def voteplay_cb(_, cq: CallbackQuery):
             })
         except: pass
         
-        # ✅ SEND FULL PLAYER CARD WITH THUMBNAIL
         thumb = await generate_thumbnail(cq.message.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"

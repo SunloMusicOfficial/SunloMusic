@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, shutil
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
@@ -12,7 +12,12 @@ async def main():
     print_banner()
     LOGGER.info("🚀 Starting SunloMusic...")
     
-    # ✅ Initialize clients inside the running event loop
+    # ✅ CLEAR OLD CACHE (Fixes corrupted .webm files)
+    if os.path.exists("cache/downloads"):
+        shutil.rmtree("cache/downloads")
+        LOGGER.info("🧹 Cleared old downloads cache")
+    os.makedirs("cache/downloads", exist_ok=True)
+    
     init_clients()
     init_calls()
     
