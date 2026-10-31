@@ -1,14 +1,14 @@
-import asyncio, os
+import asyncio, os, base64
 from pyrogram import filters
-from pyrogram.types import Message
+from pyrogram.types import Message, CallbackQuery
 from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors
-from SunloMusic.database import add_coins, get_coins, spend_coins
+from SunloMusic.database import add_coins, get_coins, spend_coins, is_sudo
 from SunloMusic.ytdlp import download_media_file, cleanup_download
 from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
 
-DOWNLOAD_COST = 5  # 5 coins per download
+DOWNLOAD_COST = 5
 
 def _fmt_size(size: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB']:
@@ -34,8 +34,6 @@ async def _do_download(m: Message, video: bool):
     user_id = m.from_user.id
     query = " ".join(m.command[1:])
     
-    # Coins check (skip for sudo/owner)
-    from SunloMusic.database import is_sudo
     is_priv = await is_sudo(user_id)
     if not is_priv:
         bal = await get_coins(user_id)
@@ -65,30 +63,20 @@ async def _do_download(m: Message, video: bool):
     try:
         file_size = os.path.getsize(file_path)
         
-        # Telegram bot limit is 2GB
         if file_size > 2 * 1024 * 1024 * 1024:
             return await status.edit_text("❌ <b>File too large (over 2GB).</b>")
         
         await status.edit_text(f"📤 <b>Uploading:</b> {title[:50]}\n📦 Size: {_fmt_size(file_size)}")
         
-        from pyrogram.types import InputMediaAudio, InputMediaVideo
-        
         try:
-            await m.reply_audio(
-                audio=file_path,
-                title=title[:64],
-                performer="SunloMusic",
-                duration=duration,
-                caption=f"🎵 <b>{title}</b>\n\n🤖 Downloaded by @{config.BOT_USERNAME.strip('@')}"
-            )
+            if video:
+                await m.reply_video(video=file_path, caption=f"🎬 <b>{title}</b>\n\n🤖 Downloaded by @{config.BOT_USERNAME.strip('@')}")
+            else:
+                await m.reply_audio(audio=file_path, title=title[:64], performer="SunloMusic", duration=duration, caption=f"🎵 <b>{title}</b>\n\n🤖 Downloaded by @{config.BOT_USERNAME.strip('@')}")
         except Exception as e:
-            LOGGER.error(f"reply_audio failed: {e}, trying as document")
-            await m.reply_document(
-                document=file_path,
-                caption=f"🎵 <b>{title}</b>\n\n🤖 Downloaded by @{config.BOT_USERNAME.strip('@')}"
-            )
+            LOGGER.error(f"reply_audio/video failed: {e}, trying as document")
+            await m.reply_document(document=file_path, caption=f"🎵 <b>{title}</b>\n\n🤖 Downloaded by @{config.BOT_USERNAME.strip('@')}")
         
-        # Deduct coins
         if not is_priv:
             await spend_coins(user_id, DOWNLOAD_COST)
             await status.delete()
@@ -100,3 +88,58 @@ async def _do_download(m: Message, video: bool):
         await status.edit_text(f"❌ <b>Upload failed:</b> <code>{str(e)[:200]}</code>")
     finally:
         cleanup_download(file_path)
+
+# ✅ NEW: Callback Handlers for /start dl_ buttons
+@bot.on_callback_query(filters.regex("^dla_"))
+@catch_errors
+async def dl_audio_cb(_, cq: CallbackQuery):
+    b64_query = cq.data.replace("dla_", "")
+    try:
+        query = base64.urlsafe_b64decode(b64_query + "=" * (-len(b64_query) % 4)).decode()
+    except:
+        return await cq.answer("Invalid query", show_alert=True)
+    
+    await cq.answer("Downloading Audio...", show_alert=False)
+    await cq.message.edit_text(f"⏳ Downloading audio for: <b>{query}</b>...")
+    
+    result = await download_media_file(query, video=False)
+    if result and result.get("path") and os.path.exists(result["path"]):
+        try:
+            await cq.message.reply_audio(audio=result["path"], title=result["title"][:64], performer="SunloMusic", duration=result["duration"], caption=f"🎵 <b>{result['title']}</b>\n\n🤖 Downloaded by @{config.BOT_USERNAME.strip('@')}")
+            try: await cq.message.delete()
+            except: pass
+        except:
+            await cq.message.reply_document(document=result["path"], caption=f"🎵 <b>{result['title']}</b>")
+            try: await cq.message.delete()
+            except: pass
+        finally:
+            cleanup_download(result["path"])
+    else:
+        await cq.message.edit_text("❌ <b>Failed to download audio.</b>")
+
+@bot.on_callback_query(filters.regex("^dlv_"))
+@catch_errors
+async def dl_video_cb(_, cq: CallbackQuery):
+    b64_query = cq.data.replace("dlv_", "")
+    try:
+        query = base64.urlsafe_b64decode(b64_query + "=" * (-len(b64_query) % 4)).decode()
+    except:
+        return await cq.answer("Invalid query", show_alert=True)
+    
+    await cq.answer("Downloading Video...", show_alert=False)
+    await cq.message.edit_text(f"⏳ Downloading video for: <b>{query}</b>...")
+    
+    result = await download_media_file(query, video=True)
+    if result and result.get("path") and os.path.exists(result["path"]):
+        try:
+            await cq.message.reply_video(video=result["path"], caption=f"🎬 <b>{result['title']}</b>\n\n🤖 Downloaded by @{config.BOT_USERNAME.strip('@')}")
+            try: await cq.message.delete()
+            except: pass
+        except:
+            await cq.message.reply_document(document=result["path"], caption=f"🎬 <b>{result['title']}</b>")
+            try: await cq.message.delete()
+            except: pass
+        finally:
+            cleanup_download(result["path"])
+    else:
+        await cq.message.edit_text("❌ <b>Failed to download video.</b>")
