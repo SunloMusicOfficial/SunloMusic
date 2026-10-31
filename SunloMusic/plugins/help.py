@@ -7,9 +7,8 @@ from SunloMusic.keyboards import (
     start_keyboard, help_main_keyboard, help_back_keyboard
 )
 
-
 # ═══════════════════════════════════════════
-# ✅ SAFE EDIT HELPER — text/photo/caption sab handle karega
+# SAFE EDIT HELPER
 # ═══════════════════════════════════════════
 async def _safe_edit(cq: CallbackQuery, text: str, reply_markup=None):
     msg = cq.message
@@ -20,12 +19,10 @@ async def _safe_edit(cq: CallbackQuery, text: str, reply_markup=None):
         else:
             await msg.edit_text(text=text, reply_markup=reply_markup)
     except Exception:
-        # Final fallback: new message
         try:
             await msg.reply_text(text, reply_markup=reply_markup)
         except Exception:
             pass
-
 
 # ═══════════════════════════════════════════
 # HELP CATEGORIES
@@ -74,7 +71,7 @@ HELP_TEXTS = {
         "<code>/dedicate @user song</code>"
     ),
     "admin": (
-        "<b>🛡 Admin Commands</b>\n"
+        "<b>🛡 Admin & Sudo Commands</b>\n"
         "━━━━━━━━━━━━━\n\n"
         "<b>Group Admin:</b>\n"
         "<code>/auth</code> — Authorize chat\n"
@@ -84,17 +81,18 @@ HELP_TEXTS = {
         "<code>/id</code> — Get IDs\n\n"
         "<b>👑 Sudo Only:</b>\n"
         "<code>/stats</code> — Bot stats\n"
-        "<code>/broadcast</code> — Broadcast\n"
-        "<code>/addsudo</code> — Add sudo\n"
-        "<code>/delsudo id</code> — Remove\n"
+        "<code>/broadcast</code> — Broadcast msg\n"
+        "<code>/addsudo</code> — Add sudo (reply)\n"
+        "<code>/delsudo id</code> — Remove sudo\n"
+        "<code>/sudolist</code> — List all sudos\n"
+        "<code>/activevc</code> — List active VCs\n"
         "<code>/gstats</code> — Group stats\n\n"
-        "<b>📊 Utility:</b>\n"
-        "<code>/afk reason</code> — AFK\n"
-        "<code>/leaderboard</code> — Top users\n"
-        "<code>/recent</code> — Recent songs"
+        "<b>💻 Advanced Sudo:</b>\n"
+        "<code>/eval code</code> — Run Python code\n"
+        "<code>/sh command</code> — Run Linux shell\n"
+        "<code>/restart</code> — Restart the bot"
     ),
 }
-
 
 # ═══════════════════════════════════════════
 # ALL COMMANDS
@@ -126,10 +124,11 @@ ALL_COMMANDS_TEXT = (
     "/daily • /points • /shop\n\n"
     "<b>🛡 Moderation</b>\n"
     "/auth • /purge • /tagall • /welcome • /id\n\n"
-    "<b>👑 Sudo</b>\n"
-    "/stats • /broadcast • /addsudo • /delsudo • /gstats\n\n"
+    "<b>👑 Sudo / Owner</b>\n"
+    "/stats • /broadcast • /addsudo • /delsudo • /sudolist\n"
+    "/activevc • /gstats • /eval • /sh • /restart\n\n"
     "<b>👤 User</b>\n"
-    "/afk • /leaderboard • /recent • /gstats\n\n"
+    "/afk • /leaderboard • /recent\n\n"
     "<b>🤖 Start</b>\n"
     "/start • /ping • /help • /allcommand\n\n"
     "━━━━━━━━━━━━━━━━━━\n"
@@ -138,7 +137,6 @@ ALL_COMMANDS_TEXT = (
     "<b>🎤 Shazam:</b>\n"
     "Send any voice/audio in group"
 )
-
 
 # ═══════════════════════════════════════════
 # MESSAGE COMMANDS
@@ -150,9 +148,8 @@ async def allcommand_cmd(_, m: Message):
     text = ALL_COMMANDS_TEXT.replace("BOT_USERNAME", me.username)
     await m.reply_text(text)
 
-
 # ═══════════════════════════════════════════
-# CALLBACKS — all use _safe_edit
+# CALLBACKS
 # ═══════════════════════════════════════════
 @bot.on_callback_query(filters.regex(r"^help_menu$"))
 @catch_errors
@@ -166,7 +163,6 @@ async def help_menu_cb(_, cq: CallbackQuery):
     )
     await cq.answer()
 
-
 @bot.on_callback_query(filters.regex(r"^help_(music|controls|effects|admin)$"))
 @catch_errors
 async def help_category_cb(_, cq: CallbackQuery):
@@ -177,7 +173,6 @@ async def help_category_cb(_, cq: CallbackQuery):
     await _safe_edit(cq, text, reply_markup=help_back_keyboard())
     await cq.answer()
 
-
 @bot.on_callback_query(filters.regex(r"^all_commands$"))
 @catch_errors
 async def all_commands_cb(_, cq: CallbackQuery):
@@ -185,7 +180,6 @@ async def all_commands_cb(_, cq: CallbackQuery):
     text = ALL_COMMANDS_TEXT.replace("BOT_USERNAME", me.username)
     await _safe_edit(cq, text, reply_markup=help_back_keyboard())
     await cq.answer()
-
 
 @bot.on_callback_query(filters.regex(r"^back_start$"))
 @catch_errors
