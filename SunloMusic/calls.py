@@ -220,30 +220,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         return True
     except Exception as e:
         LOGGER.error(f"Direct Play error: {type(e).__name__} - {str(e)}")
-        
-        if "http" in url and "youtube.com" not in url and "youtu.be" not in url:
-            LOGGER.info("⚠️ Direct link failed! Attempting local download fallback...")
-            try:
-                os.makedirs("cache/downloads", exist_ok=True)
-                ext = ".mp4" if video else ".m4a"
-                file_path = f"cache/downloads/{abs(hash(url))}{ext}"
-                
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as resp:
-                        if resp.status == 200:
-                            with open(file_path, "wb") as f: f.write(await resp.read())
-                                
-                if os.path.exists(file_path):
-                    if video: 
-                        stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
-                    else: 
-                        stream2 = MediaStream(media_path=file_path, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
-                    
-                    await asyncio.wait_for(call.play(chat_id, stream2, config=GroupCallConfig(auto_start=True)), timeout=30.0)
-                    return True
-            except Exception as download_err:
-                LOGGER.error(f"Download fallback failed: {download_err}")
-                
         return True
 
 async def pause_stream(chat_id: int):

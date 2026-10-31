@@ -11,15 +11,9 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 _SEARCH_CACHE = {}
 _CACHE_TTL = 3600
 
-# ✅ BYPASS YOUTUBE BOT CHECK (Just in case API fails for search)
-EXTRACTOR_ARGS = {"youtube": {"player_client": ["android", "ios"]}}
-
 def _search_ytdlp_sync(query: str):
     try:
-        ydl_opts = {
-            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
-            "extractor_args": EXTRACTOR_ARGS
-        }
+        ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
             if info and "entries" in info and len(info["entries"]) > 0:
@@ -34,26 +28,6 @@ def _search_ytdlp_sync(query: str):
                 }
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
-
-def _search_ytdlp_multi_sync(query: str, limit: int = 10):
-    try:
-        ydl_opts = {
-            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
-            "extractor_args": EXTRACTOR_ARGS
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
-            results = []
-            if info and "entries" in info:
-                for e in info["entries"]:
-                    if e:
-                        vid_id = e.get("id")
-                        thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
-                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
-            return results
-    except Exception as e:
-        LOGGER.error(f"yt-dlp multi search error: {e}")
-        return []
 
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
@@ -78,35 +52,46 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
 
 def _convert_to_mp4(input_path):
     output_path = os.path.splitext(input_path)[0] + ".mp4"
-    if os.path.exists(output_path): return output_path
+    if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
+        return output_path
     try:
+        LOGGER.info(f"🎬 Converting {input_path} to MP4...")
         subprocess.run(
             ["ffmpeg", "-y", "-i", input_path, "-c:v", "libx264", "-c:a", "aac", output_path],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
         )
         if os.path.exists(output_path):
-            os.remove(input_path) # remove .webm
+            os.remove(input_path)
             return output_path
     except Exception as e:
         LOGGER.error(f"FFmpeg conversion error: {e}")
     return input_path
 
 async def _download_file(url: str, video: bool) -> str | None:
+    # Determine extension from URL
     ext = ".mp4" if video else ".m4a"
+    if url.endswith(".webm"): ext = ".webm"
+    elif url.endswith(".mp3"): ext = ".mp3"
+    elif url.endswith(".m4a"): ext = ".m4a"
+    
     file_path = f"{DOWNLOAD_DIR}/{abs(hash(url))}{ext}"
     if os.path.exists(file_path): return file_path
     
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
+            async with session.get(url, timeout=60) as resp:
                 if resp.status == 200:
                     with open(file_path, "wb") as f: f.write(await resp.read())
                     return file_path
-    except: pass
+    except Exception as e:
+        LOGGER.error(f"Download error: {e}")
     return None
 
 async def extract_audio(query: str, video: bool = False) -> dict | None:
-    if not config.ONEGRAB_API_KEY: return None
+    if not config.ONEGRAB_API_KEY: 
+        LOGGER.error("❌ ONEGRAB_API_KEY missing in Render!")
+        return None
+        
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
         return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
 
@@ -114,13 +99,16 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if cache_key in _SEARCH_CACHE:
         data, t = _SEARCH_CACHE[cache_key]
         if time.time() - t < _CACHE_TTL:
-            return data
+            # Check if it's a local file that still exists
+            if not data["url"].startswith("http") and not os.path.exists(data["url"]):
+                pass # Bypass cache if file deleted
+            else:
+                return data
 
     webpage_url = query
     meta = {}
     loop = asyncio.get_running_loop()
 
-    # ✅ 1. YT-DLP SEARCH (For perfect song accuracy)
     if not query.startswith("http"):
         try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=8.0)
         except: ytdlp_info = None
@@ -129,7 +117,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             webpage_url = ytdlp_info["url"]
             meta = ytdlp_info
         else:
-            # Fallback to API search
             search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
@@ -142,7 +129,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
-    # ✅ 2. API STREAM (To bypass YouTube IP block)
     req_type = "video" if video else "audio"
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
     
@@ -165,33 +151,28 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                     _SEARCH_CACHE[cache_key] = (res, time.time())
                     return res
             else:
-                if video and cdnurl.endswith(".webm"):
-                    LOGGER.info("⚠️ OneGrab returned .webm, downloading and converting to .mp4...")
-                    dl_path = await _download_file(cdnurl, video)
-                    if dl_path:
-                        mp4_path = _convert_to_mp4(dl_path)
-                        res = {"title": final_title, "url": mp4_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-                        _SEARCH_CACHE[cache_key] = (res, time.time())
-                        return res
-                else:
-                    res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-                    _SEARCH_CACHE[cache_key] = (res, time.time())
-                    return res
+                res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                _SEARCH_CACHE[cache_key] = (res, time.time())
+                return res
     
     return None
 
 async def download_media_file(query: str, video: bool = False, max_duration: int = 3600):
-    # Used by /song and /video
     res = await extract_audio(query, video)
     if res and res.get("url"):
         if res["url"].startswith("http"):
             path = await _download_file(res["url"], video)
-            if path and video and path.endswith(".webm"):
-                path = _convert_to_mp4(path)
-            return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
+            if path:
+                # ✅ FORCE MP4 CONVERSION HERE
+                if video and path.endswith(".webm"):
+                    path = _convert_to_mp4(path)
+                return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
         else:
             # Already local
-            return {"path": res["url"], "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
+            path = res["url"]
+            if video and path.endswith(".webm"):
+                path = _convert_to_mp4(path)
+            return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
     return None
 
 def cleanup_download(path: str):
