@@ -14,7 +14,6 @@ async def auth_cmd(_, m: Message):
     await set_auth(m.chat.id, True)
     await m.reply_text("✅ <b>Chat Authorized</b>")
 
-# ✅ ADVANCED STATS
 @bot.on_message(filters.command("stats"))
 @catch_errors
 @sudo_only
@@ -33,7 +32,6 @@ async def stats_cmd(_, m: Message):
     )
     await m.reply_text(text)
 
-# ✅ BROADCAST
 @bot.on_message(filters.command("broadcast"))
 @catch_errors
 @sudo_only
@@ -52,7 +50,6 @@ async def bc_cmd(_, m: Message):
         await asyncio.sleep(0.1)
     await status.edit_text(f"✅ <b>Broadcast Complete</b>\n\n🟢 Success: {success}\n🔴 Failed: {failed}")
 
-# ✅ SUDO MANAGEMENT (No filters.private)
 @bot.on_message(filters.command("addsudo"))
 @catch_errors
 @sudo_only
@@ -68,7 +65,6 @@ async def addsudo_cmd(_, m: Message):
 async def delsudo_cmd(_, m: Message):
     if not m.reply_to_message and len(m.command) < 2: 
         return await m.reply_text("❌ <b>Reply to a user or provide ID.</b>")
-    
     target = m.reply_to_message.from_user.id if m.reply_to_message else int(m.command[1])
     await remove_sudo(target)
     await m.reply_text("🗑 <b>Sudo removed.</b>")
@@ -88,7 +84,7 @@ async def sudolist_cmd(_, m: Message):
     text += f"<b>Owner:</b> <code>{config.OWNER_ID}</code>"
     await m.reply_text(text)
 
-# ✅ PREMIUM: ACTIVE VC TRACKER (No filters.private)
+# ✅ PREMIUM ACTIVE VC TRACKER (With Auto Links & Dashboard)
 @bot.on_message(filters.command("activevc"))
 @catch_errors
 @sudo_only
@@ -97,57 +93,52 @@ async def activevc_cmd(_, m: Message):
     if not chats:
         return await m.reply_text("📭 <b>No active Voice Chats right now.</b>")
     
-    text = "<b>🎵 Active Voice Chats</b>\n━━━━━━━━━━━━━\n"
+    status = await m.reply_text("📡 <i>Scanning active Voice Chats...</i>")
+    
+    text = "⚡ <b>『 ACTIVE VC MONITOR 』</b> ⚡\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+    
     for c in chats:
         q = get_queue(c)
+        try:
+            chat = await bot.get_chat(c)
+            chat_title = chat.title or "Private Group"
+            
+            # ✅ Smart Link Generation
+            if chat.username:
+                link = f"https://t.me/{chat.username}"
+                link_text = f"<a href='{link}'>🔗 Click Here</a>"
+            else:
+                try:
+                    invite = await bot.export_chat_invite_link(c)
+                    link_text = f"<a href='{invite}'>🔗 Join Link</a>"
+                except:
+                    link_text = "<i>No Public Link</i>"
+                    
+        except:
+            chat_title = "Unknown Group"
+            link_text = "<i>No Link Available</i>"
+
         if q.now_playing:
-            text += f"💬 <code>{c}</code>\n🎶 <i>{q.now_playing.title[:30]}</i>\n\n"
+            song = q.now_playing.title[:30] + ("..." if len(q.now_playing.title) > 30 else "")
+            req = q.now_playing.requester
+            text += (
+                f"🎧 <b>Group:</b> {chat_title}\n"
+                f"{link_text}\n"
+                f"🆔 <b>ID:</b> <code>{c}</code>\n"
+                f"▶️ <b>Playing:</b> <i>{song}</i>\n"
+                f"🙋‍♂️ <b>By:</b> {req}\n"
+                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            )
         else:
-            text += f"💬 <code>{c}</code>\n🎶 <i>Connecting...</i>\n\n"
-    text += f"<b>Total:</b> {len(chats)}"
-    await m.reply_text(text)
-
-# ✅ PREMIUM: EVAL (No filters.private)
-@bot.on_message(filters.command("eval"))
-@catch_errors
-@sudo_only
-async def eval_cmd(_, m: Message):
-    if len(m.command) < 2:
-        return await m.reply_text("❌ <b>Usage:</b> <code>/eval print('hello')</code>")
-    code = m.text.split(None, 1)[1]
-    try:
-        result = eval(code)
-        if asyncio.iscoroutine(result):
-            result = await result
-        await m.reply_text(f"✅ <b>Result:</b>\n<code>{result}</code>")
-    except Exception as e:
-        await m.reply_text(f"❌ <b>Error:</b>\n<code>{e}</code>")
-
-# ✅ PREMIUM: SHELL COMMAND (No filters.private)
-@bot.on_message(filters.command("sh"))
-@catch_errors
-@sudo_only
-async def sh_cmd(_, m: Message):
-    if len(m.command) < 2:
-        return await m.reply_text("❌ <b>Usage:</b> <code>/sh ls -la</code>")
-    cmd = m.text.split(None, 1)[1]
-    try:
-        process = await asyncio.create_subprocess_shell(
-            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-        out = (stdout.decode() + stderr.decode()).strip()
-        if not out: out = "No output."
-        if len(out) > 4000: out = out[:4000] + "\n...(truncated)"
-        await m.reply_text(f"✅ <b>Output:</b>\n<pre>{out}</pre>")
-    except Exception as e:
-        await m.reply_text(f"❌ <b>Error:</b>\n<code>{e}</code>")
-
-# ✅ PREMIUM: RESTART BOT (No filters.private)
-@bot.on_message(filters.command("restart"))
-@catch_errors
-@sudo_only
-async def restart_cmd(_, m: Message):
-    await m.reply_text("🔄 <b>Restarting SunloMusic...</b>")
-    await asyncio.sleep(2)
-    os.execl(sys.executable, sys.executable, *sys.argv)
+            text += (
+                f"🎧 <b>Group:</b> {chat_title}\n"
+                f"{link_text}\n"
+                f"🆔 <b>ID:</b> <code>{c}</code>\n"
+                f"⏳ <b>Status:</b> <i>Connecting...</i>\n"
+                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            )
+            
+    text += f"🌐 <b>Total Active VCs:</b> <code>{len(chats)}</code>"
+    
+    await status.delete()
+    await m.reply_text(text, disable_web_page_preview=True)
