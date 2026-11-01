@@ -35,6 +35,27 @@ def _search_ytdlp_sync(query: str):
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
+# ✅ ADDED BACK: Function for trending.py
+def _search_ytdlp_multi_sync(query: str, limit: int = 10):
+    try:
+        ydl_opts = {
+            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
+            "extractor_args": EXTRACTOR_ARGS
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            results = []
+            if info and "entries" in info:
+                for e in info["entries"]:
+                    if e:
+                        vid_id = e.get("id")
+                        thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
+            return results
+    except Exception as e:
+        LOGGER.error(f"yt-dlp multi search error: {e}")
+        return []
+
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
@@ -119,7 +140,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             webpage_url = ytdlp_info["url"]
             meta = ytdlp_info
         else:
-            # API fallback removed "song audio" so it doesn't screw up
             search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
@@ -154,7 +174,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                     _SEARCH_CACHE[cache_key] = (res, time.time())
                     return res
             else:
-                # ✅ Download locally + Convert
                 LOGGER.info("⬇️ Downloading stream locally...")
                 local_path = await _download_file(cdnurl, not video)
                 if local_path:
