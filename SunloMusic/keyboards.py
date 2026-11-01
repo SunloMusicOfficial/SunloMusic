@@ -24,7 +24,9 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     elapsed_str = format_duration(elapsed)
     
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "━" * 8
-    timer_btn = InlineKeyboardButton(f"{elapsed_str} 🎵 {bar} {dur_str}", callback_data="cb_timer")
+    
+    # ✅ Exact match with screenshot: Sparkle + Time + Bar + Time
+    timer_btn = InlineKeyboardButton(f"✨ {elapsed_str} {bar} {dur_str}", callback_data="cb_timer")
     
     pause_text = "▶️ ʀᴇsᴜᴍᴇ" if q.paused else "⏸️ ᴘᴀᴜsᴇ"
     pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause")
