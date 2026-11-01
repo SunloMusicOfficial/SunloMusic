@@ -7,17 +7,42 @@ from SunloMusic.decorators import catch_errors
 from SunloMusic.database import set_group_setting, get_group_setting
 from SunloMusic.logger import LOGGER
 
-# ✅ Random Premium Emojis
 EMOJIS = ["🍃", "🌿", "🌺", "🌸", "🦋", "✨", "💎", "🪐", "🌌", "🔥", "🎵", "🎶", "🌟", "👑", "🥂", "🎧", "⚜️"]
 
-@bot.on_message(filters.command("id") & filters.group)
+# ✅ PREMIUM /id COMMAND
+@bot.on_message(filters.command("id"))
 @catch_errors
 async def id_cmd(_, m: Message):
+    chat = m.chat
+    chat_title = chat.title or chat.first_name or "Private Chat"
+    
     if m.reply_to_message:
         user = m.reply_to_message.from_user
-        text = f"👤 <b>User ID:</b> <code>{user.id}</code>\n📝 <b>Name:</b> {user.mention}\n💬 <b>Message ID:</b> <code>{m.reply_to_message.id}</code>"
+        text = (
+            f"⚡ <b>『 IDENTITY CARD 』</b> ⚡\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            f"👤 <b>Name:</b> {user.mention}\n"
+            f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+            f"🔗 <b>Username:</b> @{user.username if user.username else 'None'}\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            f"💬 <b>Chat:</b> {chat_title}\n"
+            f"🆔 <b>Chat ID:</b> <code>{chat.id}</code>\n"
+            f"📩 <b>Msg ID:</b> <code>{m.reply_to_message.id}</code>\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+        )
     else:
-        text = f"💬 <b>Chat ID:</b> <code>{m.chat.id}</code>\n👤 <b>Your ID:</b> <code>{m.from_user.id}</code>"
+        user = m.from_user
+        text = (
+            f"⚡ <b>『 IDENTITY CARD 』</b> ⚡\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            f"👤 <b>Name:</b> {user.mention}\n"
+            f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+            f"🔗 <b>Username:</b> @{user.username if user.username else 'None'}\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            f"💬 <b>Chat:</b> {chat_title}\n"
+            f"🆔 <b>Chat ID:</b> <code>{chat.id}</code>\n"
+            f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+        )
     await m.reply_text(text)
 
 @bot.on_message(filters.command("purge") & filters.group)
@@ -49,7 +74,6 @@ async def tagall_cmd(_, m: Message):
         try: await m.reply_to_message.copy(m.chat.id)
         except: pass
 
-    # ✅ Highlight Message Format (Blockquote)
     msg_text = f"<blockquote><b>{custom_msg}</b></blockquote>" if custom_msg else ""
 
     header = (
@@ -62,7 +86,7 @@ async def tagall_cmd(_, m: Message):
 
     current_text = header
     count = 0
-    member_count = 0 # ✅ Track members for 20-page limit
+    member_count = 0 
     
     async for member in m.chat.get_members():
         if member.user.is_bot or member.user.is_deleted:
@@ -74,19 +98,17 @@ async def tagall_cmd(_, m: Message):
         current_text += line
         member_count += 1
         
-        # ✅ 20 members per message
         if member_count == 20:
             try: 
                 await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
             except Exception as e: 
                 LOGGER.error(f"Tagall send error: {e}")
                 
-            current_text = "" # Reset for next page
+            current_text = "" 
             member_count = 0
             count += 1
-            await asyncio.sleep(1) # Anti-flood delay
+            await asyncio.sleep(1) 
 
-    # Send remaining members if any
     if current_text:
         try: 
             await bot.send_message(m.chat.id, current_text, disable_notification=(count > 0))
