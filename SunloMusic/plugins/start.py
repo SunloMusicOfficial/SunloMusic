@@ -1,5 +1,5 @@
 import base64
-from pyrogram import filters
+from pyrogram import filters, enums
 from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from SunloMusic.bot import bot
 from SunloMusic.config import config
@@ -19,9 +19,22 @@ START_CAPTION = (
     "📢 <b>Updates:</b> <a href='{channel}'>Vip Sakil Bio</a>"
 )
 
-@bot.on_message(filters.command("start") & filters.private)
+@bot.on_message(filters.command("start"))
 @catch_errors
 async def start_cmd(_, m):
+    me = await bot.get_me()
+    
+    # ✅ GROUP ME START KARNE PAR PM KA BUTTON BHEJO
+    if m.chat.type != enums.ChatType.PRIVATE:
+        return await m.reply_text(
+            f"👋 <b>Hello {m.from_user.first_name}!</b>\n\n"
+            f"I am <b>{config.BOT_NAME}</b>, your Music Companion.\n"
+            f"Click the button below to start me in PM to access all features and download songs.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 Start in PM", url=f"https://t.me/{me.username}?start=start")]
+            ])
+        )
+
     await add_user(m.from_user.id, m.from_user.first_name)
     
     log_text = (
@@ -39,6 +52,7 @@ async def start_cmd(_, m):
         try: await bot.send_message(config.OWNER_ID, log_text)
         except: pass
 
+    # Handle deep link for downloads
     if len(m.command) > 1 and m.command[1].startswith("dl_"):
         b64_query = m.command[1][3:]
         try:
@@ -51,6 +65,7 @@ async def start_cmd(_, m):
             )
             return
         except Exception: pass
+        
     caption = START_CAPTION.format(bot_name=config.BOT_NAME, channel=config.UPDATES_CHANNEL)
     try:
         if config.START_IMG: await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
@@ -63,7 +78,6 @@ async def ping_help_cmd(_, m):
     if m.command[0] == "ping":
         return await m.reply_text("🏓 <b>Pong! System is active.</b>")
     
-    # ✅ Better /help — shows help menu directly
     await m.reply_text(
         "<b>❓ SunloMusic Help</b>\n"
         "━━━━━━━━━━━━━\n\n"
