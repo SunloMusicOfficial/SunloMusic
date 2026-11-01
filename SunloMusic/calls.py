@@ -11,7 +11,7 @@ from SunloMusic.config import config
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
 from SunloMusic.keyboards import player_keyboard
-from SunloMusic.ytdlp import extract_audio, download_media_file
+from SunloMusic.ytdlp import extract_audio, download_media_file, _convert_media
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
 from SunloMusic.lyrics import start_live_karaoke
 
@@ -155,13 +155,11 @@ async def start_next_song(chat_id, q):
         if thumb:
             try: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
             except Exception: pass
-            
         if not sent_msg:
             local_thumb = get_default_thumb()
             if local_thumb:
                 try: sent_msg = await bot_module.bot.send_photo(chat_id, local_thumb, caption=caption, reply_markup=player_keyboard(q, 0))
                 except Exception: pass
-                
         if not sent_msg:
             sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
             
@@ -199,15 +197,10 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
     
-    # ✅ FORCE CONVERSION FOR .webm (Prevents Telegram DC error)
+    # ✅ ULTIMATE FIX: Convert .webm synchronously before playing
     if url.endswith('.webm'):
-        LOGGER.info("⚠️ .webm detected. Downloading and converting...")
-        dl_res = await download_media_file(url, video=video)
-        if dl_res and dl_res.get("path"):
-            url = dl_res["path"]
-        else:
-            LOGGER.error("❌ Failed to convert .webm, forcing audio mode.")
-            video = False
+        LOGGER.info("⚠️ .webm detected. Converting to compatible format...")
+        url = _convert_media(url)
 
     ffmpeg_args = _build_audio_filters(chat_id, effect)
     
@@ -222,7 +215,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         err_str = str(e)
         LOGGER.error(f"Direct Play error: {type(e).__name__} - {err_str}")
         
-        # ✅ RETRY ON TELEGRAM DC ERROR
         if "INTERDC_X_CALL_ERROR" in err_str:
             LOGGER.info("⚠️ Telegram Server Error. Retrying in 2s...")
             await asyncio.sleep(2)

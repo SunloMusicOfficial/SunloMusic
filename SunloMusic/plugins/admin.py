@@ -1,13 +1,12 @@
 import asyncio, time, platform, os, sys, subprocess
 from pyrogram import filters
-from pyrogram.types import Message
+from pyrogram.types import Message, LinkPreviewOptions
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.database import set_auth, get_all_chats, get_stats, add_sudo, remove_sudo, sudo_col, is_sudo
 from SunloMusic.decorators import sudo_only, admin_only, catch_errors
 from SunloMusic.queues import active_chats, get_queue
 
-# ✅ Uptime Tracker
 START_TIME = time.time()
 
 @bot.on_message(filters.command("auth") & filters.group)
@@ -17,25 +16,21 @@ async def auth_cmd(_, m: Message):
     await set_auth(m.chat.id, True)
     await m.reply_text("✅ <b>Chat Authorized</b>")
 
-# ✅ PREMIUM STATS
 @bot.on_message(filters.command("stats"))
 @catch_errors
 @sudo_only
 async def stats_cmd(_, m: Message):
     s = await get_stats()
-    
-    # Calculate Uptime
     uptime_sec = int(time.time() - START_TIME)
     hours, remainder = divmod(uptime_sec, 3600)
     minutes, seconds = divmod(remainder, 60)
     uptime_str = f"{hours:02d}h {minutes:02d}m {seconds:02d}s"
-    
     active_vc = len(active_chats())
     
     try:
         sudos = await sudo_col.count_documents({})
     except:
-        sudos = len(config.sudo_list) + 1 # +1 for owner
+        sudos = len(config.sudo_list) + 1
         
     text = (
         f"⚡ <b>『 SYSTEM MONITOR 』</b> ⚡\n"
@@ -113,7 +108,6 @@ async def activevc_cmd(_, m: Message):
         return await m.reply_text("📭 <b>No active Voice Chats right now.</b>")
     
     status = await m.reply_text("📡 <i>Scanning active Voice Chats...</i>")
-    
     text = "⚡ <b>『 ACTIVE VC MONITOR 』</b> ⚡\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
     
     for c in chats:
@@ -142,7 +136,7 @@ async def activevc_cmd(_, m: Message):
             
     text += f"🌐 <b>Total Active VCs:</b> <code>{len(chats)}</code>"
     await status.delete()
-    await m.reply_text(text, disable_web_page_preview=True)
+    await m.reply_text(text, link_preview_options=LinkPreviewOptions(is_disabled=True))
 
 @bot.on_message(filters.command("eval"))
 @catch_errors
