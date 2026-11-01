@@ -34,7 +34,6 @@ def _search_ytdlp_sync(query: str):
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
-# ✅ ADDED BACK: Missing function for trending.py
 def _search_ytdlp_multi_sync(query: str, limit: int = 10):
     try:
         ydl_opts = {
@@ -59,7 +58,7 @@ async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=API_HEADERS, params=params, timeout=15) as resp:
+            async with session.get(url, headers=API_HEADERS, params=params, timeout=10) as resp:
                 if resp.status != 200: return None
                 return await resp.json()
     except: return None
@@ -134,7 +133,8 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     loop = asyncio.get_running_loop()
 
     if not query.startswith("http"):
-        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=8.0)
+        # ✅ Reduced timeout from 8.0s to 4.0s for speed
+        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=4.0)
         except: ytdlp_info = None
             
         if ytdlp_info and ytdlp_info.get("url"):

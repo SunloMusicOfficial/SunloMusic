@@ -53,8 +53,7 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    # ✅ Random Emoji Loading Text
-    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Loading your music...</b>")
+    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Fetching your music...</b>")
     video = "vplay" in m.command[0].lower()
     
     admin_task = _check_admin(m)
@@ -77,7 +76,6 @@ async def play_cmd(_, m):
     if q.now_playing:
         q.queue.append(track)
         track_hash = str(abs(hash(track.url)))
-        
         await status.delete()
         
         thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
@@ -102,20 +100,22 @@ async def play_cmd(_, m):
         track.message_id = sent_msg.id
         return
     
-    await status.delete()
-    
     q.now_playing = track
     q.start_time = time.time()
     q.total_paused = 0
     q.paused = False
     q.votes = set()
     
+    # ✅ Synchronized: Wait for VC to join first
+    await status.edit_text(f"{random.choice(LOADING_EMOJIS)} <b>Connecting to Voice Chat...</b>")
+    await play_stream(m.chat.id, track.url, track.video)
+    
+    await status.delete()
+    
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
-    
-    play_task = asyncio.create_task(play_stream(m.chat.id, track.url, track.video))
     
     sent_msg = None
     if thumb:
@@ -141,8 +141,6 @@ async def play_cmd(_, m):
 
     if m.chat.id in KARAOKE_CHATS:
         q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, track.title, track.duration, q))
-        
-    await play_task
 
     asyncio.create_task(add_recent(m.chat.id, {
         "title": track.title, "url": track.url,
