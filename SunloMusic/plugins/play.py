@@ -53,7 +53,7 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Loading your music...</b>")
+    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Fetching your music...</b>")
     video = "vplay" in m.command[0].lower()
     
     admin_task = _check_admin(m)
@@ -71,6 +71,19 @@ async def play_cmd(_, m):
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
     
     q = get_queue(m.chat.id)
+    
+    # ✅ NO DUPLICATE SYSTEM CHECK
+    is_duplicate = False
+    if q.now_playing and (q.now_playing.url == info["url"] or q.now_playing.title == safe_title):
+        is_duplicate = True
+    for t in q.queue:
+        if t.url == info["url"] or t.title == safe_title:
+            is_duplicate = True
+            break
+            
+    if is_duplicate:
+        return await status.edit_text("⚠️ <b>This song is already playing or in the queue!</b>")
+    
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
     
     if q.now_playing:
@@ -110,7 +123,6 @@ async def play_cmd(_, m):
     thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
     
-    # ✅ ULTRA FAST: Send Card and Join VC at the EXACT same time!
     async def send_card():
         if thumb:
             try: return await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))

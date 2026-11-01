@@ -24,13 +24,16 @@ def cleanup_file(url: str):
         try: os.remove(url)
         except: pass
 
-def _build_audio_filters(chat_id: int, effect: str = "none") -> str | None:
+def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0) -> str | None:
     ctrl = AUDIO_CONTROLS.get(chat_id, {})
     speed = ctrl.get("speed", 1.0)
     volume = ctrl.get("volume", 1.0)
     eq = ctrl.get("eq", "none")
 
     filters = []
+    if seek_time > 0:
+        filters.append(f"-ss {seek_time}")
+        
     if effect == "bass": filters.append("bass=g=10")
     elif effect == "8d": filters.append("apulsator=hz=0.1")
     elif effect == "nightcore": filters.append("atempo=1.25,asetrate=44100*1.25")
@@ -48,7 +51,12 @@ def _build_audio_filters(chat_id: int, effect: str = "none") -> str | None:
     if speed != 1.0: filters.append(f"atempo={speed}")
     if volume != 1.0: filters.append(f"volume={volume}")
     
-    return "-af " + ",".join(filters) if filters else None
+    if not filters: return None
+    
+    if seek_time > 0:
+        return " ".join(filters)
+    else:
+        return "-af " + ",".join(filters)
 
 async def check_empty_vc(chat_id):
     try:
@@ -191,18 +199,17 @@ def init_calls():
 async def start_call():
     if call: await call.start()
 
-async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none"):
+async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none", seek_time: int = 0):
     if not call: return False
     
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
     
-    # ✅ ULTIMATE FIX: Convert .webm synchronously before playing
     if url.endswith('.webm'):
         LOGGER.info("⚠️ .webm detected. Converting to compatible format...")
         url = _convert_media(url)
 
-    ffmpeg_args = _build_audio_filters(chat_id, effect)
+    ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time)
     
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
