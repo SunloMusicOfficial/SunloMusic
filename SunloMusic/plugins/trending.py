@@ -1,4 +1,4 @@
-import asyncio, time, base64, hashlib, os
+import asyncio, time, base64, hashlib, os, random
 from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, LinkPreviewOptions
 from SunloMusic.bot import bot, ensure_assistant_in_chat
@@ -24,6 +24,7 @@ CATEGORIES = {
 }
 
 TRENDING_CACHE = {}
+LOADING_EMOJIS = ["✨", "🌸", "🪄", "🌟", "🦋", "🎧", "🎶", "🍃", "🔥", "💫", "🪐", "🌈"]
 
 @bot.on_message(filters.command("trending"))
 @catch_errors
@@ -48,7 +49,7 @@ async def trending_category(_, cq: CallbackQuery):
     cat = cq.data.replace("tr_", "")
     
     await cq.answer(f"🔍 Loading {cat}...")
-    try: await cq.message.edit_text(f"🔍 <b>Fetching {cat} top songs...</b>")
+    try: await cq.message.edit_text(f"{random.choice(LOADING_EMOJIS)} <b>Fetching {cat} top songs...</b>")
     except: pass
     
     loop = asyncio.get_running_loop()
@@ -159,7 +160,8 @@ async def tr_act_play(_, cq: CallbackQuery):
     url = r["url"]
     
     await cq.answer("⚡ Loading into VC...")
-    status = await cq.message.reply_text("⚡ <b>Turbo Loading...</b>")
+    # ✅ Random Emoji Loading Text
+    status = await cq.message.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Loading your music...</b>")
     
     if not await ensure_assistant_in_chat(cq.message.chat.id):
         return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
@@ -168,7 +170,6 @@ async def tr_act_play(_, cq: CallbackQuery):
     if not info:
         return await status.edit_text("❌ <b>Failed to fetch media.</b>")
     
-    # ✅ FALLBACK TO CACHE IF API FAILED
     title = info.get("title", "Unknown")
     dur = info.get("duration", 0)
     thumb = info.get("thumbnail", "")
@@ -254,14 +255,14 @@ async def tr_act_dl(_, cq: CallbackQuery):
     url = r["url"]
     
     await cq.answer("⬇️ Downloading Audio...")
-    status = await cq.message.reply_text("⬇️ <b>Downloading audio, please wait...</b>\n<i>(This may take a minute)</i>")
+    status = await cq.message.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Downloading audio, please wait...</b>\n<i>(This may take a minute)</i>")
     
     result = await download_media_file(url, video=False)
     if not result or not result.get("path") or not os.path.exists(result["path"]):
         return await status.edit_text("❌ <b>Download failed.</b>")
         
     try:
-        await status.edit_text("📤 <b>Uploading to Telegram...</b>")
+        await status.edit_text(f"{random.choice(LOADING_EMOJIS)} <b>Uploading to Telegram...</b>")
         await cq.message.reply_audio(
             audio=result["path"],
             title=result.get("title", r.get("title", "Unknown"))[:64],

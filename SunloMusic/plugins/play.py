@@ -1,4 +1,4 @@
-import asyncio, time, base64
+import asyncio, time, base64, random
 from pyrogram import filters, enums
 from pyrogram.types import LinkPreviewOptions
 from SunloMusic.bot import bot, ensure_assistant_in_chat
@@ -13,6 +13,8 @@ from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
 from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
 from SunloMusic.lyrics import start_live_karaoke
 from SunloMusic.logger import LOGGER
+
+LOADING_EMOJIS = ["✨", "🌸", "🪄", "🌟", "🦋", "🎧", "🎶", "🍃", "🔥", "💫", "🪐", "🌈"]
 
 async def _check_admin(m):
     if m.from_user.id == config.OWNER_ID or m.from_user.id in config.sudo_list: return True
@@ -51,7 +53,8 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    status = await m.reply_text("⚡ <b>Turbo Loading...</b>")
+    # ✅ Random Emoji Loading Text
+    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Loading your music...</b>")
     video = "vplay" in m.command[0].lower()
     
     admin_task = _check_admin(m)
@@ -82,12 +85,11 @@ async def play_cmd(_, m):
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
         
-        # ✅ THUMBNAIL GUARANTEE (Queue)
         sent_msg = None
         if thumb:
             try: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
             except Exception: pass
-        
+            
         if not sent_msg:
             local_thumb = get_default_thumb()
             if local_thumb:
@@ -115,7 +117,6 @@ async def play_cmd(_, m):
     
     play_task = asyncio.create_task(play_stream(m.chat.id, track.url, track.video))
     
-    # ✅ THUMBNAIL GUARANTEE (Player)
     sent_msg = None
     if thumb:
         try: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
