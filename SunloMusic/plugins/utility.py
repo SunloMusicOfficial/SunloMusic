@@ -1,5 +1,5 @@
 from pyrogram import filters, enums
-from pyrogram.types import Message
+from pyrogram.types import Message, LinkPreviewOptions
 from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors
 from SunloMusic.database import set_afk, get_afk, remove_afk, get_leaderboard
@@ -38,15 +38,14 @@ async def lb_cmd(_, m: Message):
         emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
         text += f"{emoji} <a href='tg://user?id={user['user_id']}'>{user['name']}</a> - <code>{user['points']}</code> plays\n"
     text += "━━━━━━━━━━━━━"
-    await m.reply_text(text)
+    # ✅ Disabled Link Preview
+    await m.reply_text(text, link_preview_options=LinkPreviewOptions(is_disabled=True))
 
-# ✅ PREMIUM GSTATS
 @bot.on_message(filters.command("gstats") & filters.group)
 @catch_errors
 async def gstats_cmd(_, m: Message):
     status_msg = await m.reply_text("⏳ <b>Fetching Premium Stats...</b>")
     
-    # Get Chat Data (Fix for "None" members)
     try:
         chat = await bot.get_chat(m.chat.id)
         member_count = chat.members_count or "N/A"
@@ -55,14 +54,12 @@ async def gstats_cmd(_, m: Message):
         member_count = "N/A"
         chat_photo = None
 
-    # Get VC Status
     q = get_queue(m.chat.id)
     if q.now_playing:
         vc_status = f"▶️ <i>{q.now_playing.title[:25]}...</i>"
     else:
         vc_status = "💤 <i>No active stream</i>"
 
-    # Get Top 3 Leaderboard
     top_users = await get_leaderboard(m.chat.id, limit=3)
     lb_text = ""
     if top_users:
@@ -89,7 +86,7 @@ async def gstats_cmd(_, m: Message):
 
     await status_msg.delete()
     
-    # Try sending with Group Photo
+    # ✅ Disabled Link Preview (Even for photo, Pyrogram allows this in newer versions, but text fallback definitely needs it)
     if chat_photo:
         try:
             await m.reply_photo(chat_photo, caption=text)
@@ -97,4 +94,4 @@ async def gstats_cmd(_, m: Message):
         except:
             pass
             
-    await m.reply_text(text)
+    await m.reply_text(text, link_preview_options=LinkPreviewOptions(is_disabled=True))
