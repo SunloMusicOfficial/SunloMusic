@@ -160,7 +160,7 @@ async def tr_act_play(_, cq: CallbackQuery):
     url = r["url"]
     
     await cq.answer("⚡ Loading into VC...")
-    status = await cq.message.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Connecting to Voice Chat...</b>")
+    status = await cq.message.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Loading your music...</b>")
     
     if not await ensure_assistant_in_chat(cq.message.chat.id):
         return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
@@ -207,10 +207,6 @@ async def tr_act_play(_, cq: CallbackQuery):
     q.paused = False
     q.votes = set()
     
-    # ✅ Synchronized: Wait for VC to join first
-    await status.edit_text(f"{random.choice(LOADING_EMOJIS)} <b>Connecting to Voice Chat...</b>")
-    await play_stream(cq.message.chat.id, track.url, track.video)
-    
     await status.delete()
     try: await cq.message.delete()
     except: pass
@@ -220,13 +216,19 @@ async def tr_act_play(_, cq: CallbackQuery):
     thumb_img = await generate_thumbnail(cq.message.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
     
-    sent_msg = None
-    if thumb_img:
-        try: sent_msg = await cq.message.reply_photo(thumb_img, caption=caption, reply_markup=player_keyboard(q, 0))
-        except: pass
-    if not sent_msg:
-        sent_msg = await cq.message.reply_text(caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
-        
+    # ✅ ULTRA FAST: Send Card and Join VC at the EXACT same time!
+    async def send_card():
+        if thumb_img:
+            try: return await cq.message.reply_photo(thumb_img, caption=caption, reply_markup=player_keyboard(q, 0))
+            except: pass
+        local_thumb = get_default_thumb()
+        if local_thumb:
+            try: return await cq.message.reply_photo(local_thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+            except: pass
+        return await cq.message.reply_text(caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
+    
+    sent_msg, _ = await asyncio.gather(send_card(), play_stream(cq.message.chat.id, track.url, track.video))
+    
     q.playing_message_id = sent_msg.id
     try: await sent_msg.pin(disable_notification=True)
     except: pass

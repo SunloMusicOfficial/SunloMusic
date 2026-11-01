@@ -53,7 +53,7 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Fetching your music...</b>")
+    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Loading your music...</b>")
     video = "vplay" in m.command[0].lower()
     
     admin_task = _check_admin(m)
@@ -87,16 +87,13 @@ async def play_cmd(_, m):
         if thumb:
             try: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
             except Exception: pass
-            
         if not sent_msg:
             local_thumb = get_default_thumb()
             if local_thumb:
                 try: sent_msg = await m.reply_photo(local_thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
                 except Exception: pass
-                
         if not sent_msg:
             sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=queue_add_keyboard(track_hash), link_preview_options=LinkPreviewOptions(is_disabled=True))
-            
         track.message_id = sent_msg.id
         return
     
@@ -106,10 +103,6 @@ async def play_cmd(_, m):
     q.paused = False
     q.votes = set()
     
-    # ✅ Synchronized: Wait for VC to join first
-    await status.edit_text(f"{random.choice(LOADING_EMOJIS)} <b>Connecting to Voice Chat...</b>")
-    await play_stream(m.chat.id, track.url, track.video)
-    
     await status.delete()
     
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
@@ -117,22 +110,20 @@ async def play_cmd(_, m):
     thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
     
-    sent_msg = None
-    if thumb:
-        try: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-        except Exception: pass
-        
-    if not sent_msg:
+    # ✅ ULTRA FAST: Send Card and Join VC at the EXACT same time!
+    async def send_card():
+        if thumb:
+            try: return await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+            except: pass
         local_thumb = get_default_thumb()
         if local_thumb:
-            try: sent_msg = await m.reply_photo(local_thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-            except Exception: pass
-            
-    if not sent_msg:
-        sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
+            try: return await m.reply_photo(local_thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+            except: pass
+        return await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
+    
+    sent_msg, _ = await asyncio.gather(send_card(), play_stream(m.chat.id, track.url, track.video))
     
     q.playing_message_id = sent_msg.id
-    
     try: await sent_msg.pin(disable_notification=True)
     except: pass
     
