@@ -7,6 +7,9 @@ from SunloMusic.database import set_auth, get_all_chats, get_stats, add_sudo, re
 from SunloMusic.decorators import sudo_only, admin_only, catch_errors
 from SunloMusic.queues import active_chats, get_queue
 
+# ✅ Uptime Tracker
+START_TIME = time.time()
+
 @bot.on_message(filters.command("auth") & filters.group)
 @catch_errors
 @admin_only
@@ -14,20 +17,37 @@ async def auth_cmd(_, m: Message):
     await set_auth(m.chat.id, True)
     await m.reply_text("✅ <b>Chat Authorized</b>")
 
+# ✅ PREMIUM STATS
 @bot.on_message(filters.command("stats"))
 @catch_errors
 @sudo_only
 async def stats_cmd(_, m: Message):
     s = await get_stats()
+    
+    # Calculate Uptime
+    uptime_sec = int(time.time() - START_TIME)
+    hours, remainder = divmod(uptime_sec, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    uptime_str = f"{hours:02d}h {minutes:02d}m {seconds:02d}s"
+    
+    active_vc = len(active_chats())
+    
+    try:
+        sudos = await sudo_col.count_documents({})
+    except:
+        sudos = len(config.sudo_list) + 1 # +1 for owner
+        
     text = (
-        f"📊 <b>SunloMusic Premium Stats</b>\n"
-        f"━━━━━━━━━━━━━\n"
-        f"👥 <b>Total Users:</b> <code>{s['users']}</code>\n"
-        f"💬 <b>Total Chats:</b> <code>{s['chats']}</code>\n"
-        f"🎵 <b>Active VCs:</b> <code>{len(active_chats())}</code>\n"
-        f"💻 <b>System:</b> <code>Python {platform.python_version()}</code>\n"
-        f"⏱ <b>Server Time:</b> <code>{time.strftime('%Y-%m-%d %H:%M:%S')}</code>\n"
-        f"━━━━━━━━━━━━━\n"
+        f"⚡ <b>『 SYSTEM MONITOR 』</b> ⚡\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        f"🟢 <b>Status:</b> ONLINE  |  ⏱ <b>Uptime:</b> <code>{uptime_str}</code>\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        f"👥 <b>Users:</b> <code>{s['users']}</code>  |  💬 <b>Chats:</b> <code>{s['chats']}</code>\n"
+        f"🎵 <b>Active VCs:</b> <code>{active_vc}</code>  |  👑 <b>Sudos:</b> <code>{sudos}</code>\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        f"💻 <b>Server:</b> <code>Python {platform.python_version()}</code>\n"
+        f"🗄 <b>Database:</b> 🟢 <i>Connected</i>\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
         f"<i>Bot is running smoothly.</i>"
     )
     await m.reply_text(text)
@@ -84,7 +104,6 @@ async def sudolist_cmd(_, m: Message):
     text += f"<b>Owner:</b> <code>{config.OWNER_ID}</code>"
     await m.reply_text(text)
 
-# ✅ PREMIUM ACTIVE VC TRACKER (With Auto Links & Dashboard)
 @bot.on_message(filters.command("activevc"))
 @catch_errors
 @sudo_only
@@ -102,18 +121,14 @@ async def activevc_cmd(_, m: Message):
         try:
             chat = await bot.get_chat(c)
             chat_title = chat.title or "Private Group"
-            
-            # ✅ Smart Link Generation
             if chat.username:
-                link = f"https://t.me/{chat.username}"
-                link_text = f"<a href='{link}'>🔗 Click Here</a>"
+                link_text = f"<a href='https://t.me/{chat.username}'>🔗 Click Here</a>"
             else:
                 try:
                     invite = await bot.export_chat_invite_link(c)
                     link_text = f"<a href='{invite}'>🔗 Join Link</a>"
                 except:
                     link_text = "<i>No Public Link</i>"
-                    
         except:
             chat_title = "Unknown Group"
             link_text = "<i>No Link Available</i>"
@@ -121,24 +136,47 @@ async def activevc_cmd(_, m: Message):
         if q.now_playing:
             song = q.now_playing.title[:30] + ("..." if len(q.now_playing.title) > 30 else "")
             req = q.now_playing.requester
-            text += (
-                f"🎧 <b>Group:</b> {chat_title}\n"
-                f"{link_text}\n"
-                f"🆔 <b>ID:</b> <code>{c}</code>\n"
-                f"▶️ <b>Playing:</b> <i>{song}</i>\n"
-                f"🙋‍♂️ <b>By:</b> {req}\n"
-                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-            )
+            text += f"🎧 <b>Group:</b> {chat_title}\n{link_text}\n🆔 <b>ID:</b> <code>{c}</code>\n▶️ <b>Playing:</b> <i>{song}</i>\n🙋‍♂️ <b>By:</b> {req}\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
         else:
-            text += (
-                f"🎧 <b>Group:</b> {chat_title}\n"
-                f"{link_text}\n"
-                f"🆔 <b>ID:</b> <code>{c}</code>\n"
-                f"⏳ <b>Status:</b> <i>Connecting...</i>\n"
-                f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-            )
+            text += f"🎧 <b>Group:</b> {chat_title}\n{link_text}\n🆔 <b>ID:</b> <code>{c}</code>\n⏳ <b>Status:</b> <i>Connecting...</i>\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
             
     text += f"🌐 <b>Total Active VCs:</b> <code>{len(chats)}</code>"
-    
     await status.delete()
     await m.reply_text(text, disable_web_page_preview=True)
+
+@bot.on_message(filters.command("eval"))
+@catch_errors
+@sudo_only
+async def eval_cmd(_, m: Message):
+    if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/eval print('hello')</code>")
+    code = m.text.split(None, 1)[1]
+    try:
+        result = eval(code)
+        if asyncio.iscoroutine(result): result = await result
+        await m.reply_text(f"✅ <b>Result:</b>\n<code>{result}</code>")
+    except Exception as e:
+        await m.reply_text(f"❌ <b>Error:</b>\n<code>{e}</code>")
+
+@bot.on_message(filters.command("sh"))
+@catch_errors
+@sudo_only
+async def sh_cmd(_, m: Message):
+    if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/sh ls -la</code>")
+    cmd = m.text.split(None, 1)[1]
+    try:
+        process = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout, stderr = await process.communicate()
+        out = (stdout.decode() + stderr.decode()).strip()
+        if not out: out = "No output."
+        if len(out) > 4000: out = out[:4000] + "\n...(truncated)"
+        await m.reply_text(f"✅ <b>Output:</b>\n<pre>{out}</pre>")
+    except Exception as e:
+        await m.reply_text(f"❌ <b>Error:</b>\n<code>{e}</code>")
+
+@bot.on_message(filters.command("restart"))
+@catch_errors
+@sudo_only
+async def restart_cmd(_, m: Message):
+    await m.reply_text("🔄 <b>Restarting SunloMusic...</b>")
+    await asyncio.sleep(2)
+    os.execl(sys.executable, sys.executable, *sys.argv)
