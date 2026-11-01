@@ -20,17 +20,23 @@ def _search_ytdlp_sync(query: str):
             "extractor_args": EXTRACTOR_ARGS
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
-            if info and "entries" in info and len(info["entries"]) > 0:
-                entry = info["entries"][0]
-                vid_id = entry.get("id")
-                thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
-                return {
-                    "title": entry.get("title", query),
-                    "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else entry.get("url"),
-                    "duration": int(entry.get("duration") or 0),
-                    "thumbnail": thumb
-                }
+            # ✅ Use ytsearch3 and filter out 1-hour mixes
+            info = ydl.extract_info(f"ytsearch3:{query} song audio", download=False)
+            if info and "entries" in info:
+                for entry in info["entries"]:
+                    if not entry: continue
+                    dur = int(entry.get("duration") or 0)
+                    # Ignore mixes/long compilations over 15 mins
+                    if dur > 900 or dur == 0: continue
+                    
+                    vid_id = entry.get("id")
+                    thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+                    return {
+                        "title": entry.get("title", query),
+                        "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else entry.get("url"),
+                        "duration": dur,
+                        "thumbnail": thumb
+                    }
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
@@ -58,7 +64,7 @@ async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=API_HEADERS, params=params, timeout=10) as resp:
+            async with session.get(url, headers=API_HEADERS, params=params, timeout=15) as resp:
                 if resp.status != 200: return None
                 return await resp.json()
     except: return None
@@ -133,15 +139,16 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     loop = asyncio.get_running_loop()
 
     if not query.startswith("http"):
-        # ✅ Reduced timeout from 8.0s to 4.0s for speed
-        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=4.0)
+        # ✅ Restored timeout to 10.0s for accurate search
+        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
         except: ytdlp_info = None
             
         if ytdlp_info and ytdlp_info.get("url"):
             webpage_url = ytdlp_info["url"]
             meta = ytdlp_info
         else:
-            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
+            # ✅ Added "song audio" filter to API fallback
+            search_data = await _api_request("/api/search", {"query": f"{query} song audio", "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
                 webpage_url = track.get("url")
@@ -175,9 +182,19 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                     _SEARCH_CACHE[cache_key] = (res, time.time())
                     return res
             else:
-                res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-                _SEARCH_CACHE[cache_key] = (res, time.time())
-                return res
+                # ✅ DOWNLOAD LOCALLY TO PREVENT STUTTER
+                LOGGER.info("⬇️ Downloading stream locally to prevent stutter...")
+                local_path = await _download_file(cdnurl, video)
+                if local_path:
+                    if video and local_path.endswith(".webm"):
+                        local_path = _convert_to_mp4(local_path)
+                    res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                    _SEARCH_CACHE[cache_key] = (res, time.time())
+                    return res
+                else:
+                    res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                    _SEARCH_CACHE[cache_key] = (res, time.time())
+                    return res
     
     return None
 
