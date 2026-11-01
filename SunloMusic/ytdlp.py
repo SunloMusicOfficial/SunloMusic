@@ -11,9 +11,14 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 _SEARCH_CACHE = {}
 _CACHE_TTL = 3600
 
+EXTRACTOR_ARGS = {"youtube": {"player_client": ["android", "ios"]}}
+
 def _search_ytdlp_sync(query: str):
     try:
-        ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True}
+        ydl_opts = {
+            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
+            "extractor_args": EXTRACTOR_ARGS
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
             if info and "entries" in info and len(info["entries"]) > 0:
@@ -28,6 +33,27 @@ def _search_ytdlp_sync(query: str):
                 }
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
+
+# ✅ ADDED BACK: Missing function for trending.py
+def _search_ytdlp_multi_sync(query: str, limit: int = 10):
+    try:
+        ydl_opts = {
+            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
+            "extractor_args": EXTRACTOR_ARGS
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            results = []
+            if info and "entries" in info:
+                for e in info["entries"]:
+                    if e:
+                        vid_id = e.get("id")
+                        thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
+            return results
+    except Exception as e:
+        LOGGER.error(f"yt-dlp multi search error: {e}")
+        return []
 
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
@@ -68,7 +94,6 @@ def _convert_to_mp4(input_path):
     return input_path
 
 async def _download_file(url: str, video: bool) -> str | None:
-    # Determine extension from URL
     ext = ".mp4" if video else ".m4a"
     if url.endswith(".webm"): ext = ".webm"
     elif url.endswith(".mp3"): ext = ".mp3"
@@ -99,9 +124,8 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if cache_key in _SEARCH_CACHE:
         data, t = _SEARCH_CACHE[cache_key]
         if time.time() - t < _CACHE_TTL:
-            # Check if it's a local file that still exists
             if not data["url"].startswith("http") and not os.path.exists(data["url"]):
-                pass # Bypass cache if file deleted
+                pass 
             else:
                 return data
 
@@ -163,12 +187,10 @@ async def download_media_file(query: str, video: bool = False, max_duration: int
         if res["url"].startswith("http"):
             path = await _download_file(res["url"], video)
             if path:
-                # ✅ FORCE MP4 CONVERSION HERE
                 if video and path.endswith(".webm"):
                     path = _convert_to_mp4(path)
                 return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
         else:
-            # Already local
             path = res["url"]
             if video and path.endswith(".webm"):
                 path = _convert_to_mp4(path)
