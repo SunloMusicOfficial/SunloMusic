@@ -6,31 +6,27 @@ from SunloMusic.database import (
     save_playlist, get_playlist, get_all_user_playlists,
     delete_user_playlist
 )
-from SunloMusic.queues import get_queue, Track
+from SunloMusic.queues import get_queue, Track, active_chats
 from SunloMusic.formatters import format_duration
 
-@bot.on_message(filters.command("save") & filters.private)
+# ✅ Removed filters.private so it works in Groups too
+@bot.on_message(filters.command("save"))
 @catch_errors
 async def save_personal(_, m: Message):
     if len(m.command) < 2:
         return await m.reply_text(
             "❌ <b>Usage:</b> <code>/save playlist_name</code>\n\n"
-            "<i>⚠️ This saves songs from your group queue to your personal playlist.\n"
-            "First use /play in a group, then come here and /save to save.</i>\n\n"
-            "💡 <b>Tip:</b> Use <code>/addsong playlist_name song name</code> to add by search."
+            "<i>⚠️ This saves songs from active group queues to your personal playlist.\n"
+            "Or use <code>/addsong playlist_name song name</code> to add by search.</i>"
         )
     
     name = m.command[1].lower()
     user_id = m.from_user.id
-    
-    # Get songs from user's group queues
-    from SunloMusic.queues import active_chats
-    from SunloMusic.database import get_chat
-    
     queue_data = []
+    
+    # Get songs from active queues
     for chat_id in active_chats():
         q = get_queue(chat_id)
-        # Check if user in this chat (simplified - just add all if only one active)
         if q.now_playing:
             queue_data.append({
                 "title": q.now_playing.title,
@@ -48,7 +44,7 @@ async def save_personal(_, m: Message):
     await save_playlist(user_id, name, queue_data)
     await m.reply_text(f"✅ <b>Playlist '{name}' saved with {len(queue_data)} tracks!</b>\n\nPlay with <code>/load {name}</code>")
 
-@bot.on_message(filters.command("addsong") & filters.private)
+@bot.on_message(filters.command("addsong"))
 @catch_errors
 async def addsong_cmd(_, m: Message):
     if len(m.command) < 3:
@@ -82,7 +78,7 @@ async def addsong_cmd(_, m: Message):
         f"📀 <b>Playlist:</b> {name} ({len(existing)} tracks)"
     )
 
-@bot.on_message(filters.command("myplaylists") & filters.private)
+@bot.on_message(filters.command("myplaylists"))
 @catch_errors
 async def myplaylists_cmd(_, m: Message):
     user_id = m.from_user.id
@@ -95,7 +91,7 @@ async def myplaylists_cmd(_, m: Message):
             "<code>/addsong myfav song name</code>"
         )
     
-    text = "<b>📀 Your Playlists</b>\n━━━━━━━━━━━━━\n"
+    text = f"<b>📀 {m.from_user.first_name}'s Playlists</b>\n━━━━━━━━━━━━━\n"
     buttons = []
     for p in playlists[:15]:
         text += f"🎵 <b>{p['name']}</b> — {p['count']} tracks\n"
@@ -106,7 +102,7 @@ async def myplaylists_cmd(_, m: Message):
     
     await m.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons[:10]))
 
-@bot.on_message(filters.command("load") & filters.private)
+@bot.on_message(filters.command("load"))
 @catch_errors
 async def load_cmd(_, m: Message):
     if len(m.command) < 2:
@@ -119,13 +115,21 @@ async def load_cmd(_, m: Message):
     if not data:
         return await m.reply_text(f"❌ <b>Playlist '{name}' not found.</b>")
     
-    await m.reply_text(
-        f"✅ <b>Playlist '{name}' loaded:</b> {len(data)} tracks\n\n"
-        f"⚠️ <b>To play in VC:</b> Use <code>/play</code> in a group with the songs you want.\n\n"
-        f"<i>Tip: Use inline search to get any track link quickly.</i>"
-    )
+    if m.chat.type.name == "PRIVATE":
+        return await m.reply_text(
+            f"✅ <b>Playlist '{name}' loaded:</b> {len(data)} tracks\n\n"
+            f"⚠️ <b>To play in VC:</b> Use <code>/load {name}</code> in a group."
+        )
+        
+    # If in group, load and play
+    q = get_queue(m.chat.id)
+    for item in data:
+        track = Track(item["title"], item["url"], item["duration"], item["thumbnail"], m.from_user.first_name, m.from_user.id, item.get("video", False))
+        q.queue.append(track)
+    
+    await m.reply_text(f"✅ <b>Playlist '{name}' added to queue with {len(data)} tracks!</b>\n\nUse <code>/play</code> to start playing if not playing.")
 
-@bot.on_message(filters.command("delplaylist") & filters.private)
+@bot.on_message(filters.command("delplaylist"))
 @catch_errors
 async def delplaylist_cmd(_, m: Message):
     if len(m.command) < 2:
