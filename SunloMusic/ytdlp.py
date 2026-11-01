@@ -18,10 +18,11 @@ def _search_ytdlp_sync(query: str):
         ydl_opts = {
             "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
             "extractor_args": EXTRACTOR_ARGS,
-            "match_filter": yt_dlp.utils.match_filter_func("duration < 600") # Ignore > 10 mins
+            "match_filter": yt_dlp.utils.match_filter_func("duration < 600")
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch1:{query}", download=False)
+            # ✅ Added "song audio" back to fix wrong song issue
+            info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
             if info and "entries" in info and len(info["entries"]) > 0:
                 entry = info["entries"][0]
                 vid_id = entry.get("id")
@@ -35,7 +36,6 @@ def _search_ytdlp_sync(query: str):
     except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
-# ✅ ADDED BACK: Function for trending.py
 def _search_ytdlp_multi_sync(query: str, limit: int = 10):
     try:
         ydl_opts = {
@@ -140,7 +140,8 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             webpage_url = ytdlp_info["url"]
             meta = ytdlp_info
         else:
-            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
+            # ✅ Added "song audio" to API fallback as well
+            search_data = await _api_request("/api/search", {"query": f"{query} song audio", "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
                 webpage_url = track.get("url")
