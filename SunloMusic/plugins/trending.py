@@ -42,7 +42,6 @@ async def trending_cmd(_, m: Message):
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-# ✅ FIXED: Strict regex so it doesn't catch tr_back, tr_act_play, etc.
 @bot.on_callback_query(filters.regex(r"^tr_(hindi|punjabi|english|lofi|arijit|old)$"))
 @catch_errors
 async def trending_category(_, cq: CallbackQuery):
@@ -168,12 +167,20 @@ async def tr_act_play(_, cq: CallbackQuery):
     info = await extract_audio(url)
     if not info:
         return await status.edit_text("❌ <b>Failed to fetch media.</b>")
+    
+    # ✅ FALLBACK TO CACHE IF API FAILED
+    title = info.get("title", "Unknown")
+    dur = info.get("duration", 0)
+    thumb = info.get("thumbnail", "")
+    
+    if title in ["Unknown", "Direct Link"] and r.get("title"): title = r["title"]
+    if dur == 0 and r.get("duration"): dur = r["duration"]
+    if not thumb and r.get("thumbnail"): thumb = r["thumbnail"]
         
-    raw_title = info["title"]
-    safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
+    safe_title = title[:40] + "..." if len(title) > 40 else title
     
     q = get_queue(cq.message.chat.id)
-    track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], cq.from_user.first_name, cq.from_user.id, False)
+    track = Track(safe_title, info["url"], dur, thumb, cq.from_user.first_name, cq.from_user.id, False)
     
     if q.now_playing:
         q.queue.append(track)
@@ -181,14 +188,14 @@ async def tr_act_play(_, cq: CallbackQuery):
         try: await cq.message.delete()
         except: pass
         
-        thumb = await generate_thumbnail(cq.message.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
+        thumb_img = await generate_thumbnail(cq.message.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
         
         sent_msg = None
-        if thumb:
-            try: sent_msg = await cq.message.reply_photo(thumb, caption=caption)
+        if thumb_img:
+            try: sent_msg = await cq.message.reply_photo(thumb_img, caption=caption)
             except: pass
         if not sent_msg:
             sent_msg = await cq.message.reply_text(caption, link_preview_options=LinkPreviewOptions(is_disabled=True))
@@ -206,14 +213,14 @@ async def tr_act_play(_, cq: CallbackQuery):
     
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-    thumb = await generate_thumbnail(cq.message.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
+    thumb_img = await generate_thumbnail(cq.message.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
     caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
     
     play_task = asyncio.create_task(play_stream(cq.message.chat.id, track.url, track.video))
     
     sent_msg = None
-    if thumb:
-        try: sent_msg = await cq.message.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
+    if thumb_img:
+        try: sent_msg = await cq.message.reply_photo(thumb_img, caption=caption, reply_markup=player_keyboard(q, 0))
         except: pass
     if not sent_msg:
         sent_msg = await cq.message.reply_text(caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
@@ -257,10 +264,10 @@ async def tr_act_dl(_, cq: CallbackQuery):
         await status.edit_text("📤 <b>Uploading to Telegram...</b>")
         await cq.message.reply_audio(
             audio=result["path"],
-            title=result["title"][:64],
+            title=result.get("title", r.get("title", "Unknown"))[:64],
             performer="SunloMusic",
-            duration=result["duration"],
-            caption=f"🎵 <b>{result['title']}</b>\n\n🤖 Downloaded via @{config.BOT_USERNAME.strip('@')}"
+            duration=result.get("duration", r.get("duration", 0)),
+            caption=f"🎵 <b>{result.get('title', r.get('title', 'Unknown'))}</b>\n\n🤖 Downloaded via @{config.BOT_USERNAME.strip('@')}"
         )
         await status.delete()
         try: await cq.message.delete()
