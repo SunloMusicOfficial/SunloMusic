@@ -23,7 +23,6 @@ CATEGORIES = {
     "old": "old hindi classic songs",
 }
 
-# ✅ Cache to avoid Telegram 64-byte callback limit
 TRENDING_CACHE = {}
 
 @bot.on_message(filters.command("trending"))
@@ -43,12 +42,11 @@ async def trending_cmd(_, m: Message):
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-@bot.on_callback_query(filters.regex("^tr_"))
+# ✅ FIXED: Strict regex so it doesn't catch tr_back, tr_act_play, etc.
+@bot.on_callback_query(filters.regex(r"^tr_(hindi|punjabi|english|lofi|arijit|old)$"))
 @catch_errors
 async def trending_category(_, cq: CallbackQuery):
     cat = cq.data.replace("tr_", "")
-    if cat not in CATEGORIES:
-        return await cq.answer("Unknown category", show_alert=True)
     
     await cq.answer(f"🔍 Loading {cat}...")
     try: await cq.message.edit_text(f"🔍 <b>Fetching {cat} top songs...</b>")
@@ -66,7 +64,7 @@ async def trending_category(_, cq: CallbackQuery):
     if not results:
         return await cq.message.edit_text("❌ <b>Could not fetch trending songs.</b>")
     
-    TRENDING_CACHE.clear() # Clear old data
+    TRENDING_CACHE.clear()
     
     text = f"<b>🔥 Trending: {cat.title()}</b>\n━━━━━━━━━━━━━\n\n"
     buttons = []
@@ -75,7 +73,6 @@ async def trending_category(_, cq: CallbackQuery):
         title = r.get("title", "Unknown")[:45]
         text += f"{i}. {title} <i>({dur})</i>\n"
         
-        # Generate short cache key
         cache_key = hashlib.md5(r['url'].encode()).hexdigest()[:8]
         TRENDING_CACHE[cache_key] = r
         
@@ -108,7 +105,6 @@ async def tr_back(_, cq: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-# ✅ PREMIUM CARD
 @bot.on_callback_query(filters.regex("^trplay_"))
 @catch_errors
 async def tr_play(_, cq: CallbackQuery):
@@ -154,7 +150,6 @@ async def tr_cancel(_, cq: CallbackQuery):
     await cq.message.delete()
     await cq.answer("Cancelled.")
 
-# ✅ PLAY ACTION
 @bot.on_callback_query(filters.regex("^tr_act_play_"))
 @catch_errors
 async def tr_act_play(_, cq: CallbackQuery):
@@ -242,7 +237,6 @@ async def tr_act_play(_, cq: CallbackQuery):
         "video": track.video
     }))
 
-# ✅ DOWNLOAD ACTION
 @bot.on_callback_query(filters.regex("^tr_act_dl_"))
 @catch_errors
 async def tr_act_dl(_, cq: CallbackQuery):
