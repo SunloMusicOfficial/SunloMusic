@@ -55,8 +55,13 @@ async def start_cmd(_, m):
         else: raise Exception()
     except Exception: await m.reply_text(caption, reply_markup=start_keyboard())
 
-# ✅ Handle Web App Data (Button clicks inside the Web App)
-@bot.on_message(filters.web_app_data)
+# ✅ Custom Filter to avoid "module has no attribute 'web_app_data'" error
+async def web_app_filter(_, __, m: Message):
+    return bool(getattr(m, "web_app_data", None))
+
+web_app_data_filter = filters.create(web_app_filter)
+
+@bot.on_message(web_app_data_filter)
 @catch_errors
 async def web_app_handler(_, m: Message):
     try:
@@ -71,7 +76,6 @@ async def web_app_handler(_, m: Message):
                 reply_markup=help_main_keyboard()
             )
         elif cmd == "/allcommand":
-            # Import allcommand logic here or call it directly
             from SunloMusic.plugins.help import ALL_COMMANDS_TEXT
             me = await bot.get_me()
             text = ALL_COMMANDS_TEXT.replace("BOT_USERNAME", me.username)
