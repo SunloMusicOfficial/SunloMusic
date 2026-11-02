@@ -197,7 +197,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
     
-    # ✅ Only converts if video=True and it's webm. Audio is played directly.
     if url.endswith('.webm') and video:
         LOGGER.info("⚠️ .webm video detected. Fast converting...")
         url = await _convert_media(url, video)
@@ -215,13 +214,15 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         err_str = str(e)
         LOGGER.error(f"Direct Play error: {type(e).__name__} - {err_str}")
         
-        if "INTERDC_X_CALL_ERROR" in err_str:
-            LOGGER.info("⚠️ Telegram Server Error. Retrying in 2s...")
-            await asyncio.sleep(2)
+        # ✅ EXTRA RETRY FOR TELEGRAM DC ERROR
+        if "INTERDC_X_CALL_ERROR" in err_str or "INTERDC_X_CALL_RICH_ERROR" in err_str:
+            LOGGER.info("⚠️ Telegram Server Error (DC). Retrying in 5s...")
+            await asyncio.sleep(5)
             try:
                 await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=120.0)
                 return True
-            except: pass
+            except Exception as e2:
+                LOGGER.error(f"Retry failed: {e2}")
 
         return True
 

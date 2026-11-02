@@ -36,6 +36,27 @@ def _search_ytdlp_sync(query: str):
         LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
+# ✅ ADDED BACK: For Trending (Uses API now)
+def _search_ytdlp_multi_sync(query: str, limit: int = 10):
+    try:
+        ydl_opts = {
+            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
+            "extractor_args": EXTRACTOR_ARGS
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            results = []
+            if info and "entries" in info:
+                for e in info["entries"]:
+                    if e:
+                        vid_id = e.get("id")
+                        thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
+                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
+            return results
+    except Exception as e:
+        LOGGER.error(f"yt-dlp multi search error: {e}")
+        return []
+
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
@@ -63,9 +84,9 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
 
 async def _convert_media(input_path, is_video=False):
     if not os.path.exists(input_path): return None
-    if not is_video: return input_path # Audio plays directly, no conversion needed
-    if not input_path.endswith(".webm"): return input_path
+    if not is_video: return input_path # Audio plays directly
     
+    if not input_path.endswith(".webm"): return input_path
     output_path = os.path.splitext(input_path)[0] + ".mp4"
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
         return output_path
@@ -123,7 +144,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     loop = asyncio.get_running_loop()
 
     if not query.startswith("http"):
-        # Search via yt-dlp
         try: 
             ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
         except: 
@@ -133,7 +153,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             webpage_url = ytdlp_info["url"]
             meta = ytdlp_info
         else:
-            # If yt-dlp search fails, use API search
             LOGGER.info("yt-dlp search failed, using API search...")
             search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
             if search_data and search_data.get("results"):
@@ -147,7 +166,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
-    # ✅ 100% API Focus for Stream
     req_type = "video" if video else "audio"
     LOGGER.info(f"Fetching stream from API for: {webpage_url}")
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
@@ -185,7 +203,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             _SEARCH_CACHE[cache_key] = (res, time.time())
             return res
         else:
-            # If download fails, play direct URL
             res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
             _SEARCH_CACHE[cache_key] = (res, time.time())
             return res
