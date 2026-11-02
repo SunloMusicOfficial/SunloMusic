@@ -20,7 +20,7 @@ EMPTY_VC_TIMERS = {}
 AUDIO_CONTROLS = {}
 
 def cleanup_file(url: str):
-    if url and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a', '.mp3')):
+    if url and not url.startswith("http") and os.path.exists(url) and url.endswith(('.mp4', '.webm', '.m4a', '.mp3')):
         try: os.remove(url)
         except: pass
 

@@ -9,6 +9,7 @@ from SunloMusic.queues import get_queue, clear_queue
 from SunloMusic.texts import NOT_PLAYING_TEXT
 from SunloMusic.keyboards import player_keyboard, more_menu_keyboard
 from SunloMusic.formatters import format_duration
+from SunloMusic.logger import LOGGER # ✅ FIXED: Added LOGGER import
 
 @bot.on_message(filters.command(["skip", "next"]) & filters.group)
 @catch_errors
@@ -99,18 +100,8 @@ async def seek_cmd(_, m: Message):
         
     status = await m.reply_text(f"⏳ <b>Seeking to {format_duration(seconds)}...</b>")
     
-    # ✅ Use Native PyTgCalls Seek (Instant, no restart)
-    success = False
-    if call:
-        try:
-            await call.seek(m.chat.id, seconds)
-            success = True
-        except Exception as e:
-            LOGGER.error(f"Native seek error: {e}")
-            
-    if not success:
-        # Fallback: Restart Stream with -ss
-        await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, seek_time=seconds)
+    # ✅ FIXED: PyTgCalls v3 doesn't have .seek(). Use play_stream fallback.
+    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, seek_time=seconds)
     
     q.start_time = time.time() - seconds
     q.total_paused = 0

@@ -36,7 +36,6 @@ def _search_ytdlp_sync(query: str):
         LOGGER.error(f"yt-dlp search error: {e}")
     return None
 
-# ✅ ADDED BACK: For Trending (Uses API now)
 def _search_ytdlp_multi_sync(query: str, limit: int = 10):
     try:
         ydl_opts = {
@@ -84,9 +83,9 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
 
 async def _convert_media(input_path, is_video=False):
     if not os.path.exists(input_path): return None
-    if not is_video: return input_path # Audio plays directly
-    
+    if not is_video: return input_path 
     if not input_path.endswith(".webm"): return input_path
+    
     output_path = os.path.splitext(input_path)[0] + ".mp4"
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
         return output_path
@@ -134,10 +133,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if cache_key in _SEARCH_CACHE:
         data, t = _SEARCH_CACHE[cache_key]
         if time.time() - t < _CACHE_TTL:
-            if not data["url"].startswith("http") and not os.path.exists(data["url"]):
-                pass 
-            else:
-                return data
+            return data
 
     webpage_url = query
     meta = {}
@@ -145,7 +141,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not query.startswith("http"):
         try: 
-            ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
+            ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=8.0)
         except: 
             ytdlp_info = None
             
@@ -195,17 +191,21 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             _SEARCH_CACHE[cache_key] = (res, time.time())
             return res
     else:
-        LOGGER.info(f"⬇️ Downloading from API CDN: {cdnurl[:50]}...")
-        local_path = await _download_file(cdnurl, not video)
-        if local_path:
-            local_path = await _convert_media(local_path, video) 
-            res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-            _SEARCH_CACHE[cache_key] = (res, time.time())
-            return res
-        else:
-            res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-            _SEARCH_CACHE[cache_key] = (res, time.time())
-            return res
+        # ✅ ULTRA FAST: Stream directly! No download for normal audio/video.
+        if video and cdnurl.endswith(".webm"):
+            LOGGER.info(f"⬇️ Downloading from API CDN for conversion: {cdnurl[:50]}...")
+            local_path = await _download_file(cdnurl, not video)
+            if local_path:
+                local_path = await _convert_media(local_path, video) 
+                res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+                _SEARCH_CACHE[cache_key] = (res, time.time())
+                return res
+        
+        # Just return the direct CDN URL (instant play)
+        LOGGER.info(f"⚡ Streaming directly from API CDN: {cdnurl[:50]}")
+        res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+        _SEARCH_CACHE[cache_key] = (res, time.time())
+        return res
     
     return None
 
