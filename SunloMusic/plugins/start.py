@@ -9,10 +9,10 @@ from SunloMusic.ytdlp import extract_audio
 from SunloMusic.decorators import catch_errors
 from pyrogram.enums import ButtonStyle
 
-# ✅ EXPANDABLE MESSAGE (Arrow wala feature)
+# ✅ Exact Sumi Music Style (Full Blockquote + Expandable)
 START_CAPTION = (
-    "<b>🎶 Welcome to SunloMusic 🎶</b>\n\n"
     "<blockquote expandable>"
+    "<b>🎶 Welcome to SunloMusic 🎶</b>\n\n"
     "👋 <b>Hey there!</b>\n"
     "✨ <i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
     "<b>🔥 ᴘʀᴇᴍɪᴜᴍ ꜰᴇᴀᴛᴜʀᴇꜱ:</b>\n"
@@ -59,16 +59,17 @@ async def start_cmd(_, m):
             return
         except Exception: pass
         
-    # ✅ Wahi purana Image logic jo tera pehle se set hai
+    # ✅ SPOILER IMAGE (Dot Dot) & HIGH QUALITY
     try:
         if config.START_IMG: 
-            await m.reply_photo(config.START_IMG, caption=START_CAPTION, reply_markup=start_keyboard())
+            # has_spoiler=True se dot dot (blur) aayega
+            await m.reply_photo(config.START_IMG, caption=START_CAPTION, reply_markup=start_keyboard(), has_spoiler=True)
         else: 
             raise Exception()
     except Exception: 
         await m.reply_text(START_CAPTION, reply_markup=start_keyboard(), link_preview_options=LinkPreviewOptions(is_disabled=True))
 
-# Custom Filter to avoid "module has no attribute 'web_app_data'" error
+# Custom Filter
 async def web_app_filter(_, __, m: Message):
     return bool(getattr(m, "web_app_data", None))
 
