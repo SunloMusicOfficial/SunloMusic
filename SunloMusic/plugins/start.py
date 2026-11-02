@@ -9,11 +9,11 @@ from SunloMusic.ytdlp import extract_audio
 from SunloMusic.decorators import catch_errors
 from pyrogram.enums import ButtonStyle
 
-# ✅ Exact Sumi Music Style (Full Blockquote + Expandable)
+# ✅ Added {user_mention} for clickable name
 START_CAPTION = (
     "<blockquote expandable>"
     "<b>🎶 Welcome to SunloMusic 🎶</b>\n\n"
-    "👋 <b>Hey there!</b>\n"
+    "👋 <b>Hey {user_mention}!</b>\n"
     "✨ <i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
     "<b>🔥 ᴘʀᴇᴍɪᴜᴍ ꜰᴇᴀᴛᴜʀᴇꜱ:</b>\n"
     "• 🎧 <b>High-Quality</b> Audio & Video\n"
@@ -34,7 +34,7 @@ async def start_cmd(_, m):
     
     if m.chat.type != enums.ChatType.PRIVATE:
         return await m.reply_text(
-            f"👋 <b>Hello {m.from_user.first_name}!</b>\n\n"
+            f"👋 <b>Hello {m.from_user.mention}!</b>\n\n"
             f"I am <b>{config.BOT_NAME}</b>.\n"
             f"Click the button below to start me in PM.",
             reply_markup=InlineKeyboardMarkup([
@@ -59,15 +59,16 @@ async def start_cmd(_, m):
             return
         except Exception: pass
         
-    # ✅ SPOILER IMAGE (Dot Dot) & HIGH QUALITY
+    # ✅ Format caption with user's clickable mention
+    caption = START_CAPTION.format(user_mention=m.from_user.mention)
+    
     try:
         if config.START_IMG: 
-            # has_spoiler=True se dot dot (blur) aayega
-            await m.reply_photo(config.START_IMG, caption=START_CAPTION, reply_markup=start_keyboard(), has_spoiler=True)
+            await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard(), has_spoiler=True)
         else: 
             raise Exception()
     except Exception: 
-        await m.reply_text(START_CAPTION, reply_markup=start_keyboard(), link_preview_options=LinkPreviewOptions(is_disabled=True))
+        await m.reply_text(caption, reply_markup=start_keyboard(), link_preview_options=LinkPreviewOptions(is_disabled=True))
 
 # Custom Filter
 async def web_app_filter(_, __, m: Message):
