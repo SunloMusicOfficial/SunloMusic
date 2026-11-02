@@ -1,4 +1,4 @@
-import time
+import time, random
 from pyrogram import filters, enums
 from pyrogram.types import CallbackQuery, Message
 from SunloMusic.bot import bot
@@ -7,7 +7,7 @@ from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import is_sudo
 from SunloMusic.queues import get_queue, clear_queue
 from SunloMusic.texts import NOT_PLAYING_TEXT
-from SunloMusic.keyboards import player_keyboard
+from SunloMusic.keyboards import player_keyboard, more_menu_keyboard
 from SunloMusic.formatters import format_duration
 
 @bot.on_message(filters.command(["skip", "next"]) & filters.group)
@@ -21,9 +21,7 @@ async def skip_cmd(_, m: Message):
     
     if q.karaoke_task: q.karaoke_task.cancel()
     await start_next_song(m.chat.id, q)
-    await m.reply_text("⏭ <b>Skipped!</b>")
 
-# ✅ ADDED: /pause Text Command
 @bot.on_message(filters.command("pause") & filters.group)
 @catch_errors
 @admin_only
@@ -38,10 +36,7 @@ async def pause_cmd(_, m: Message):
         q.paused = True
         q.paused_at = time.time()
         await m.reply_text("⏸ <b>Paused!</b>")
-    else:
-        await m.reply_text("⏸ <b>Already paused.</b>")
 
-# ✅ ADDED: /resume Text Command
 @bot.on_message(filters.command("resume") & filters.group)
 @catch_errors
 @admin_only
@@ -56,10 +51,7 @@ async def resume_cmd(_, m: Message):
         q.paused = False
         q.total_paused += time.time() - q.paused_at
         await m.reply_text("▶️ <b>Resumed!</b>")
-    else:
-        await m.reply_text("▶️ <b>Already playing.</b>")
 
-# ✅ ADDED: /stop Text Command
 @bot.on_message(filters.command("stop") & filters.group)
 @catch_errors
 @admin_only
@@ -86,7 +78,7 @@ async def controls_cb(_, cq: CallbackQuery):
     chat_id = cq.message.chat.id
     user = cq.from_user
     
-    if action not in ["cb_more", "cb_close", "cb_timer"]:
+    if action not in ["cb_more", "cb_close", "cb_timer", "cb_back_player", "cb_seek_info", "cb_q_show", "cb_q_shuffle", "cb_q_export"]:
         is_admin = False
         if await is_sudo(user.id): is_admin = True
         else:
@@ -134,8 +126,40 @@ async def controls_cb(_, cq: CallbackQuery):
             modes = {0: "Off", 1: "One", 2: "All"}
             await cq.answer(f"🔁 Loop: {modes[q.loop]}")
             
+        # ✅ NEW MORE MENU LOGIC
         elif action == "cb_more":
-            await cq.answer("📋 Queue: /queue\n🔄 Shuffle: /shuffle\n⏩ Seek: /seek", show_alert=True)
+            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
+            try: await cq.message.edit_reply_markup(reply_markup=more_menu_keyboard())
+            except: pass
+            await cq.answer()
+
+        elif action == "cb_back_player":
+            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
+            try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
+            except: pass
+            await cq.answer()
+
+        elif action == "cb_seek_info":
+            await cq.answer("⏩ Use command: /seek 1:30 to jump to any time!", show_alert=True)
+
+        elif action == "cb_q_show":
+            if not q.now_playing and not q.queue:
+                return await cq.answer("Queue is empty.", show_alert=True)
+            text = f"▶️ Playing: {q.now_playing.title[:30] if q.now_playing else 'None'}\n"
+            text += f"⏭ Up Next: {len(q.queue)} songs"
+            await cq.answer(text, show_alert=True)
+
+        elif action == "cb_q_shuffle":
+            if not q.queue:
+                return await cq.answer("Queue is empty.", show_alert=True)
+            random.shuffle(q.queue)
+            await cq.answer("🔀 Queue Shuffled!", show_alert=True)
+
+        elif action == "cb_q_export":
+            if not q.now_playing and not q.queue:
+                return await cq.answer("Queue is empty.", show_alert=True)
+            await cq.answer("Please use /export in chat to get the file.", show_alert=True)
+
         elif action == "cb_close":
             await cq.message.delete(); await cq.answer()
     except Exception: pass

@@ -5,7 +5,6 @@ from SunloMusic.formatters import format_duration, make_progress_bar
 
 def start_keyboard() -> InlineKeyboardMarkup:
     WEB_APP_URL = "https://sunlomusic.onrender.com/app"
-    
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("✨ ᴏᴘᴇɴ ᴘʀᴇᴍɪᴜᴍ ᴍᴇɴᴜ ✨", web_app=WebAppInfo(url=WEB_APP_URL), style=ButtonStyle.SUCCESS)],
         [InlineKeyboardButton("🚀 ᴀᴅᴅ ᴍᴇ ᴛᴏ ɢʀᴏᴜᴘ 🚀", url=f"https://t.me/{config.BOT_USERNAME.strip('@')}?startgroup=true", style=ButtonStyle.PRIMARY)],
@@ -41,26 +40,15 @@ def help_back_keyboard() -> InlineKeyboardMarkup:
 def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
-    
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "▭" * 8
     
-    # ✅ NEW LAYOUT & COLOR MAPPING
-    
-    # Row 1: Timer (Blue)
     timer_btn = InlineKeyboardButton(f"✨ {elapsed_str} {bar} {dur_str} ✨", callback_data="cb_timer", style=ButtonStyle.PRIMARY)
-    
-    # Row 2: Pause (Green) | Loop (Green)
     pause_text = "▶️ ʀᴇꜱᴜᴍᴇ" if q.paused else "⏸ ᴘᴀᴜꜱᴇ"
     pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause", style=ButtonStyle.SUCCESS)
-    
     loop_text = "🔁 ʟᴏᴏᴘ ᴏꜰꜰ" if q.loop == 0 else ("🔂 ʟᴏᴏᴘ ᴏɴᴇ" if q.loop == 1 else "🔁 ʟᴏᴏᴘ ᴀʟʟ")
     loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop", style=ButtonStyle.SUCCESS)
-    
-    # Row 3: Skip (Red) | Stop (Red)
     skip_btn = InlineKeyboardButton("⏭ ꜱᴋɪᴘ", callback_data="cb_skip", style=ButtonStyle.DANGER)
     stop_btn = InlineKeyboardButton("⏹ ꜱᴛᴏᴘ", callback_data="cb_stop", style=ButtonStyle.DANGER)
-    
-    # Row 4: More (Blue)
     more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more", style=ButtonStyle.PRIMARY)
     
     return InlineKeyboardMarkup([
@@ -68,6 +56,20 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
         [pause_btn, loop_btn],
         [skip_btn, stop_btn],
         [more_btn]
+    ])
+
+# ✅ NEW: More Menu Keyboard
+def more_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📋 ǫᴜᴇᴜᴇ", callback_data="cb_q_show", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("🔀 ꜱʜᴜꜰꜰʟᴇ", callback_data="cb_q_shuffle", style=ButtonStyle.SUCCESS)
+        ],
+        [
+            InlineKeyboardButton("📁 ᴇxᴘᴏʀᴛ", callback_data="cb_q_export", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("⏩ ꜱᴇᴇᴋ ɪɴꜰᴏ", callback_data="cb_seek_info", style=ButtonStyle.SUCCESS)
+        ],
+        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ᴘʟᴀʏᴇʀ", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
     ])
 
 def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
