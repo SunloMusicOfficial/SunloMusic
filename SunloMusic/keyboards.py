@@ -44,28 +44,29 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "▭" * 8
     
-    # Balanced Color Pattern (No same colors vertically)
+    # ✅ NEW LAYOUT & COLOR MAPPING
     
-    # 1. Timer (Blue)
+    # Row 1: Timer (Blue)
     timer_btn = InlineKeyboardButton(f"✨ {elapsed_str} {bar} {dur_str} ✨", callback_data="cb_timer", style=ButtonStyle.PRIMARY)
     
-    # 2. Pause (Green), Skip (Blue) - Changed Skip to Blue to avoid Red-Blue mismatch
+    # Row 2: Pause (Green) | Loop (Green)
     pause_text = "▶️ ʀᴇꜱᴜᴍᴇ" if q.paused else "⏸ ᴘᴀᴜꜱᴇ"
     pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause", style=ButtonStyle.SUCCESS)
-    skip_btn = InlineKeyboardButton("⏭ ꜱᴋɪᴘ", callback_data="cb_skip", style=ButtonStyle.PRIMARY)
     
-    # 3. Loop (Green), Stop (Red)
     loop_text = "🔁 ʟᴏᴏᴘ ᴏꜰꜰ" if q.loop == 0 else ("🔂 ʟᴏᴏᴘ ᴏɴᴇ" if q.loop == 1 else "🔁 ʟᴏᴏᴘ ᴀʟʟ")
     loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop", style=ButtonStyle.SUCCESS)
+    
+    # Row 3: Skip (Red) | Stop (Red)
+    skip_btn = InlineKeyboardButton("⏭ ꜱᴋɪᴘ", callback_data="cb_skip", style=ButtonStyle.DANGER)
     stop_btn = InlineKeyboardButton("⏹ ꜱᴛᴏᴘ", callback_data="cb_stop", style=ButtonStyle.DANGER)
     
-    # 4. More (Blue)
+    # Row 4: More (Blue)
     more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more", style=ButtonStyle.PRIMARY)
     
     return InlineKeyboardMarkup([
         [timer_btn],
-        [pause_btn, skip_btn],
-        [loop_btn, stop_btn],
+        [pause_btn, loop_btn],
+        [skip_btn, stop_btn],
         [more_btn]
     ])
 
