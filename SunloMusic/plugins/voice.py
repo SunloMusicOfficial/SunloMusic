@@ -1,4 +1,4 @@
-import os
+import os, time
 import asyncio
 import edge_tts
 from groq import Groq
@@ -13,7 +13,9 @@ from SunloMusic.queues import get_queue, Track
 from SunloMusic.logger import LOGGER
 import SunloMusic.bot as bot_module
 
-# ✅ Initialize Groq Client using config
+# ✅ Import AudioQuality
+from pytgcalls.types import MediaStream, AudioQuality
+
 groq_client = Groq(api_key=config.GROQ_API_KEY) if config.GROQ_API_KEY else None
 
 TTS_DIR = "cache/tts"
@@ -23,26 +25,25 @@ async def speak_in_vc(chat_id: int, text: str):
     if not call: return
     try:
         voice = "en-US-ChristopherNeural" 
-        output_file = f"{TTS_DIR}/voice_{chat_id}.mp3"
+        output_file = f"{TTS_DIR}/voice_{chat_id}_{int(time.time())}.mp3"
         
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(output_file)
         
-        if os.path.exists(output_file):
-            from pytgcalls.types import MediaStream
-            stream = MediaStream(media_path=output_file, audio_parameters=None)
+        if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            # ✅ FIXED: Added AudioQuality.HIGH
+            stream = MediaStream(media_path=output_file, audio_parameters=AudioQuality.HIGH)
             await call.play(chat_id, stream)
-            await asyncio.sleep(len(text) * 0.08) 
-            os.remove(output_file)
+            # Wait for the audio to finish playing based on text length
+            await asyncio.sleep(len(text) * 0.1 + 1.5) 
     except Exception as e:
         LOGGER.error(f"TTS Error: {e}")
 
 @bot.on_message(filters.voice & filters.group)
 @catch_errors
 async def voice_command_handler(_, m: Message):
-    # ✅ Check if API key is set
     if not groq_client or not config.GROQ_API_KEY:
-        return await m.reply_text("❌ <b>GROQ_API_KEY is missing!</b>\nPlease add it in config or Render Environment.")
+        return await m.reply_text("❌ <b>GROQ_API_KEY is missing!</b>\nPlease add it in Render Environment.")
         
     status = await m.reply_text("🎤 <b>Listening...</b>\n<i>Converting your voice to text...</i>")
     
@@ -85,7 +86,7 @@ async def voice_command_handler(_, m: Message):
             await speak_in_vc(m.chat.id, f"Now playing, {info['title']}")
             await play_stream(m.chat.id, track.url, track.video)
             q.now_playing = track
-            q.start_time = asyncio.get_event_loop().time()
+            q.start_time = time.time()
             q.paused = False
             q.votes = set()
             

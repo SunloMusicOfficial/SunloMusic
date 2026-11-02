@@ -6,13 +6,14 @@ from SunloMusic.logger import LOGGER
 from shazamio import Shazam
 from SunloMusic.ytdlp import extract_audio
 
-@bot.on_message(filters.voice | filters.audio | (filters.video & ~filters.command(["play", "vplay", "song"])) & filters.group)
+# ✅ REMOVED filters.voice so it doesn't conflict with Voice Commands
+@bot.on_message((filters.audio | filters.video) & ~filters.command(["play", "vplay", "song"]) & filters.group)
 @catch_errors
 async def shazam_handler(_, m):
     # Ignore if it's a command
     if m.text and m.text.startswith("/"): return
     
-    msg = await m.reply_text("🎧 <b>Listening to your voice/audio...</b>")
+    msg = await m.reply_text("🎧 <b>Listening to your audio...</b>")
     path = await m.download()
     
     try:
@@ -24,7 +25,6 @@ async def shazam_handler(_, m):
             artist = out["track"]["subtitle"]
             await msg.edit_text(f"🎵 <b>Found:</b> {title} by {artist}\n\n⚡ <b>Fetching stream link to play...</b>")
             
-            # Play the song
             info = await extract_audio(f"{title} {artist}")
             if info:
                 await msg.edit_text(f"🎶 <b>Matched:</b> {title} by {artist}\n\n<i>Use /play {title} to play it in VC!</i>")
