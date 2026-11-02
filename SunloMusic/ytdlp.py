@@ -76,21 +76,22 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
         return await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
     except: return None
 
-# ✅ CONVERT TO MP3 FOR AUDIO (M4A was causing play issues)
+# ✅ ULTRA FAST CONVERSION (AAC instead of MP3)
 async def _convert_media(input_path, is_video=False):
     if not input_path.endswith(".webm"): return input_path
     
-    output_path = os.path.splitext(input_path)[0] + (".mp4" if is_video else ".mp3")
+    output_path = os.path.splitext(input_path)[0] + (".mp4" if is_video else ".m4a")
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
         return output_path
     try:
-        LOGGER.info(f"🎬 Converting {input_path} to {os.path.basename(output_path)}...")
+        LOGGER.info(f"🎬 Fast Converting {input_path} to {os.path.basename(output_path)}...")
         
         if is_video:
-            cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "libx264", "-c:a", "aac", output_path]
+            # Fast video conversion
+            cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "copy", "-c:a", "aac", output_path]
         else:
-            # Use libmp3lame for perfect audio compatibility
-            cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "libmp3lame", "-q:a", "2", output_path]
+            # ULTRA FAST AUDIO EXTRACTION (AAC is 10x faster than MP3)
+            cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "aac", "-b:a", "128k", output_path]
             
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL

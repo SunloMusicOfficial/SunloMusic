@@ -198,7 +198,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         video = False
     
     if url.endswith('.webm'):
-        LOGGER.info("⚠️ .webm detected. Converting to compatible format...")
+        LOGGER.info("⚠️ .webm detected. Fast converting...")
         url = await _convert_media(url, video)
 
     ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time)
@@ -208,7 +208,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     
     try:
         LOGGER.info(f"🎵 Attempting to play URL directly: {url[:80]}")
-        # ✅ Increased timeout to 120s to allow slow conversion/streaming
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=120.0) 
         return True
     except Exception as e:
