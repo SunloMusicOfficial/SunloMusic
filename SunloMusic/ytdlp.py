@@ -32,37 +32,22 @@ def _search_ytdlp_sync(query: str):
                     "duration": int(entry.get("duration") or 0),
                     "thumbnail": thumb
                 }
-    except Exception as e: LOGGER.error(f"yt-dlp search error: {e}")
+    except Exception as e: 
+        LOGGER.error(f"yt-dlp search error: {e}")
     return None
-
-def _search_ytdlp_multi_sync(query: str, limit: int = 10):
-    try:
-        ydl_opts = {
-            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
-            "extractor_args": EXTRACTOR_ARGS
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
-            results = []
-            if info and "entries" in info:
-                for e in info["entries"]:
-                    if e:
-                        vid_id = e.get("id")
-                        thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
-                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
-            return results
-    except Exception as e:
-        LOGGER.error(f"yt-dlp multi search error: {e}")
-        return []
 
 async def _api_request(endpoint: str, params: dict) -> dict | None:
     url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=API_HEADERS, params=params, timeout=15) as resp:
-                if resp.status != 200: return None
+                if resp.status != 200: 
+                    LOGGER.error(f"API Error {resp.status}: {await resp.text()}")
+                    return None
                 return await resp.json()
-    except: return None
+    except Exception as e: 
+        LOGGER.error(f"API Request Error: {e}")
+        return None
 
 async def _download_telegram_cdn(cdnurl: str) -> str | None:
     if not bot_module.assistant: return None
@@ -76,27 +61,25 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
         return await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
     except: return None
 
-# ✅ ONLY CONVERT IF IT'S VIDEO. AUDIO (.webm) IS NATIVELY SUPPORTED BY PYTGCALLS!
 async def _convert_media(input_path, is_video=False):
-    if not is_video: return input_path # No conversion for audio
-    
+    if not os.path.exists(input_path): return None
+    if not is_video: return input_path # Audio plays directly, no conversion needed
     if not input_path.endswith(".webm"): return input_path
+    
     output_path = os.path.splitext(input_path)[0] + ".mp4"
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
         return output_path
     try:
-        LOGGER.info(f"🎬 Fast Converting Video {input_path} to {os.path.basename(output_path)}...")
+        LOGGER.info(f"🎬 Fast Converting Video {input_path}...")
         cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "copy", "-c:a", "aac", output_path]
-        process = await asyncio.create_subprocess_exec(
-            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
-        )
+        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         await process.communicate()
         
         if os.path.exists(output_path):
             os.remove(input_path)
             return output_path
     except Exception as e:
-        LOGGER.error(f"FFmpeg conversion error: {e}")
+        LOGGER.error(f"FFmpeg error: {e}")
     return input_path
 
 async def _download_file(url: str, is_audio: bool) -> str | None:
@@ -119,7 +102,10 @@ async def _download_file(url: str, is_audio: bool) -> str | None:
     return None
 
 async def extract_audio(query: str, video: bool = False) -> dict | None:
-    if not config.ONEGRAB_API_KEY: return None
+    if not config.ONEGRAB_API_KEY: 
+        LOGGER.error("ONEGRAB_API_KEY missing")
+        return None
+        
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
         return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
 
@@ -137,14 +123,19 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     loop = asyncio.get_running_loop()
 
     if not query.startswith("http"):
-        try: ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
-        except: ytdlp_info = None
+        # Search via yt-dlp
+        try: 
+            ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
+        except: 
+            ytdlp_info = None
             
         if ytdlp_info and ytdlp_info.get("url"):
             webpage_url = ytdlp_info["url"]
             meta = ytdlp_info
         else:
-            search_data = await _api_request("/api/search", {"query": f"{query} song audio", "platform": "youtube"})
+            # If yt-dlp search fails, use API search
+            LOGGER.info("yt-dlp search failed, using API search...")
+            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
                 webpage_url = track.get("url")
@@ -156,40 +147,48 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
 
     if not webpage_url: return None
 
+    # ✅ 100% API Focus for Stream
     req_type = "video" if video else "audio"
+    LOGGER.info(f"Fetching stream from API for: {webpage_url}")
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
     
-    if track_data:
-        result = track_data
-        if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
-            result = track_data["results"][0]
+    if not track_data:
+        LOGGER.error("❌ API /api/track returned None")
+        return None
 
-        cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
-        
-        if cdnurl:
-            final_thumb = meta.get("thumbnail") or result.get("thumbnail", "")
-            final_dur = meta.get("duration") or int(result.get("duration") or 0)
-            final_title = meta.get("title") or result.get("title", "Unknown")
-            
-            if "t.me" in cdnurl or "telegram.me" in cdnurl:
-                local_path = await _download_telegram_cdn(cdnurl)
-                if local_path: 
-                    res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-                    _SEARCH_CACHE[cache_key] = (res, time.time())
-                    return res
-            else:
-                LOGGER.info("⬇️ Downloading stream locally...")
-                local_path = await _download_file(cdnurl, not video)
-                if local_path:
-                    # ✅ Only converts if video=True. Audio stays .webm
-                    local_path = await _convert_media(local_path, video) 
-                    res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-                    _SEARCH_CACHE[cache_key] = (res, time.time())
-                    return res
-                else:
-                    res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-                    _SEARCH_CACHE[cache_key] = (res, time.time())
-                    return res
+    result = track_data
+    if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
+        result = track_data["results"][0]
+
+    cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
+    
+    if not cdnurl:
+        LOGGER.error(f"❌ API response missing CDN URL: {track_data}")
+        return None
+
+    final_thumb = meta.get("thumbnail") or result.get("thumbnail", "")
+    final_dur = meta.get("duration") or int(result.get("duration") or 0)
+    final_title = meta.get("title") or result.get("title", "Unknown")
+    
+    if "t.me" in cdnurl or "telegram.me" in cdnurl:
+        local_path = await _download_telegram_cdn(cdnurl)
+        if local_path: 
+            res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+            _SEARCH_CACHE[cache_key] = (res, time.time())
+            return res
+    else:
+        LOGGER.info(f"⬇️ Downloading from API CDN: {cdnurl[:50]}...")
+        local_path = await _download_file(cdnurl, not video)
+        if local_path:
+            local_path = await _convert_media(local_path, video) 
+            res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+            _SEARCH_CACHE[cache_key] = (res, time.time())
+            return res
+        else:
+            # If download fails, play direct URL
+            res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
+            _SEARCH_CACHE[cache_key] = (res, time.time())
+            return res
     
     return None
 
