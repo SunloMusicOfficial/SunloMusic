@@ -208,7 +208,8 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     
     try:
         LOGGER.info(f"🎵 Attempting to play URL directly: {url[:80]}")
-        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=60.0) # ✅ Increased timeout
+        # ✅ Increased timeout to 120s to allow slow conversion/streaming
+        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=120.0) 
         return True
     except Exception as e:
         err_str = str(e)
@@ -218,7 +219,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
             LOGGER.info("⚠️ Telegram Server Error. Retrying in 2s...")
             await asyncio.sleep(2)
             try:
-                await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=60.0)
+                await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=120.0)
                 return True
             except: pass
 

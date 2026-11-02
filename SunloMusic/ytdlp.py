@@ -76,11 +76,11 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
         return await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
     except: return None
 
-# ✅ ASYNC CONVERSION (Prevents bot from freezing)
+# ✅ CONVERT TO MP3 FOR AUDIO (M4A was causing play issues)
 async def _convert_media(input_path, is_video=False):
     if not input_path.endswith(".webm"): return input_path
     
-    output_path = os.path.splitext(input_path)[0] + (".mp4" if is_video else ".m4a")
+    output_path = os.path.splitext(input_path)[0] + (".mp4" if is_video else ".mp3")
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
         return output_path
     try:
@@ -89,7 +89,8 @@ async def _convert_media(input_path, is_video=False):
         if is_video:
             cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "libx264", "-c:a", "aac", output_path]
         else:
-            cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "aac", output_path]
+            # Use libmp3lame for perfect audio compatibility
+            cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "libmp3lame", "-q:a", "2", output_path]
             
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
@@ -185,7 +186,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                 LOGGER.info("⬇️ Downloading stream locally...")
                 local_path = await _download_file(cdnurl, not video)
                 if local_path:
-                    local_path = await _convert_media(local_path, video) # ✅ Await added
+                    local_path = await _convert_media(local_path, video) 
                     res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
                     _SEARCH_CACHE[cache_key] = (res, time.time())
                     return res
@@ -202,7 +203,7 @@ async def download_media_file(query: str, video: bool = False, max_duration: int
         if res["url"].startswith("http"):
             path = await _download_file(res["url"], not video)
             if path:
-                path = await _convert_media(path, video) # ✅ Await added
+                path = await _convert_media(path, video) 
                 return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
         else:
             return {"path": res["url"], "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
