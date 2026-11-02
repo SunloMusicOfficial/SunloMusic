@@ -1,5 +1,5 @@
 from pyrogram import filters
-from pyrogram.types import Message, CallbackQuery
+from pyrogram.types import Message, CallbackQuery, LinkPreviewOptions
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.decorators import catch_errors
@@ -139,13 +139,7 @@ async def allcommand_cmd(_, m: Message):
 @bot.on_callback_query(filters.regex(r"^help_menu$"))
 @catch_errors
 async def help_menu_cb(_, cq: CallbackQuery):
-    await _safe_edit(
-        cq,
-        "<b>❓ SunloMusic Help</b>\n"
-        "━━━━━━━━━━━━━\n\n"
-        "Choose a category to explore commands:",
-        reply_markup=help_main_keyboard(),
-    )
+    await _safe_edit(cq, "<b>❓ SunloMusic Help</b>\n━━━━━━━━━━━━━\n\nChoose a category to explore commands:", reply_markup=help_main_keyboard())
     await cq.answer()
 
 @bot.on_callback_query(filters.regex(r"^help_(music|controls|effects|admin)$"))
@@ -168,15 +162,19 @@ async def all_commands_cb(_, cq: CallbackQuery):
 @bot.on_callback_query(filters.regex(r"^back_start$"))
 @catch_errors
 async def back_start_cb(_, cq: CallbackQuery):
+    # ✅ UPDATED BACK TO START TEXT
     caption = (
-        f"<b>🎶 Welcome to {config.BOT_NAME}!</b>\n\n"
-        f"<i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
-        f"✨ <b>Features:</b>\n"
-        f"• High-Quality Audio & Video Streaming\n"
-        f"• Zero Lag & 24/7 Uptime\n"
-        f"• Premium User Interface\n\n"
-        f"👨‍💻 <b>Developer:</b> <a href='https://t.me/YO_UR_OFFICIAL_CRUSH'>Sakil</a>\n"
-        f"📢 <b>Updates:</b> <a href='{config.UPDATES_CHANNEL}'>Vip Sakil Bio</a>"
+        "<b>✨ ──『 ꜱᴜɴʟᴏ ᴍᴜꜱɪᴄ 』── ✨</b>\n\n"
+        "🎶 <b>Welcome to SunloMusic!</b>\n"
+        "<i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
+        "<b>🔥 ᴘʀᴇᴍɪᴜᴍ ꜰᴇᴀᴛᴜʀᴇꜱ:</b>\n"
+        "• 🎧 <b>High-Quality</b> Audio & Video\n"
+        "• 🚀 <b>Zero Lag</b> & Turbo Speed\n"
+        "• 🛡 <b>24/7 Uptime</b> & Stability\n"
+        "• 💎 <b>Elegant</b> & Next-Gen UI\n"
+        "• 📥 <b>Unlimited Downloads</b> (MP3/MP4)\n\n"
+        "💡 <i>Over 100+ commands available!</i>\n"
+        "👇 <b>Tap the buttons below to explore.</b>"
     )
     await _safe_edit(cq, caption, reply_markup=start_keyboard())
     await cq.answer()

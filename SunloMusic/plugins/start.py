@@ -1,22 +1,27 @@
 import base64, json
 from pyrogram import filters, enums
-from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
+from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message, LinkPreviewOptions
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.keyboards import start_keyboard, help_main_keyboard, help_back_keyboard
 from SunloMusic.database import add_user
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.decorators import catch_errors
+from pyrogram.enums import ButtonStyle
 
+# ✅ PREMIUM START CAPTION
 START_CAPTION = (
-    "<b>🎶 Welcome to {bot_name}!</b>\n\n"
+    "<b>✨ ──『 ꜱᴜɴʟᴏ ᴍᴜꜱɪᴄ 』── ✨</b>\n\n"
+    "🎶 <b>Welcome to SunloMusic!</b>\n"
     "<i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
-    "✨ <b>Features:</b>\n"
-    "• High-Quality Audio & Video Streaming\n"
-    "• Zero Lag & 24/7 Uptime\n"
-    "• Premium User Interface\n\n"
-    "👨‍💻 <b>Developer:</b> <a href='https://t.me/YO_UR_OFFICIAL_CRUSH'>Sakil</a>\n"
-    "📢 <b>Updates:</b> <a href='{channel}'>Vip Sakil Bio</a>"
+    "<b>🔥 ᴘʀᴇᴍɪᴜᴍ ꜰᴇᴀᴛᴜʀᴇꜱ:</b>\n"
+    "• 🎧 <b>High-Quality</b> Audio & Video\n"
+    "• 🚀 <b>Zero Lag</b> & Turbo Speed\n"
+    "• 🛡 <b>24/7 Uptime</b> & Stability\n"
+    "• 💎 <b>Elegant</b> & Next-Gen UI\n"
+    "• 📥 <b>Unlimited Downloads</b> (MP3/MP4)\n\n"
+    "💡 <i>Over 100+ commands available!</i>\n"
+    "👇 <b>Tap the buttons below to explore.</b>"
 )
 
 @bot.on_message(filters.command("start"))
@@ -30,8 +35,9 @@ async def start_cmd(_, m):
             f"I am <b>{config.BOT_NAME}</b>.\n"
             f"Click the button below to start me in PM.",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🚀 Start in PM", url=f"https://t.me/{me.username}?start=start")]
-            ])
+                [InlineKeyboardButton("🚀 Start in PM", url=f"https://t.me/{me.username}?start=start", style=ButtonStyle.SUCCESS)]
+            ]),
+            link_preview_options=LinkPreviewOptions(is_disabled=True)
         )
 
     await add_user(m.from_user.id, m.from_user.first_name)
@@ -43,17 +49,20 @@ async def start_cmd(_, m):
             await m.reply_text(
                 f"📥 <b>Download Menu</b>\n\nSong: <b>{query}</b>\nChoose format:",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🎵 Audio", callback_data=f"dla_{b64_query}"), InlineKeyboardButton("🎬 Video", callback_data=f"dlv_{b64_query}")]
-                ])
+                    [InlineKeyboardButton("🎵 Audio", callback_data=f"dla_{b64_query}", style=ButtonStyle.SUCCESS), InlineKeyboardButton("🎬 Video", callback_data=f"dlv_{b64_query}", style=ButtonStyle.PRIMARY)]
+                ]),
+                link_preview_options=LinkPreviewOptions(is_disabled=True)
             )
             return
         except Exception: pass
         
-    caption = START_CAPTION.format(bot_name=config.BOT_NAME, channel=config.UPDATES_CHANNEL)
     try:
-        if config.START_IMG: await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
-        else: raise Exception()
-    except Exception: await m.reply_text(caption, reply_markup=start_keyboard())
+        if config.START_IMG: 
+            await m.reply_photo(config.START_IMG, caption=START_CAPTION, reply_markup=start_keyboard())
+        else: 
+            raise Exception()
+    except Exception: 
+        await m.reply_text(START_CAPTION, reply_markup=start_keyboard(), link_preview_options=LinkPreviewOptions(is_disabled=True))
 
 # ✅ Custom Filter to avoid "module has no attribute 'web_app_data'" error
 async def web_app_filter(_, __, m: Message):
