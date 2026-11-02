@@ -76,8 +76,8 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
         return await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
     except: return None
 
-# ✅ SMART CONVERSION (Audio to M4A, Video to MP4)
-def _convert_media(input_path, is_video=False):
+# ✅ ASYNC CONVERSION (Prevents bot from freezing)
+async def _convert_media(input_path, is_video=False):
     if not input_path.endswith(".webm"): return input_path
     
     output_path = os.path.splitext(input_path)[0] + (".mp4" if is_video else ".m4a")
@@ -87,13 +87,14 @@ def _convert_media(input_path, is_video=False):
         LOGGER.info(f"🎬 Converting {input_path} to {os.path.basename(output_path)}...")
         
         if is_video:
-            # Convert to video MP4
             cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "libx264", "-c:a", "aac", output_path]
         else:
-            # Extract audio to M4A (Ignores video stream so it won't crash)
             cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "aac", output_path]
             
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        process = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+        )
+        await process.communicate()
         
         if os.path.exists(output_path):
             os.remove(input_path)
@@ -184,7 +185,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                 LOGGER.info("⬇️ Downloading stream locally...")
                 local_path = await _download_file(cdnurl, not video)
                 if local_path:
-                    local_path = _convert_media(local_path, video) # ✅ Pass video flag
+                    local_path = await _convert_media(local_path, video) # ✅ Await added
                     res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
                     _SEARCH_CACHE[cache_key] = (res, time.time())
                     return res
@@ -201,7 +202,7 @@ async def download_media_file(query: str, video: bool = False, max_duration: int
         if res["url"].startswith("http"):
             path = await _download_file(res["url"], not video)
             if path:
-                path = _convert_media(path, video) # ✅ Pass video flag
+                path = await _convert_media(path, video) # ✅ Await added
                 return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
         else:
             return {"path": res["url"], "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}

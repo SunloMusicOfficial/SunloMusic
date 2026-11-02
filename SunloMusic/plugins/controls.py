@@ -2,7 +2,7 @@ import time, random
 from pyrogram import filters, enums
 from pyrogram.types import CallbackQuery, Message
 from SunloMusic.bot import bot
-from SunloMusic.calls import pause_stream, resume_stream, stop_stream, start_next_song, play_stream, update_live_timer
+from SunloMusic.calls import pause_stream, resume_stream, stop_stream, start_next_song, play_stream, update_live_timer, call
 from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import is_sudo
 from SunloMusic.queues import get_queue, clear_queue
@@ -71,6 +71,58 @@ async def stop_cmd(_, m: Message):
     clear_queue(m.chat.id)
     await m.reply_text("⏹ <b>Stopped and Assistant left VC!</b>")
 
+# ✅ NEW: SEEK COMMAND (Using Native PyTgCalls Seek)
+@bot.on_message(filters.command("seek") & filters.group)
+@catch_errors
+@admin_only
+async def seek_cmd(_, m: Message):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/seek 1:30</code> or <code>/seek 90</code>")
+        
+    q = get_queue(m.chat.id)
+    if not q.now_playing:
+        return await m.reply_text(NOT_PLAYING_TEXT)
+        
+    time_str = m.command[1]
+    seconds = 0
+    try:
+        if ":" in time_str:
+            parts = list(map(int, time_str.split(':')))
+            if len(parts) == 2: seconds = parts[0] * 60 + parts[1]
+            elif len(parts) == 3: seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+        else:
+            seconds = int(time_str)
+    except:
+        return await m.reply_text("❌ <b>Invalid time format.</b> Use <code>1:30</code> or <code>90</code>")
+        
+    if seconds >= q.now_playing.duration:
+        return await m.reply_text("❌ <b>Seek time is greater than song duration!</b>")
+        
+    status = await m.reply_text(f"⏳ <b>Seeking to {format_duration(seconds)}...</b>")
+    
+    # ✅ Use Native Seek if possible
+    success = False
+    if call:
+        try:
+            await call.seek(m.chat.id, seconds)
+            success = True
+        except Exception as e:
+            pass
+            
+    if not success:
+        # Fallback: Restart Stream with -ss
+        await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, seek_time=seconds)
+    
+    q.start_time = time.time() - seconds
+    q.total_paused = 0
+    q.paused = False
+    
+    await status.delete()
+    try:
+        if q.playing_message_id:
+            await bot.edit_message_reply_markup(m.chat.id, q.playing_message_id, reply_markup=player_keyboard(q, seconds))
+    except: pass
+
 @bot.on_callback_query(filters.regex("^cb_"))
 @catch_errors
 async def controls_cb(_, cq: CallbackQuery):
@@ -126,9 +178,7 @@ async def controls_cb(_, cq: CallbackQuery):
             modes = {0: "Off", 1: "One", 2: "All"}
             await cq.answer(f"🔁 Loop: {modes[q.loop]}")
             
-        # ✅ NEW MORE MENU LOGIC
         elif action == "cb_more":
-            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
             try: await cq.message.edit_reply_markup(reply_markup=more_menu_keyboard())
             except: pass
             await cq.answer()

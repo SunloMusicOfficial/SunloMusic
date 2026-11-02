@@ -199,7 +199,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     
     if url.endswith('.webm'):
         LOGGER.info("⚠️ .webm detected. Converting to compatible format...")
-        url = _convert_media(url, video) # ✅ Pass video flag here too
+        url = await _convert_media(url, video)
 
     ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time)
     
@@ -208,7 +208,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     
     try:
         LOGGER.info(f"🎵 Attempting to play URL directly: {url[:80]}")
-        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=20.0)
+        await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=60.0) # ✅ Increased timeout
         return True
     except Exception as e:
         err_str = str(e)
@@ -218,7 +218,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
             LOGGER.info("⚠️ Telegram Server Error. Retrying in 2s...")
             await asyncio.sleep(2)
             try:
-                await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=20.0)
+                await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=60.0)
                 return True
             except: pass
 
