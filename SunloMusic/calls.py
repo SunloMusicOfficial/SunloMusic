@@ -105,21 +105,8 @@ async def update_live_timer(chat_id, msg_id):
                 except: pass
         except: pass
 
-async def delayed_leave(chat_id):
-    await asyncio.sleep(60) 
-    from SunloMusic.queues import get_queue, clear_queue
-    q = get_queue(chat_id)
-    if not q.now_playing:
-        try:
-            if call: await call.leave_call(chat_id)
-        except: pass
-        clear_queue(chat_id)
-        ghost_text = f"👻 <b>G H O S T E D !</b> 👻\n━━━━━━━━━━━━━━━━━━━\n<i>The queue vanished into thin air...</i>\n━━━━━━━━━━━━━━━━━━━\n📭 <b>STATUS:</b> <code>EMPTY</code>\n🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n━━━━━━━━━━━━━━━━━━━"
-        try: await bot_module.bot.send_message(chat_id, ghost_text)
-        except: pass
-
 async def start_next_song(chat_id, q):
-    from SunloMusic.queues import Track
+    from SunloMusic.queues import Track, clear_queue
     from SunloMusic.database import add_recent
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
@@ -177,7 +164,14 @@ async def start_next_song(chat_id, q):
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         if chat_id in KARAOKE_CHATS: q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
-        asyncio.create_task(delayed_leave(chat_id))
+        # ✅ FIX: Immediate Leave on Empty Queue
+        try:
+            if call: await call.leave_call(chat_id)
+        except: pass
+        clear_queue(chat_id)
+        ghost_text = f"👻 <b>G H O S T E D !</b> 👻\n━━━━━━━━━━━━━━━━━━━\n<i>The queue vanished into thin air...</i>\n━━━━━━━━━━━━━━━━━━━\n📭 <b>STATUS:</b> <code>EMPTY</code>\n🚪 <b>ASSISTANT:</b> <i>DISAPPEARED FROM VC</i>\n━━━━━━━━━━━━━━━━━━━"
+        try: await bot_module.bot.send_message(chat_id, ghost_text)
+        except: pass
 
 async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue

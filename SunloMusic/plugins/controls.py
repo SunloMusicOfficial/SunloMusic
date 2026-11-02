@@ -12,81 +12,72 @@ from SunloMusic.formatters import format_duration
 
 @bot.on_message(filters.command(["skip", "next"]) & filters.group)
 @catch_errors
+@admin_only
 async def skip_cmd(_, m: Message):
     try: await m.delete()
     except: pass
     q = get_queue(m.chat.id)
     if not q.now_playing: return await m.reply_text(NOT_PLAYING_TEXT)
     
-    user = m.from_user
-    is_admin = False
-    if await is_sudo(user.id): is_admin = True
-    else:
-        try:
-            member = await m.chat.get_member(user.id)
-            if member.privileges and (member.privileges.can_manage_voice_chats or member.privileges.can_manage_chat): is_admin = True
-        except: pass
-        
-    if is_admin:
-        if q.karaoke_task: q.karaoke_task.cancel()
-        return await start_next_song(m.chat.id, q)
-        
-    if user.id in q.votes: return await m.reply_text("🗳️ You have already voted to skip!")
-    q.votes.add(user.id)
-    
-    try:
-        participants = await m.chat.get_members(filter=enums.ChatMembersFilter.VOICE_CHAT)
-        total_listeners = len(participants) - 2
-    except: total_listeners = 5
-        
-    votes_needed = max(1, int(total_listeners / 2))
-    if len(q.votes) >= votes_needed:
-        await m.reply_text(f"🗳️ <b>Vote Skip Passed!</b> Skipping...")
-        if q.karaoke_task: q.karaoke_task.cancel()
-        await start_next_song(m.chat.id, q)
-    else:
-        await m.reply_text(f"🗳️ <b>Vote Added!</b> Needed: {votes_needed - len(q.votes)} more.")
+    if q.karaoke_task: q.karaoke_task.cancel()
+    await start_next_song(m.chat.id, q)
+    await m.reply_text("⏭ <b>Skipped!</b>")
 
-# ✅ NEW: SEEK COMMAND
-@bot.on_message(filters.command("seek") & filters.group)
+# ✅ ADDED: /pause Text Command
+@bot.on_message(filters.command("pause") & filters.group)
 @catch_errors
 @admin_only
-async def seek_cmd(_, m: Message):
-    if len(m.command) < 2:
-        return await m.reply_text("❌ <b>Usage:</b> <code>/seek 1:30</code> or <code>/seek 90</code>")
-        
-    q = get_queue(m.chat.id)
-    if not q.now_playing:
-        return await m.reply_text(NOT_PLAYING_TEXT)
-        
-    time_str = m.command[1]
-    seconds = 0
-    try:
-        if ":" in time_str:
-            parts = list(map(int, time_str.split(':')))
-            if len(parts) == 2: seconds = parts[0] * 60 + parts[1]
-            elif len(parts) == 3: seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
-        else:
-            seconds = int(time_str)
-    except:
-        return await m.reply_text("❌ <b>Invalid time format.</b> Use <code>1:30</code> or <code>90</code>")
-        
-    if seconds >= q.now_playing.duration:
-        return await m.reply_text("❌ <b>Seek time is greater than song duration!</b>")
-        
-    status = await m.reply_text(f"⏳ <b>Seeking to {format_duration(seconds)}...</b>")
-    
-    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, seek_time=seconds)
-    
-    q.start_time = time.time() - seconds
-    q.total_paused = 0
-    q.paused = False
-    
-    await status.delete()
-    try:
-        if q.playing_message_id:
-            await bot.edit_message_reply_markup(m.chat.id, q.playing_message_id, reply_markup=player_keyboard(q, seconds))
+async def pause_cmd(_, m: Message):
+    try: await m.delete()
     except: pass
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text(NOT_PLAYING_TEXT)
+    
+    if not q.paused:
+        await pause_stream(m.chat.id)
+        q.paused = True
+        q.paused_at = time.time()
+        await m.reply_text("⏸ <b>Paused!</b>")
+    else:
+        await m.reply_text("⏸ <b>Already paused.</b>")
+
+# ✅ ADDED: /resume Text Command
+@bot.on_message(filters.command("resume") & filters.group)
+@catch_errors
+@admin_only
+async def resume_cmd(_, m: Message):
+    try: await m.delete()
+    except: pass
+    q = get_queue(m.chat.id)
+    if not q.now_playing: return await m.reply_text(NOT_PLAYING_TEXT)
+    
+    if q.paused:
+        await resume_stream(m.chat.id)
+        q.paused = False
+        q.total_paused += time.time() - q.paused_at
+        await m.reply_text("▶️ <b>Resumed!</b>")
+    else:
+        await m.reply_text("▶️ <b>Already playing.</b>")
+
+# ✅ ADDED: /stop Text Command
+@bot.on_message(filters.command("stop") & filters.group)
+@catch_errors
+@admin_only
+async def stop_cmd(_, m: Message):
+    try: await m.delete()
+    except: pass
+    q = get_queue(m.chat.id)
+    
+    if q.timer_task: q.timer_task.cancel()
+    if q.karaoke_task: q.karaoke_task.cancel()
+    
+    if q.playing_message_id:
+        try: await bot.delete_messages(m.chat.id, q.playing_message_id)
+        except: pass
+        
+    await stop_stream(m.chat.id)
+    clear_queue(m.chat.id)
+    await m.reply_text("⏹ <b>Stopped and Assistant left VC!</b>")
 
 @bot.on_callback_query(filters.regex("^cb_"))
 @catch_errors
