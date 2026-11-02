@@ -7,30 +7,29 @@ def start_keyboard() -> InlineKeyboardMarkup:
     WEB_APP_URL = "https://sunlomusic.onrender.com/app"
     
     return InlineKeyboardMarkup([
-        # Mix of Colors
         [InlineKeyboardButton("✨ ᴏᴘᴇɴ ᴘʀᴇᴍɪᴜᴍ ᴍᴇɴᴜ ✨", web_app=WebAppInfo(url=WEB_APP_URL), style=ButtonStyle.SUCCESS)],
         [InlineKeyboardButton("🚀 ᴀᴅᴅ ᴍᴇ ᴛᴏ ɢʀᴏᴜᴘ 🚀", url=f"https://t.me/{config.BOT_USERNAME.strip('@')}?startgroup=true", style=ButtonStyle.PRIMARY)],
         [
-            InlineKeyboardButton("🟢 ʜᴇʟᴘ", callback_data="help_menu", style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton("🔵 ꜱᴜᴘᴘᴏʀᴛ", url=config.SUPPORT_CHAT, style=ButtonStyle.PRIMARY)
+            InlineKeyboardButton("⚙️ ʜᴇʟᴘ", callback_data="help_menu", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("💬 ꜱᴜᴘᴘᴏʀᴛ", url=config.SUPPORT_CHAT, style=ButtonStyle.SUCCESS)
         ],
         [
-            InlineKeyboardButton("🔴 ᴜᴘᴅᴀᴛᴇꜱ", url=config.UPDATES_CHANNEL, style=ButtonStyle.DANGER),
-            InlineKeyboardButton("🟢 ᴅᴇᴠ", url="https://t.me/YO_UR_OFFICIAL_CRUSH", style=ButtonStyle.SUCCESS)
+            InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ", url=config.UPDATES_CHANNEL, style=ButtonStyle.DANGER),
+            InlineKeyboardButton("👨‍💻 ᴅᴇᴠ", url="https://t.me/YO_UR_OFFICIAL_CRUSH", style=ButtonStyle.SUCCESS)
         ]
     ])
 
 def help_main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🟣 ᴍᴜꜱɪᴄ", callback_data="help_music", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("🟠 ᴄᴏɴᴛʀᴏʟꜱ", callback_data="help_controls", style=ButtonStyle.DANGER)
+            InlineKeyboardButton("🎵 ᴍᴜꜱɪᴄ", callback_data="help_music", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("⏯ ᴄᴏɴᴛʀᴏʟꜱ", callback_data="help_controls", style=ButtonStyle.SUCCESS)
         ],
         [
-            InlineKeyboardButton("🟢 ᴇꜰꜰᴇᴄᴛꜱ", callback_data="help_effects", style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton("🔴 ᴀᴅᴍɪɴ", callback_data="help_admin", style=ButtonStyle.DANGER)
+            InlineKeyboardButton("🎛 ᴇꜰꜰᴇᴄᴛꜱ", callback_data="help_effects", style=ButtonStyle.SUCCESS),
+            InlineKeyboardButton("🛡 ᴀᴅᴍɪɴ", callback_data="help_admin", style=ButtonStyle.DANGER)
         ],
-        [InlineKeyboardButton("🟡 ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅꜱ", callback_data="all_commands", style=ButtonStyle.PRIMARY)],
+        [InlineKeyboardButton("📜 ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅꜱ", callback_data="all_commands", style=ButtonStyle.PRIMARY)],
         [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start", style=ButtonStyle.DANGER)]
     ])
 
@@ -45,21 +44,23 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "▭" * 8
     
-    # Timer (Blue)
+    # Balanced Color Pattern (No same colors vertically)
+    
+    # 1. Timer (Blue)
     timer_btn = InlineKeyboardButton(f"✨ {elapsed_str} {bar} {dur_str} ✨", callback_data="cb_timer", style=ButtonStyle.PRIMARY)
     
-    # Pause (Green), Skip (Red)
+    # 2. Pause (Green), Skip (Blue) - Changed Skip to Blue to avoid Red-Blue mismatch
     pause_text = "▶️ ʀᴇꜱᴜᴍᴇ" if q.paused else "⏸ ᴘᴀᴜꜱᴇ"
     pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause", style=ButtonStyle.SUCCESS)
-    skip_btn = InlineKeyboardButton("⏭ ꜱᴋɪᴘ", callback_data="cb_skip", style=ButtonStyle.DANGER)
+    skip_btn = InlineKeyboardButton("⏭ ꜱᴋɪᴘ", callback_data="cb_skip", style=ButtonStyle.PRIMARY)
     
-    # Loop (Blue), Stop (Red)
+    # 3. Loop (Green), Stop (Red)
     loop_text = "🔁 ʟᴏᴏᴘ ᴏꜰꜰ" if q.loop == 0 else ("🔂 ʟᴏᴏᴘ ᴏɴᴇ" if q.loop == 1 else "🔁 ʟᴏᴏᴘ ᴀʟʟ")
-    loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop", style=ButtonStyle.PRIMARY)
+    loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop", style=ButtonStyle.SUCCESS)
     stop_btn = InlineKeyboardButton("⏹ ꜱᴛᴏᴘ", callback_data="cb_stop", style=ButtonStyle.DANGER)
     
-    # More (Green)
-    more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more", style=ButtonStyle.SUCCESS)
+    # 4. More (Blue)
+    more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more", style=ButtonStyle.PRIMARY)
     
     return InlineKeyboardMarkup([
         [timer_btn],
