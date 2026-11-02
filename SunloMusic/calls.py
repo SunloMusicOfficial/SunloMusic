@@ -30,13 +30,10 @@ def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0)
     volume = ctrl.get("volume", 1.0)
     eq = ctrl.get("eq", "none")
 
-    filters = []
-    if seek_time > 0:
-        filters.append(f"-ss {seek_time}")
-        
-    if effect == "bass": filters.append("bass=g=10")
-    elif effect == "8d": filters.append("apulsator=hz=0.1")
-    elif effect == "nightcore": filters.append("atempo=1.25,asetrate=44100*1.25")
+    af_filters = []
+    if effect == "bass": af_filters.append("bass=g=10")
+    elif effect == "8d": af_filters.append("apulsator=hz=0.1")
+    elif effect == "nightcore": af_filters.append("atempo=1.25,asetrate=44100*1.25")
     else:
         if eq != "none":
             eq_map = {
@@ -46,17 +43,20 @@ def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0)
                 "jazz": "equalizer=f=200:width_type=h:width=200:g=2,equalizer=f=2000:width_type=h:width=200:g=3",
                 "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5",
             }
-            if eq in eq_map: filters.append(eq_map[eq])
+            if eq in eq_map: af_filters.append(eq_map[eq])
     
-    if speed != 1.0: filters.append(f"atempo={speed}")
-    if volume != 1.0: filters.append(f"volume={volume}")
-    
-    if not filters: return None
-    
+    if speed != 1.0: af_filters.append(f"atempo={speed}")
+    if volume != 1.0: af_filters.append(f"volume={volume}")
+
+    # ✅ FIXED: Correct FFmpeg parameters for seeking and filters
+    params = []
     if seek_time > 0:
-        return " ".join(filters)
-    else:
-        return "-af " + ",".join(filters)
+        params.append(f"-ss {seek_time}")
+    
+    if af_filters:
+        params.append(f"-af \"{','.join(af_filters)}\"")
+        
+    return " ".join(params) if params else None
 
 async def check_empty_vc(chat_id):
     try:
@@ -237,8 +237,7 @@ async def resume_stream(chat_id: int):
 
 async def stop_stream(chat_id: int):
     if call:
-        # ✅ FIXED: Catch NotInCallError if bot is already disconnected
         try:
             await call.leave_call(chat_id)
-        except Exception as e:
+        except Exception:
             pass
