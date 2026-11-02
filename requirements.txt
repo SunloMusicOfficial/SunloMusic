@@ -10,3 +10,5 @@ pyfiglet
 pytz
 tgcrypto
 shazamio
+edge-tts
+groq
