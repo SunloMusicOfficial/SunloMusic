@@ -1,6 +1,6 @@
-import base64
+import base64, json
 from pyrogram import filters, enums
-from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.keyboards import start_keyboard, help_main_keyboard, help_back_keyboard
@@ -24,12 +24,11 @@ START_CAPTION = (
 async def start_cmd(_, m):
     me = await bot.get_me()
     
-    # ✅ GROUP ME START KARNE PAR PM KA BUTTON BHEJO
     if m.chat.type != enums.ChatType.PRIVATE:
         return await m.reply_text(
             f"👋 <b>Hello {m.from_user.first_name}!</b>\n\n"
-            f"I am <b>{config.BOT_NAME}</b>, your Music Companion.\n"
-            f"Click the button below to start me in PM to access all features and download songs.",
+            f"I am <b>{config.BOT_NAME}</b>.\n"
+            f"Click the button below to start me in PM.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🚀 Start in PM", url=f"https://t.me/{me.username}?start=start")]
             ])
@@ -37,22 +36,6 @@ async def start_cmd(_, m):
 
     await add_user(m.from_user.id, m.from_user.first_name)
     
-    log_text = (
-        f"<b>🚀 New User Started Bot!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 <b>Name:</b> {m.from_user.mention}\n"
-        f"🆔 <b>ID:</b> <code>{m.from_user.id}</code>\n"
-        f"🔗 <b>Username:</b> @{m.from_user.username if m.from_user.username else 'None'}\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
-    )
-    if config.LOGGER_ID:
-        try: await bot.send_message(config.LOGGER_ID, log_text)
-        except: pass
-    if config.OWNER_ID:
-        try: await bot.send_message(config.OWNER_ID, log_text)
-        except: pass
-
-    # Handle deep link for downloads
     if len(m.command) > 1 and m.command[1].startswith("dl_"):
         b64_query = m.command[1][3:]
         try:
@@ -71,6 +54,31 @@ async def start_cmd(_, m):
         if config.START_IMG: await m.reply_photo(config.START_IMG, caption=caption, reply_markup=start_keyboard())
         else: raise Exception()
     except Exception: await m.reply_text(caption, reply_markup=start_keyboard())
+
+# ✅ Handle Web App Data (Button clicks inside the Web App)
+@bot.on_message(filters.web_app_data)
+@catch_errors
+async def web_app_handler(_, m: Message):
+    try:
+        data = json.loads(m.web_app_data.data)
+        cmd = data.get("command")
+        
+        if cmd == "/help":
+            await m.reply_text(
+                "<b>❓ SunloMusic Help</b>\n"
+                "━━━━━━━━━━━━━\n\n"
+                "Choose a category to explore commands:",
+                reply_markup=help_main_keyboard()
+            )
+        elif cmd == "/allcommand":
+            # Import allcommand logic here or call it directly
+            from SunloMusic.plugins.help import ALL_COMMANDS_TEXT
+            me = await bot.get_me()
+            text = ALL_COMMANDS_TEXT.replace("BOT_USERNAME", me.username)
+            await m.reply_text(text)
+            
+    except Exception as e:
+        await m.reply_text(f"❌ Error handling Web App data: {e}")
 
 @bot.on_message(filters.command(["ping", "help"]))
 @catch_errors

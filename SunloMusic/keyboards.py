@@ -1,69 +1,37 @@
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration, make_progress_bar
 
-# Agar tumhara Pyrogram version 'style' support karta hai (Kurigram/Pyrogrammod)
-# toh ye direct kaam karega. Agar error aaye toh check karna ki tumhara
-# Pyrogram version update hai ya nahi.
-
 def start_keyboard() -> InlineKeyboardMarkup:
+    # ⚠️ YAHAN APNA RENDER URL DAALNA (Bina slash ke end me)
+    WEB_APP_URL = "https://sunlomusic.onrender.com/app"
+    
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✨ ᴏᴘᴇɴ ᴘʀᴇᴍɪᴜᴍ ᴍᴇɴᴜ", web_app=WebAppInfo(url=WEB_APP_URL))],
+        [InlineKeyboardButton("➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ɢʀᴏᴜᴘ", url=f"https://t.me/{config.BOT_USERNAME.strip('@')}?startgroup=true")],
         [
-            InlineKeyboardButton(
-                "➕ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ",
-                url=f"https://t.me/{config.BOT_USERNAME.strip('@')}?startgroup=true",
-                style="success"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "⚙️ ʜᴇʟᴘ",
-                callback_data="help_menu",
-                style="primary"
-            ),
-            InlineKeyboardButton(
-                "💬 ꜱᴜᴘᴘᴏʀᴛ",
-                url=config.SUPPORT_CHAT,
-                style="primary"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "📢 ᴜᴘᴅᴀᴛᴇꜱ",
-                url=config.UPDATES_CHANNEL,
-                style="primary"
-            ),
-            InlineKeyboardButton(
-                "👨‍💻 ᴅᴇᴠ",
-                url="https://t.me/YO_UR_OFFICIAL_CRUSH",
-                style="primary"
-            )
+            InlineKeyboardButton("⚙️ ʜᴇʟᴘ", callback_data="help_menu"),
+            InlineKeyboardButton("💬 ꜱᴜᴘᴘᴏʀᴛ", url=config.SUPPORT_CHAT)
         ]
     ])
 
 def help_main_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🎵 ᴍᴜꜱɪᴄ", callback_data="help_music", style="primary"),
-            InlineKeyboardButton("⏯ ᴄᴏɴᴛʀᴏʟꜱ", callback_data="help_controls", style="primary")
+            InlineKeyboardButton("🎵 ᴍᴜꜱɪᴄ", callback_data="help_music"),
+            InlineKeyboardButton("⏯ ᴄᴏɴᴛʀᴏʟꜱ", callback_data="help_controls")
         ],
         [
-            InlineKeyboardButton("🎛 ᴇꜰꜰᴇᴄᴛꜱ", callback_data="help_effects", style="primary"),
-            InlineKeyboardButton("🛡 ᴀᴅᴍɪɴ", callback_data="help_admin", style="primary")
+            InlineKeyboardButton("🎛 ᴇꜰꜰᴇᴄᴛꜱ", callback_data="help_effects"),
+            InlineKeyboardButton("🛡 ᴀᴅᴍɪɴ", callback_data="help_admin")
         ],
-        [
-            InlineKeyboardButton("📜 ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅꜱ", callback_data="all_commands", style="success")
-        ],
-        [
-            InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ꜱᴛᴀʀᴛ", callback_data="back_start", style="danger")
-        ]
+        [InlineKeyboardButton("📜 ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅꜱ", callback_data="all_commands")],
+        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ꜱᴛᴀʀᴛ", callback_data="back_start")]
     ])
 
 def help_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ʜᴇʟᴘ", callback_data="help_menu", style="danger")
-        ]
+        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ʜᴇʟᴘ", callback_data="help_menu")]
     ])
 
 def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
@@ -72,40 +40,16 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "▭" * 8
     
-    timer_btn = InlineKeyboardButton(
-        f"✨ {elapsed_str} {bar} {dur_str}",
-        callback_data="cb_timer",
-        style="primary"
-    )
+    timer_btn = InlineKeyboardButton(f"✨ {elapsed_str} {bar} {dur_str}", callback_data="cb_timer")
     
     pause_text = "▶️ ʀᴇꜱᴜᴍᴇ" if q.paused else "⏸ ᴘᴀᴜꜱᴇ"
-    pause_btn = InlineKeyboardButton(
-        pause_text,
-        callback_data="cb_pause",
-        style="success" if q.paused else "primary"
-    )
-    skip_btn = InlineKeyboardButton(
-        "⏭ ꜱᴋɪᴘ",
-        callback_data="cb_skip",
-        style="primary"
-    )
+    pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause")
+    skip_btn = InlineKeyboardButton("⏭ ꜱᴋɪᴘ", callback_data="cb_skip")
     
     loop_text = "🔁 ʟᴏᴏᴘ ᴏꜰꜰ" if q.loop == 0 else ("🔂 ʟᴏᴏᴘ ᴏɴᴇ" if q.loop == 1 else "🔁 ʟᴏᴏᴘ ᴀʟʟ")
-    loop_btn = InlineKeyboardButton(
-        loop_text,
-        callback_data="cb_loop",
-        style="primary"
-    )
-    stop_btn = InlineKeyboardButton(
-        "⏹ ꜱᴛᴏᴘ",
-        callback_data="cb_stop",
-        style="danger"
-    )
-    more_btn = InlineKeyboardButton(
-        "🎵 ᴍᴏʀᴇ",
-        callback_data="cb_more",
-        style="primary"
-    )
+    loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop")
+    stop_btn = InlineKeyboardButton("⏹ ꜱᴛᴏᴘ", callback_data="cb_stop")
+    more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more")
     
     return InlineKeyboardMarkup([
         [timer_btn],
@@ -116,11 +60,5 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
 
 def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "❌ ʀᴇᴍᴏᴠᴇ ꜰʀᴏᴍ ǫᴜᴇᴜᴇ",
-                callback_data=f"cb_del_{track_hash}",
-                style="danger"
-            )
-        ]
+        [InlineKeyboardButton("❌ ʀᴇᴍᴏᴠᴇ ꜰʀᴏᴍ ǫᴜᴇᴜᴇ", callback_data=f"cb_del_{track_hash}")]
     ])
