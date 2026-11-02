@@ -7,26 +7,16 @@ from SunloMusic.keyboards import (
     start_keyboard, help_main_keyboard, help_back_keyboard
 )
 
-# ═══════════════════════════════════════════
-# SAFE EDIT HELPER
-# ═══════════════════════════════════════════
 async def _safe_edit(cq: CallbackQuery, text: str, reply_markup=None):
     msg = cq.message
     is_media = bool(msg.photo or msg.video or msg.document or msg.animation)
     try:
-        if is_media:
-            await msg.edit_caption(caption=text, reply_markup=reply_markup)
-        else:
-            await msg.edit_text(text=text, reply_markup=reply_markup)
+        if is_media: await msg.edit_caption(caption=text, reply_markup=reply_markup)
+        else: await msg.edit_text(text=text, reply_markup=reply_markup)
     except Exception:
-        try:
-            await msg.reply_text(text, reply_markup=reply_markup)
-        except Exception:
-            pass
+        try: await msg.reply_text(text, reply_markup=reply_markup)
+        except Exception: pass
 
-# ═══════════════════════════════════════════
-# HELP CATEGORIES
-# ═══════════════════════════════════════════
 HELP_TEXTS = {
     "music": (
         "<b>🎵 Music Commands</b>\n"
@@ -45,9 +35,13 @@ HELP_TEXTS = {
     "controls": (
         "<b>⏯ Playback Controls</b>\n"
         "━━━━━━━━━━━━━\n\n"
-        "<code>/skip</code> — Skip current\n"
-        "<code>/next</code> — Alias for skip\n"
+        "<code>/pause</code> — Pause current song\n"
+        "<code>/resume</code> — Resume song\n"
+        "<code>/skip</code> — Skip current song\n"
+        "<code>/stop</code> — Stop & clear queue\n"
+        "<code>/seek 1:30</code> — Jump to specific time\n"
         "<code>/queue</code> — Show queue\n"
+        "<code>/export</code> — Export queue as file\n"
         "<code>/clear</code> — Clear queue (admin)\n"
         "<code>/shuffle</code> — Shuffle queue (admin)\n\n"
         "<b>⚡ Audio Control:</b>\n"
@@ -94,9 +88,6 @@ HELP_TEXTS = {
     ),
 }
 
-# ═══════════════════════════════════════════
-# ALL COMMANDS
-# ═══════════════════════════════════════════
 ALL_COMMANDS_TEXT = (
     "<b>📜 All SunloMusic Commands</b>\n"
     "━━━━━━━━━━━━━━━━━━\n\n"
@@ -105,7 +96,7 @@ ALL_COMMANDS_TEXT = (
     "<b>📥 Download</b>\n"
     "/song • /video\n\n"
     "<b>⏯ Controls</b>\n"
-    "/skip • /next • /queue • /clear • /shuffle\n\n"
+    "/pause • /resume • /skip • /stop • /seek • /queue • /export • /clear • /shuffle\n\n"
     "<b>⚡ Audio</b>\n"
     "/speed • /volume • /eq\n\n"
     "<b>🎛 Effects</b>\n"
@@ -138,9 +129,6 @@ ALL_COMMANDS_TEXT = (
     "Send any voice/audio in group"
 )
 
-# ═══════════════════════════════════════════
-# MESSAGE COMMANDS
-# ═══════════════════════════════════════════
 @bot.on_message(filters.command("allcommand"))
 @catch_errors
 async def allcommand_cmd(_, m: Message):
@@ -148,9 +136,6 @@ async def allcommand_cmd(_, m: Message):
     text = ALL_COMMANDS_TEXT.replace("BOT_USERNAME", me.username)
     await m.reply_text(text)
 
-# ═══════════════════════════════════════════
-# CALLBACKS
-# ═══════════════════════════════════════════
 @bot.on_callback_query(filters.regex(r"^help_menu$"))
 @catch_errors
 async def help_menu_cb(_, cq: CallbackQuery):
@@ -168,8 +153,7 @@ async def help_menu_cb(_, cq: CallbackQuery):
 async def help_category_cb(_, cq: CallbackQuery):
     cat = cq.data.replace("help_", "", 1)
     text = HELP_TEXTS.get(cat)
-    if not text:
-        return await cq.answer("Unknown category", show_alert=True)
+    if not text: return await cq.answer("Unknown category", show_alert=True)
     await _safe_edit(cq, text, reply_markup=help_back_keyboard())
     await cq.answer()
 
