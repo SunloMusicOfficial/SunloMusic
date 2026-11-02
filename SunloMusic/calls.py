@@ -48,7 +48,6 @@ def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0)
     if speed != 1.0: af_filters.append(f"atempo={speed}")
     if volume != 1.0: af_filters.append(f"volume={volume}")
 
-    # ✅ FIXED: Correct FFmpeg parameters for seeking and filters
     params = []
     if seek_time > 0:
         params.append(f"-ss {seek_time}")
@@ -200,7 +199,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     
     if url.endswith('.webm'):
         LOGGER.info("⚠️ .webm detected. Converting to compatible format...")
-        url = _convert_media(url)
+        url = _convert_media(url, video) # ✅ Pass video flag here too
 
     ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time)
     
