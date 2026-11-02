@@ -71,7 +71,6 @@ async def stop_cmd(_, m: Message):
     clear_queue(m.chat.id)
     await m.reply_text("⏹ <b>Stopped and Assistant left VC!</b>")
 
-# ✅ NEW: SEEK COMMAND (Using Native PyTgCalls Seek)
 @bot.on_message(filters.command("seek") & filters.group)
 @catch_errors
 @admin_only
@@ -100,14 +99,14 @@ async def seek_cmd(_, m: Message):
         
     status = await m.reply_text(f"⏳ <b>Seeking to {format_duration(seconds)}...</b>")
     
-    # ✅ Use Native Seek if possible
+    # ✅ Use Native PyTgCalls Seek (Instant, no restart)
     success = False
     if call:
         try:
             await call.seek(m.chat.id, seconds)
             success = True
         except Exception as e:
-            pass
+            LOGGER.error(f"Native seek error: {e}")
             
     if not success:
         # Fallback: Restart Stream with -ss

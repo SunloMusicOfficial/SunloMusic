@@ -197,8 +197,9 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
     
-    if url.endswith('.webm'):
-        LOGGER.info("⚠️ .webm detected. Fast converting...")
+    # ✅ Convert ONLY if it's video. Audio plays instantly as .webm
+    if url.endswith('.webm') and video:
+        LOGGER.info("⚠️ .webm video detected. Fast converting...")
         url = await _convert_media(url, video)
 
     ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time)

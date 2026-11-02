@@ -76,23 +76,17 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
         return await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
     except: return None
 
-# ✅ ULTRA FAST CONVERSION (AAC instead of MP3)
+# ✅ ONLY CONVERT IF IT'S VIDEO. AUDIO (.webm) IS NATIVELY SUPPORTED BY PYTGCALLS!
 async def _convert_media(input_path, is_video=False):
-    if not input_path.endswith(".webm"): return input_path
+    if not is_video: return input_path # No conversion for audio
     
-    output_path = os.path.splitext(input_path)[0] + (".mp4" if is_video else ".m4a")
+    if not input_path.endswith(".webm"): return input_path
+    output_path = os.path.splitext(input_path)[0] + ".mp4"
     if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
         return output_path
     try:
-        LOGGER.info(f"🎬 Fast Converting {input_path} to {os.path.basename(output_path)}...")
-        
-        if is_video:
-            # Fast video conversion
-            cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "copy", "-c:a", "aac", output_path]
-        else:
-            # ULTRA FAST AUDIO EXTRACTION (AAC is 10x faster than MP3)
-            cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "aac", "-b:a", "128k", output_path]
-            
+        LOGGER.info(f"🎬 Fast Converting Video {input_path} to {os.path.basename(output_path)}...")
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "copy", "-c:a", "aac", output_path]
         process = await asyncio.create_subprocess_exec(
             *cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
         )
@@ -187,6 +181,7 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
                 LOGGER.info("⬇️ Downloading stream locally...")
                 local_path = await _download_file(cdnurl, not video)
                 if local_path:
+                    # ✅ Only converts if video=True. Audio stays .webm
                     local_path = await _convert_media(local_path, video) 
                     res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
                     _SEARCH_CACHE[cache_key] = (res, time.time())
