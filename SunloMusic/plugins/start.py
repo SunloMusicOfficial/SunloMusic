@@ -9,19 +9,22 @@ from SunloMusic.ytdlp import extract_audio
 from SunloMusic.decorators import catch_errors
 from pyrogram.enums import ButtonStyle
 
-# ✅ PREMIUM START CAPTION
+# ✅ EXPANDABLE MESSAGE (Arrow wala feature)
 START_CAPTION = (
-    "<b>✨ ──『 ꜱᴜɴʟᴏ ᴍᴜꜱɪᴄ 』── ✨</b>\n\n"
-    "🎶 <b>Welcome to SunloMusic!</b>\n"
-    "<i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
+    "<b>🎶 Welcome to SunloMusic 🎶</b>\n\n"
+    "<blockquote expandable>"
+    "👋 <b>Hey there!</b>\n"
+    "✨ <i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
     "<b>🔥 ᴘʀᴇᴍɪᴜᴍ ꜰᴇᴀᴛᴜʀᴇꜱ:</b>\n"
     "• 🎧 <b>High-Quality</b> Audio & Video\n"
     "• 🚀 <b>Zero Lag</b> & Turbo Speed\n"
     "• 🛡 <b>24/7 Uptime</b> & Stability\n"
     "• 💎 <b>Elegant</b> & Next-Gen UI\n"
-    "• 📥 <b>Unlimited Downloads</b> (MP3/MP4)\n\n"
-    "💡 <i>Over 100+ commands available!</i>\n"
-    "👇 <b>Tap the buttons below to explore.</b>"
+    "• 📥 <b>Unlimited Downloads</b> (MP3/MP4)\n"
+    "• ⏩ <b>Seek</b> anywhere in the song\n"
+    "• 🎯 <b>Interactive</b> Player Controls\n\n"
+    "<i>Over 100+ commands available! Tap the buttons below to start.</i>"
+    "</blockquote>"
 )
 
 @bot.on_message(filters.command("start"))
@@ -56,6 +59,7 @@ async def start_cmd(_, m):
             return
         except Exception: pass
         
+    # ✅ Wahi purana Image logic jo tera pehle se set hai
     try:
         if config.START_IMG: 
             await m.reply_photo(config.START_IMG, caption=START_CAPTION, reply_markup=start_keyboard())
@@ -64,7 +68,7 @@ async def start_cmd(_, m):
     except Exception: 
         await m.reply_text(START_CAPTION, reply_markup=start_keyboard(), link_preview_options=LinkPreviewOptions(is_disabled=True))
 
-# ✅ Custom Filter to avoid "module has no attribute 'web_app_data'" error
+# Custom Filter to avoid "module has no attribute 'web_app_data'" error
 async def web_app_filter(_, __, m: Message):
     return bool(getattr(m, "web_app_data", None))
 
