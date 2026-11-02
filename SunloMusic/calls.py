@@ -164,7 +164,6 @@ async def start_next_song(chat_id, q):
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         if chat_id in KARAOKE_CHATS: q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
-        # ✅ FIX: Immediate Leave on Empty Queue
         try:
             if call: await call.leave_call(chat_id)
         except: pass
@@ -227,8 +226,19 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         return True
 
 async def pause_stream(chat_id: int):
-    if call: await call.pause(chat_id)
+    if call:
+        try: await call.pause(chat_id)
+        except: pass
+
 async def resume_stream(chat_id: int):
-    if call: await call.resume(chat_id)
+    if call:
+        try: await call.resume(chat_id)
+        except: pass
+
 async def stop_stream(chat_id: int):
-    if call: await call.leave_call(chat_id)
+    if call:
+        # ✅ FIXED: Catch NotInCallError if bot is already disconnected
+        try:
+            await call.leave_call(chat_id)
+        except Exception as e:
+            pass
