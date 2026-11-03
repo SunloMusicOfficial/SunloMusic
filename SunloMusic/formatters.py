@@ -4,11 +4,11 @@ def format_duration(seconds: int) -> str:
     m, s = divmod(rem, 60)
     return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
-def make_progress_bar(current: int, total: int, length: int = 8) -> str:
-    """Generates exact height/thickness matching bar."""
-    if total <= 0: return "▯" * length
+def make_progress_bar(current: int, total: int, length: int = 7) -> str:
+    """Generates a clean thick bar with a music note."""
+    if total <= 0: return "▭" * length
     pos = int(length * current / total)
     pos = max(0, min(pos, length - 1))
     
-    # ✅ Left: ▄ (Niche & Thin), Right: ▯ (Upar & Thick)
-    return "▄" * pos + "🎵" + "▯" * (length - pos)
+    # ✅ Wapas thick lines aur music note pe set kiya hai
+    return "━" * pos + "🎵" + "▭" * (length - pos)
