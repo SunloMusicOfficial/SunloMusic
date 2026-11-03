@@ -111,18 +111,18 @@ async def play_cmd(_, m):
     q.votes = set()
     await status.delete()
     
-    # ✅ PREMIUM HTML CARD WITH THUMBNAIL
     thumb_url = track.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
     
-    card_text = f"""
-    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
-        <h3 style="text-align: center; color: #00e0ff; margin-top: 0;">🎧🎶 Music Time 🎶🎧</h3>
-        <img src="{thumb_url}" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" />
-        <p style="margin: 5px 0;"><b>🎵 Title:</b> {rich_esc(track.title)}</p>
-        <p style="margin: 5px 0;"><b>⏱ Duration:</b> {format_duration(track.duration)}</p>
-        <p style="margin: 5px 0;"><b>🙋 Requested by:</b> {rich_esc(track.requester)}</p>
-    </div>
-    """
+    # ✅ THUMBNAIL TOP + PREMIUM BLOCKQUOTE TEXT
+    card_text = (
+        f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
+        f"<blockquote>"
+        f"<b>🎶 {rich_esc(track.title)}</b>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"⏱ <b>Duration :</b> <i>{format_duration(track.duration)}</i>\n"
+        f"🙋 <b>Requested by :</b> <i>{rich_esc(track.requester)}</i>"
+        f"</blockquote>"
+    )
     
     buttons = player_buttons(q, 0)
     

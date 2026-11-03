@@ -77,15 +77,15 @@ async def update_live_timer(chat_id, msg_id):
         
         try:
             thumb_url = q.now_playing.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
-            card_text = f"""
-            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
-                <h3 style="text-align: center; color: #00e0ff; margin-top: 0;">🎧🎶 Music Time 🎶🎧</h3>
-                <img src="{thumb_url}" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" />
-                <p style="margin: 5px 0;"><b>🎵 Title:</b> {rich_esc(q.now_playing.title)}</p>
-                <p style="margin: 5px 0;"><b>⏱ Duration:</b> {format_duration(q.now_playing.duration)}</p>
-                <p style="margin: 5px 0;"><b>🙋 Requested by:</b> {rich_esc(q.now_playing.requester)}</p>
-            </div>
-            """
+            card_text = (
+                f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
+                f"<blockquote>"
+                f"<b>🎶 {rich_esc(q.now_playing.title)}</b>\n"
+                f"━━━━━━━━━━━━━\n"
+                f"⏱ <b>Duration :</b> <i>{format_duration(q.now_playing.duration)}</i>\n"
+                f"🙋 <b>Requested by :</b> <i>{rich_esc(q.now_playing.requester)}</i>"
+                f"</blockquote>"
+            )
             buttons = player_buttons(q, elapsed)
             msg = await bot_module.bot.get_messages(chat_id, msg_id)
             await rich_edit(msg, card_text + buttons)
@@ -131,15 +131,15 @@ async def start_next_song(chat_id, q):
         except: pass
         
         thumb_url = nxt.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
-        card_text = f"""
-        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
-            <h3 style="text-align: center; color: #00e0ff; margin-top: 0;">🎧🎶 Music Time 🎶🎧</h3>
-            <img src="{thumb_url}" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" />
-            <p style="margin: 5px 0;"><b>🎵 Title:</b> {rich_esc(nxt.title)}</p>
-            <p style="margin: 5px 0;"><b>⏱ Duration:</b> {format_duration(nxt.duration)}</p>
-            <p style="margin: 5px 0;"><b>🙋 Requested by:</b> {rich_esc(nxt.requester)}</p>
-        </div>
-        """
+        card_text = (
+            f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
+            f"<blockquote>"
+            f"<b>🎶 {rich_esc(nxt.title)}</b>\n"
+            f"━━━━━━━━━━━━━\n"
+            f"⏱ <b>Duration :</b> <i>{format_duration(nxt.duration)}</i>\n"
+            f"🙋 <b>Requested by :</b> <i>{rich_esc(nxt.requester)}</i>"
+            f"</blockquote>"
+        )
         buttons = player_buttons(q, 0)
         try:
             sent_msg = await rich_send(bot_module.bot, chat_id, card_text + buttons)
