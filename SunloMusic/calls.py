@@ -175,6 +175,15 @@ async def stream_end_handler(client, update: StreamEnded):
     from SunloMusic.queues import get_queue
     chat_id = update.chat_id
     q = get_queue(chat_id)
+    
+    # ✅ FIXED: TTS khatam hone par VC leave mat karo
+    if getattr(q, "is_playing_tts", False):
+        q.is_playing_tts = False
+        return
+        
+    if not q.now_playing:
+        return
+
     if q.loop == 1 and q.now_playing:
         await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
         q.start_time = time.time(); q.total_paused = 0; q.paused = False
@@ -194,7 +203,6 @@ async def start_call():
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none", seek_time: int = 0):
     if not call: return False
     
-    # ✅ FIXED: Prevent FileNotFoundError by checking path
     if not url.startswith("http") and not os.path.exists(url):
         LOGGER.error(f"❌ File not found before playing: {url}")
         return False

@@ -21,18 +21,25 @@ TTS_DIR = "cache/tts"
 os.makedirs(TTS_DIR, exist_ok=True)
 
 async def speak_in_vc(chat_id: int, text: str):
+    from SunloMusic.queues import get_queue
+    q = get_queue(chat_id)
     if not call: return
     try:
-        voice = "en-US-ChristopherNeural" 
+        # ✅ FEMALE VOICE (Jenny)
+        voice = "en-US-JennyNeural" 
         output_file = f"{TTS_DIR}/voice_{chat_id}_{int(time.time())}.mp3"
         
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(output_file)
         
         if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            q.is_playing_tts = True
             stream = MediaStream(media_path=output_file, audio_parameters=AudioQuality.HIGH)
             await call.play(chat_id, stream)
-            await asyncio.sleep(len(text) * 0.1 + 1.5) 
+            
+            # Wait for TTS to finish
+            await asyncio.sleep(len(text) * 0.08 + 1.5) 
+            q.is_playing_tts = False
     except Exception as e:
         LOGGER.error(f"TTS Error: {e}")
 
@@ -45,7 +52,6 @@ async def voice_command_handler(_, m: Message):
     status = await m.reply_text("🎤 <b>Listening...</b>\n<i>Converting your voice to text...</i>")
     
     try:
-        # ✅ FIXED: Explicitly download as .ogg so Groq API accepts it
         file_path = f"cache/downloads/voice_{m.id}.ogg"
         await m.download(file_name=file_path)
         
@@ -82,12 +88,17 @@ async def voice_command_handler(_, m: Message):
             asyncio.create_task(speak_in_vc(m.chat.id, f"Added {info['title']} to the queue."))
         else:
             await status.edit_text("⚡ <b>Connecting to VC...</b>")
+            
+            # ✅ Play TTS and wait for it to finish
             await speak_in_vc(m.chat.id, f"Now playing, {info['title']}")
-            await play_stream(m.chat.id, track.url, track.video)
+            
+            # ✅ Set track and start song immediately
             q.now_playing = track
             q.start_time = time.time()
             q.paused = False
             q.votes = set()
+            
+            await play_stream(m.chat.id, track.url, track.video)
             
             await status.edit_text(f"🎧 <b>Now Playing:</b> {info['title']}")
             

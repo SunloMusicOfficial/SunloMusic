@@ -72,7 +72,6 @@ async def play_cmd(_, m):
     
     q = get_queue(m.chat.id)
     
-    # ✅ NO DUPLICATE SYSTEM CHECK
     is_duplicate = False
     if q.now_playing and (q.now_playing.url == info["url"] or q.now_playing.title == safe_title):
         is_duplicate = True
@@ -133,7 +132,13 @@ async def play_cmd(_, m):
             except: pass
         return await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
     
-    sent_msg, _ = await asyncio.gather(send_card(), play_stream(m.chat.id, track.url, track.video))
+    # ✅ Integrated TTS for /play too
+    from SunloMusic.plugins.voice import speak_in_vc
+    async def play_with_tts():
+        await speak_in_vc(m.chat.id, f"Now playing, {track.title}")
+        await play_stream(m.chat.id, track.url, track.video)
+        
+    sent_msg, _ = await asyncio.gather(send_card(), play_with_tts())
     
     q.playing_message_id = sent_msg.id
     try: await sent_msg.pin(disable_notification=True)
