@@ -112,16 +112,20 @@ async def play_cmd(_, m):
     await status.delete()
     
     thumb_url = track.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
+    b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
+    title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     
-    # ✅ THUMBNAIL TOP + PREMIUM BLOCKQUOTE TEXT
+    # ✅ EXACT OLD FORMAT (Clickable Title & Request)
     card_text = (
         f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
-        f"<blockquote>"
-        f"<b>🎶 {rich_esc(track.title)}</b>\n"
+        f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
         f"━━━━━━━━━━━━━\n"
-        f"⏱ <b>Duration :</b> <i>{format_duration(track.duration)}</i>\n"
-        f"🙋 <b>Requested by :</b> <i>{rich_esc(track.requester)}</i>"
-        f"</blockquote>"
+        f"🎵 <a href='{title_link}'>{rich_esc(track.title)}</a>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"⏱ Duration: {format_duration(track.duration)}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{rich_esc(track.requester)}</a>\n"
+        f"━━━━━━━━━━━━━"
     )
     
     buttons = player_buttons(q, 0)

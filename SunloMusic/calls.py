@@ -77,14 +77,19 @@ async def update_live_timer(chat_id, msg_id):
         
         try:
             thumb_url = q.now_playing.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
+            b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
+            title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+            
             card_text = (
                 f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
-                f"<blockquote>"
-                f"<b>🎶 {rich_esc(q.now_playing.title)}</b>\n"
+                f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
                 f"━━━━━━━━━━━━━\n"
-                f"⏱ <b>Duration :</b> <i>{format_duration(q.now_playing.duration)}</i>\n"
-                f"🙋 <b>Requested by :</b> <i>{rich_esc(q.now_playing.requester)}</i>"
-                f"</blockquote>"
+                f"🎵 <a href='{title_link}'>{rich_esc(q.now_playing.title)}</a>\n"
+                f"━━━━━━━━━━━━━\n"
+                f"⏱ Duration: {format_duration(q.now_playing.duration)}\n"
+                f"━━━━━━━━━━━━━\n"
+                f"🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{rich_esc(q.now_playing.requester)}</a>\n"
+                f"━━━━━━━━━━━━━"
             )
             buttons = player_buttons(q, elapsed)
             msg = await bot_module.bot.get_messages(chat_id, msg_id)
@@ -131,14 +136,19 @@ async def start_next_song(chat_id, q):
         except: pass
         
         thumb_url = nxt.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
+        b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
+        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+        
         card_text = (
             f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
-            f"<blockquote>"
-            f"<b>🎶 {rich_esc(nxt.title)}</b>\n"
+            f"<b>🎧🎶 Music Time 🎶🎧</b>\n"
             f"━━━━━━━━━━━━━\n"
-            f"⏱ <b>Duration :</b> <i>{format_duration(nxt.duration)}</i>\n"
-            f"🙋 <b>Requested by :</b> <i>{rich_esc(nxt.requester)}</i>"
-            f"</blockquote>"
+            f"🎵 <a href='{title_link}'>{rich_esc(nxt.title)}</a>\n"
+            f"━━━━━━━━━━━━━\n"
+            f"⏱ Duration: {format_duration(nxt.duration)}\n"
+            f"━━━━━━━━━━━━━\n"
+            f"🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{rich_esc(nxt.requester)}</a>\n"
+            f"━━━━━━━━━━━━━"
         )
         buttons = player_buttons(q, 0)
         try:
