@@ -1,4 +1,4 @@
-import os, time
+import os, time, re
 import asyncio
 import edge_tts
 from groq import Groq
@@ -22,7 +22,6 @@ TTS_DIR = "cache/tts"
 os.makedirs(TTS_DIR, exist_ok=True)
 
 async def speak_in_vc(chat_id: int, text: str):
-    # ✅ Check DB for TTS status
     if not await get_group_setting(chat_id, "tts", False): return
     
     q = get_queue(chat_id)
@@ -47,7 +46,6 @@ async def speak_in_vc(chat_id: int, text: str):
 @bot.on_message(filters.voice & filters.group)
 @catch_errors
 async def voice_command_handler(_, m: Message):
-    # ✅ Check DB for Voice Search status
     if not await get_group_setting(m.chat.id, "vsearch", False): return
     
     if not groq_client or not config.GROQ_API_KEY:
@@ -59,29 +57,35 @@ async def voice_command_handler(_, m: Message):
         file_path = f"cache/downloads/voice_{m.id}.ogg"
         await m.download(file_name=file_path)
         
+        # ✅ Added prompt so AI understands it's a music bot
         with open(file_path, "rb") as file:
             transcription = groq_client.audio.transcriptions.create(
                 file=(file_path, file.read()),
                 model="whisper-large-v3",
                 response_format="json",
+                prompt="Hindi, Bollywood, Punjabi, English songs, Arijit Singh, Kesariya, Tum Hi Ho, Badshah",
             )
             
         text_query = transcription.text.strip()
+        LOGGER.info(f"Voice Search Transcribed: {text_query}") # ✅ Debugging
+        
         if os.path.exists(file_path): os.remove(file_path)
         
         if not text_query:
             return await status.edit_text("❌ <b>Awaz samajh nahi aayi, dubara bolo.</b>")
             
-        query = text_query.lower().replace("play", "").replace("bajao", "").replace("song", "").strip()
+        # ✅ Smart Cleanup (Removes filler words using regex)
+        query = re.sub(r'\b(play|bajao|baja|song|music|please|kar|do|karo|sunao)\b', '', text_query, flags=re.IGNORECASE)
+        query = re.sub(r'[^\w\s]', '', query).strip()
         
         if not query:
             return await status.edit_text("❌ <b>Gaane ka naam bolna.</b>")
             
-        await status.edit_text(f"✨ <b>Heard:</b> <code>{text_query}</code>\n\n⏳ <b>Gaana dhundh raha hu...</b>")
+        await status.edit_text(f"✨ <b>Heard:</b> <code>{text_query}</code>\n\n⏳ <b>Searching for:</b> <code>{query}</code>...")
         
         info = await extract_audio(query)
         if not info:
-            return await status.edit_text("❌ <b>Gaana nahi mila.</b>")
+            return await status.edit_text(f"❌ <b>Gaana nahi mila:</b> <code>{query}</code>")
             
         q = get_queue(m.chat.id)
         track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, False)
