@@ -3,10 +3,11 @@ from pyrogram.enums import ButtonStyle
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration, make_progress_bar
 from SunloMusic.queues import AUTO_DJ_CHATS
-
-# ✅ RichGram Imports (For Gol Buttons)
 from richgram import rich_button, rich_button_row
 
+# ═══════════════════════════════════════════
+# NORMAL KEYBOARDS (For start, help, settings)
+# ═══════════════════════════════════════════
 def start_keyboard() -> InlineKeyboardMarkup:
     WEB_APP_URL = "https://sunlomusic.onrender.com/app"
     return InlineKeyboardMarkup([
@@ -44,7 +45,6 @@ def help_back_keyboard() -> InlineKeyboardMarkup:
 def settings_keyboard(tts_on: bool, vsearch_on: bool) -> InlineKeyboardMarkup:
     tts_text = "🟢 ꜱᴜɴʟᴏ ᴀɪ: ᴏɴ" if tts_on else "🔴 ꜱᴜɴʟᴏ ᴀɪ: ᴏꜰꜰ"
     vs_text = "🟢 ᴠᴏɪᴄᴇ: ᴏɴ" if vsearch_on else "🔴 ᴠᴏɪᴄᴇ: ᴏꜰꜰ"
-    
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(tts_text, callback_data="toggle_tts", style=ButtonStyle.SUCCESS if tts_on else ButtonStyle.DANGER)],
         [InlineKeyboardButton(vs_text, callback_data="toggle_vsearch", style=ButtonStyle.SUCCESS if vsearch_on else ButtonStyle.DANGER)],
@@ -69,15 +69,37 @@ def more_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🔙 BACK", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
     ])
 
-# ✅ Rich Player Buttons (Gol Shape)
+# ═══════════════════════════════════════════
+# 1. NORMAL PLAYER KEYBOARD (For trending.py & voteplay.py)
+# ═══════════════════════════════════════════
+def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
+    dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
+    elapsed_str = format_duration(elapsed)
+    bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "─" * 7
+    
+    timer_btn = InlineKeyboardButton(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style=ButtonStyle.PRIMARY)
+    pause_btn = InlineKeyboardButton("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style=ButtonStyle.SUCCESS if q.paused else ButtonStyle.PRIMARY)
+    auto_btn = InlineKeyboardButton(f"🔄 AUTOPLAY: {'ON' if q.chat_id in AUTO_DJ_CHATS else 'OFF'}", callback_data="cb_autoplay", style=ButtonStyle.SUCCESS if q.chat_id in AUTO_DJ_CHATS else ButtonStyle.PRIMARY)
+    skip_btn = InlineKeyboardButton("⏭️ SKIP", callback_data="cb_skip", style=ButtonStyle.PRIMARY)
+    stop_btn = InlineKeyboardButton("⏹️ STOP", callback_data="cb_stop", style=ButtonStyle.DANGER)
+    more_btn = InlineKeyboardButton("🎛 MORE", callback_data="cb_more", style=ButtonStyle.SUCCESS)
+
+    return InlineKeyboardMarkup([
+        [timer_btn],
+        [pause_btn, auto_btn],
+        [skip_btn, stop_btn],
+        [more_btn]
+    ])
+
+# ═══════════════════════════════════════════
+# 2. RICHGRAM PLAYER BUTTONS (For play.py & calls.py - Gol Shape)
+# ═══════════════════════════════════════════
 def player_buttons(q, elapsed: int = 0):
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "─" * 7
     
-    timer_row = rich_button_row(
-        rich_button(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style="primary")
-    )
+    timer_row = rich_button_row(rich_button(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style="primary"))
     
     pause_btn = rich_button("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style="success" if q.paused else "primary")
     auto_btn = rich_button(f"🔄 AUTOPLAY: {'ON' if q.chat_id in AUTO_DJ_CHATS else 'OFF'}", callback_data="cb_autoplay", style="success" if q.chat_id in AUTO_DJ_CHATS else "primary")

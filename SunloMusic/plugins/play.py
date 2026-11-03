@@ -127,7 +127,7 @@ async def play_cmd(_, m):
             await speak_in_vc(m.chat.id, f"Ab play ho raha hai, {track.title}")
         await play_stream(m.chat.id, track.url, track.video)
         
-    rich_task = rich_send(m.chat.id, card_text + buttons)
+    rich_task = rich_send(bot, m.chat.id, card_text + buttons)
     play_task = play_with_tts()
     
     sent_msg, _ = await asyncio.gather(rich_task, play_task)

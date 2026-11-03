@@ -140,7 +140,6 @@ async def controls_cb(_, cq: CallbackQuery):
                     await pause_stream(chat_id); q.paused = True; q.paused_at = time.time()
                     await cq.answer("⏸ Paused")
                 
-                # ✅ Rich Edit for pause
                 card_text = rich_heading("🎧🎶 Music Time 🎶🎧", level=3) + rich_kv_table([("🎵 Title", rich_esc(q.now_playing.title)),("⏱ Duration", format_duration(q.now_playing.duration)),("🙋 Requested by", rich_esc(q.now_playing.requester))])
                 await rich_edit(cq.message, card_text + player_buttons(q, elapsed))
             else: await cq.answer("Nothing playing", show_alert=True)

@@ -13,8 +13,6 @@ from SunloMusic.ytdlp import extract_audio, download_media_file, _convert_media
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
 from SunloMusic.database import add_recent, get_group_setting
 from SunloMusic.lyrics import start_live_karaoke
-
-# ✅ RichGram Imports for Timer Updates
 from richgram import rich_send, rich_edit, rich_heading, rich_kv_table, rich_esc
 from SunloMusic.keyboards import player_buttons
 
@@ -140,7 +138,7 @@ async def start_next_song(chat_id, q):
         )
         buttons = player_buttons(q, 0)
         try:
-            sent_msg = await rich_send(chat_id, card_text + buttons)
+            sent_msg = await rich_send(bot_module.bot, chat_id, card_text + buttons)
             q.playing_message_id = sent_msg.id
             try: await sent_msg.pin(disable_notification=True)
             except: pass
