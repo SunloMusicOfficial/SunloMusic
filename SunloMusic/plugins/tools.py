@@ -1,9 +1,11 @@
 import asyncio
 from pyrogram import filters
+from pyrogram.types import Message, CallbackQuery, LinkPreviewOptions
 from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors, admin_only
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, TTS_CHATS, VOICE_CMD_CHATS, get_queue
 from SunloMusic.lyrics import fetch_lyrics_text, start_live_karaoke
+from SunloMusic.keyboards import settings_keyboard
 
 @bot.on_message(filters.command("karaoke") & filters.group)
 @catch_errors
@@ -39,48 +41,68 @@ async def autodj_cmd(_, m):
     state = m.command[1].lower()
     if state == "on":
         AUTO_DJ_CHATS.add(m.chat.id)
-        await m.reply_text("🎧 <b>Auto-DJ Enabled!</b>\nBot will auto-play random songs when queue ends.")
+        await m.reply_text("🎧 <b>Auto-DJ Enabled!</b>")
     elif state == "off":
         AUTO_DJ_CHATS.discard(m.chat.id)
         await m.reply_text("🛑 <b>Auto-DJ Disabled.</b>")
     else:
         await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
 
-# ✅ NEW: TTS Toggle Command
-@bot.on_message(filters.command("tts") & filters.group)
+# ✅ NEW: Premium Settings Dashboard
+@bot.on_message(filters.command("settings") & filters.group)
 @catch_errors
 @admin_only
-async def tts_cmd(_, m):
-    if len(m.command) < 2:
-        return await m.reply_text("❌ <b>Usage:</b> <code>/tts on</code> or <code>/tts off</code>\n<i>(Announces song name in VC)</i>")
+async def settings_cmd(_, m):
+    tts_status = m.chat.id in TTS_CHATS
+    vsearch_status = m.chat.id in VOICE_CMD_CHATS
     
-    state = m.command[1].lower()
-    if state == "on":
-        TTS_CHATS.add(m.chat.id)
-        await m.reply_text("🎙️ <b>J.A.R.V.I.S Mode Enabled!</b>\nBot will announce songs in VC with a female voice.")
-    elif state == "off":
-        TTS_CHATS.discard(m.chat.id)
-        await m.reply_text("🔇 <b>J.A.R.V.I.S Mode Disabled.</b>\nBot will not speak in VC.")
-    else:
-        await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
+    text = (
+        "⚙️ <b>『 GROUP SETTINGS 』</b> ⚙️\n"
+        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        "🎙️ <b>J.A.R.V.I.S Voice:</b> Bot will announce the song name in VC.\n"
+        "🎤 <b>Voice Search:</b> Users can send voice notes to play songs.\n"
+        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        "👇 <i>Click buttons to toggle ON/OFF</i>"
+    )
+    await m.reply_text(text, reply_markup=settings_keyboard(tts_status, vsearch_status), link_preview_options=LinkPreviewOptions(is_disabled=True))
 
-# ✅ NEW: Voice Command Toggle Command
-@bot.on_message(filters.command("vsearch") & filters.group)
+@bot.on_callback_query(filters.regex("^toggle_tts$"))
 @catch_errors
-@admin_only
-async def vsearch_cmd(_, m):
-    if len(m.command) < 2:
-        return await m.reply_text("❌ <b>Usage:</b> <code>/vsearch on</code> or <code>/vsearch off</code>\n<i>(Search songs by sending voice notes)</i>")
-    
-    state = m.command[1].lower()
-    if state == "on":
-        VOICE_CMD_CHATS.add(m.chat.id)
-        await m.reply_text("🎤 <b>Voice Search Enabled!</b>\nSend a voice note saying 'Play [song name]'.")
-    elif state == "off":
-        VOICE_CMD_CHATS.discard(m.chat.id)
-        await m.reply_text("🛑 <b>Voice Search Disabled.</b>")
+async def toggle_tts_cb(_, cq: CallbackQuery):
+    chat_id = cq.message.chat.id
+    if chat_id in TTS_CHATS:
+        TTS_CHATS.discard(chat_id)
+        await cq.answer("🔴 J.A.R.V.I.S Voice Disabled")
     else:
-        await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
+        TTS_CHATS.add(chat_id)
+        await cq.answer("🟢 J.A.R.V.I.S Voice Enabled")
+        
+    tts_status = chat_id in TTS_CHATS
+    vsearch_status = chat_id in VOICE_CMD_CHATS
+    try: await cq.message.edit_reply_markup(reply_markup=settings_keyboard(tts_status, vsearch_status))
+    except: pass
+
+@bot.on_callback_query(filters.regex("^toggle_vsearch$"))
+@catch_errors
+async def toggle_vsearch_cb(_, cq: CallbackQuery):
+    chat_id = cq.message.chat.id
+    if chat_id in VOICE_CMD_CHATS:
+        VOICE_CMD_CHATS.discard(chat_id)
+        await cq.answer("🔴 Voice Search Disabled")
+    else:
+        VOICE_CMD_CHATS.add(chat_id)
+        await cq.answer("🟢 Voice Search Enabled")
+        
+    tts_status = chat_id in TTS_CHATS
+    vsearch_status = chat_id in VOICE_CMD_CHATS
+    try: await cq.message.edit_reply_markup(reply_markup=settings_keyboard(tts_status, vsearch_status))
+    except: pass
+
+@bot.on_callback_query(filters.regex("^close_settings$"))
+@catch_errors
+async def close_settings_cb(_, cq: CallbackQuery):
+    await cq.message.delete()
+    await cq.answer()
 
 @bot.on_message(filters.command("lyrics"))
 @catch_errors

@@ -58,7 +58,6 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
         [more_btn]
     ])
 
-# ✅ NEW: More Menu Keyboard
 def more_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
@@ -70,6 +69,17 @@ def more_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("⏩ ꜱᴇᴇᴋ ɪɴꜰᴏ", callback_data="cb_seek_info", style=ButtonStyle.SUCCESS)
         ],
         [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ᴘʟᴀʏᴇʀ", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
+    ])
+
+# ✅ NEW: Premium Settings Keyboard
+def settings_keyboard(tts_on: bool, vsearch_on: bool) -> InlineKeyboardMarkup:
+    tts_text = "🟢 ᴊ.ᴀ.ʀ.ᴠ.ɪ.ꜱ ᴠᴏɪᴄᴇ: ᴏɴ" if tts_on else "🔴 ᴊ.ᴀ.ʀ.ᴠ.ɪ.ꜱ ᴠᴏɪᴄᴇ: ᴏꜰꜰ"
+    vs_text = "🟢 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏɴ" if vsearch_on else "🔴 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏꜰꜰ"
+    
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(tts_text, callback_data="toggle_tts", style=ButtonStyle.SUCCESS if tts_on else ButtonStyle.DANGER)],
+        [InlineKeyboardButton(vs_text, callback_data="toggle_vsearch", style=ButtonStyle.SUCCESS if vsearch_on else ButtonStyle.DANGER)],
+        [InlineKeyboardButton("🔙 ᴄʟᴏꜱᴇ ꜱᴇᴛᴛɪɴɢꜱ", callback_data="close_settings", style=ButtonStyle.PRIMARY)]
     ])
 
 def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
