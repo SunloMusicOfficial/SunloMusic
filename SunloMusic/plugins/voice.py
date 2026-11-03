@@ -13,7 +13,6 @@ from SunloMusic.queues import get_queue, Track
 from SunloMusic.logger import LOGGER
 import SunloMusic.bot as bot_module
 
-# ✅ Import AudioQuality
 from pytgcalls.types import MediaStream, AudioQuality
 
 groq_client = Groq(api_key=config.GROQ_API_KEY) if config.GROQ_API_KEY else None
@@ -31,10 +30,8 @@ async def speak_in_vc(chat_id: int, text: str):
         await communicate.save(output_file)
         
         if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-            # ✅ FIXED: Added AudioQuality.HIGH
             stream = MediaStream(media_path=output_file, audio_parameters=AudioQuality.HIGH)
             await call.play(chat_id, stream)
-            # Wait for the audio to finish playing based on text length
             await asyncio.sleep(len(text) * 0.1 + 1.5) 
     except Exception as e:
         LOGGER.error(f"TTS Error: {e}")
@@ -48,7 +45,9 @@ async def voice_command_handler(_, m: Message):
     status = await m.reply_text("🎤 <b>Listening...</b>\n<i>Converting your voice to text...</i>")
     
     try:
-        file_path = await m.download()
+        # ✅ FIXED: Explicitly download as .ogg so Groq API accepts it
+        file_path = f"cache/downloads/voice_{m.id}.ogg"
+        await m.download(file_name=file_path)
         
         with open(file_path, "rb") as file:
             transcription = groq_client.audio.transcriptions.create(
@@ -58,7 +57,7 @@ async def voice_command_handler(_, m: Message):
             )
             
         text_query = transcription.text.strip()
-        os.remove(file_path)
+        if os.path.exists(file_path): os.remove(file_path)
         
         if not text_query:
             return await status.edit_text("❌ <b>Could not understand the audio.</b>")

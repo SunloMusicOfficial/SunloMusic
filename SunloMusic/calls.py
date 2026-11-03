@@ -194,6 +194,11 @@ async def start_call():
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none", seek_time: int = 0):
     if not call: return False
     
+    # ✅ FIXED: Prevent FileNotFoundError by checking path
+    if not url.startswith("http") and not os.path.exists(url):
+        LOGGER.error(f"❌ File not found before playing: {url}")
+        return False
+
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
     
@@ -214,7 +219,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         err_str = str(e)
         LOGGER.error(f"Direct Play error: {type(e).__name__} - {err_str}")
         
-        # ✅ EXTRA RETRY FOR TELEGRAM DC ERROR
         if "INTERDC_X_CALL_ERROR" in err_str or "INTERDC_X_CALL_RICH_ERROR" in err_str:
             LOGGER.info("⚠️ Telegram Server Error (DC). Retrying in 5s...")
             await asyncio.sleep(5)
