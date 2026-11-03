@@ -6,80 +6,94 @@ from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors
 from SunloMusic.logger import LOGGER
 
-# ✅ 15+ Advanced Unicode Fonts
+# ✅ 18+ Advanced Unicode Fonts (Including Regional & Small Caps)
 FONTS = {
-    "𝗕𝗼𝗹𝗱": {c: chr(ord(c) + 0x1D5D4 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D5EE - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-    "𝑰𝒕𝒂𝒍𝒊𝒄": {c: chr(ord(c) + 0x1D608 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D622 - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-    "𝓢𝓬𝓻𝓲𝓹𝓽": {c: chr(ord(c) + 0x1D49C - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D4B6 - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"},
-    "𝕯𝖔𝖚𝖇𝖑𝖊": {c: chr(ord(c) + 0x1D538 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D552 - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"},
-    "𝔉𝔯𝔞𝔨𝔱𝔲𝔯": {c: chr(ord(c) + 0x1D504 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D51E - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"},
-    "𝙼𝚘𝚗𝚘": {c: chr(ord(c) + 0x1D670 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D68A - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-    "Ｆｕｌｌ": {c: chr(ord(c) + 0xFF21 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0xFF41 - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
-    "ᴄᴀᴘꜱ": {c: chr(ord(c) + 0x1D00) if 'A' <= c <= 'Z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
-    "Bᴜʙʙʟᴇ": {c: chr(ord(c) + 0x24B6 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x24D0 - 97) if 'a' <= c <= 'z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"},
-    "Sqᴜᴀʀᴇ": {c: chr(ord(c) + 0x1F130 - 65) if 'A' <= c <= 'Z' else c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
+    "𝗕𝗼𝗹𝗱": lambda s: "".join(chr(ord(c) + 0x1D5D4 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D5EE - 97) if 'a' <= c <= 'z' else c for c in s),
+    "𝑰𝒕𝒂𝒍𝒊𝒄": lambda s: "".join(chr(ord(c) + 0x1D608 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D622 - 97) if 'a' <= c <= 'z' else c for c in s),
+    "𝓢𝓬𝓻𝓲𝓹𝓽": lambda s: "".join(chr(ord(c) + 0x1D49C - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D4B6 - 97) if 'a' <= c <= 'z' else c for c in s),
+    "𝕯𝖔𝖚𝖇𝖑𝖊": lambda s: "".join(chr(ord(c) + 0x1D538 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D552 - 97) if 'a' <= c <= 'z' else c for c in s),
+    "𝔉𝔯𝔞𝔨𝔱𝔲𝔯": lambda s: "".join(chr(ord(c) + 0x1D504 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D51E - 97) if 'a' <= c <= 'z' else c for c in s),
+    "𝙼𝚘𝚗𝚘": lambda s: "".join(chr(ord(c) + 0x1D670 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D68A - 97) if 'a' <= c <= 'z' else c for c in s),
+    "Ｆｕｌｌ": lambda s: "".join(chr(ord(c) + 0xFF21 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0xFF41 - 97) if 'a' <= c <= 'z' else c for c in s),
+    "ᴄᴀᴘꜱ": lambda s: "".join(chr(ord(c) + 0x1D00) if 'A' <= c <= 'Z' else c for c in s),
+    "𝐒𝐞𝐫𝐢𝐟": lambda s: "".join(chr(ord(c) + 0x1D400 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D41A - 97) if 'a' <= c <= 'z' else c for c in s),
+    "𝕾𝖆𝖓𝖘": lambda s: "".join(chr(ord(c) + 0x1D5A0 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D5BA - 97) if 'a' <= c <= 'z' else c for c in s),
+    "Ⓒⓘⓡⓒⓛⓔ": lambda s: "".join(chr(ord(c) + 0x24B6 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x24D0 - 97) if 'a' <= c <= 'z' else c for c in s),
+    "🄢🄠🄟": lambda s: "".join(chr(ord(c) + 0x1F130 - 65) if 'A' <= c <= 'Z' else c for c in s),
+    "🇷ᴇɢɪᴏɴᴀʟ": lambda s: "".join(chr(ord(c) + 0x1F1E6 - 65) if 'A' <= c <= 'Z' else c for c in s),
+    "𝕭𝖔𝖑𝖉 𝕱𝖗𝖆𝖐": lambda s: "".join(chr(ord(c) + 0x1D56C - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D586 - 97) if 'a' <= c <= 'z' else c for c in s),
+    "𝑀𝒶𝓉𝒽": lambda s: "".join(chr(ord(c) + 0x1D434 - 65) if 'A' <= c <= 'Z' else chr(ord(c) + 0x1D44E - 97) if 'a' <= c <= 'z' else c for c in s),
+    "ᴛɪɴʏ": lambda s: "".join(chr(ord(c) + 0x1D00) if 'A' <= c <= 'Z' else c for c in s),
+    "🅑🅛🅞🅒🅚": lambda s: "".join(chr(ord(c) + 0x1F150 - 65) if 'A' <= c <= 'Z' else c for c in s),
+    "Ⓝⓔⓖⓐⓣⓘⓥⓔ": lambda s: "".join(chr(ord(c) + 0x1F150 - 65) if 'A' <= c <= 'Z' else c for c in s),
 }
 
-# ✅ 150+ Premium Wrappers
-WRAPPERS = [
-    ("✿્᭄͡", "ᥫ᭡፝֟፝֟"), ("꧁༒☬", "☬༒꧂"), ("༒⚔◥", "◤⚔༒"), ("╰☆☆", "☆☆╮"),
-    ("•´¯`•.", ".•´¯`•"), ("♡", "♡"), ("𓆩", "𓆪"), ("『", "』"), ("▰▱▰", "▰▱▰"),
-    ("✧･ﾟ: *✧", "✧*:･ﾟ✧"), ("⋆｡°✩", "✩°｡⋆"), ("▄︻デ══━一", ""), ("⚡▬▬▬▬", "▬▬▬▬⚡"),
-    ("🍃", "🍃"), ("🔥", "🔥"), ("👑", "👑"), ("🎸", "🎸"), ("⚜️", "⚜️"),
-    ("✨", "✨"), ("🖤", "🖤"), ("💎", "💎"), ("🌙", "🌙"), ("☀️", "☀️"),
-    ("⚡", "⚡"), ("🍷", "🍷"), ("🕊️", "🕊️"), ("🦋", "🦋"), ("🌸", "🌸"),
-    ("⋆", "⋆"), ("✧", "✧"), ("❥", "❥"), ("➳", "➳"), ("☬", "☬"),
-    ("༺", "༻"), ("༼", "༽"), ("【", "】"), ("《", "》"), ("〔", "〕"),
-    ("╭", "╮"), ("╰", "╯"), ("┏", "┓"), ("┗", "┛"), ("┣", "┫"),
-    ("◥", "◤"), ("◢", "◣"), ("▰", "▰"), ("▱", "▱"), ("◆", "◆"),
-    ("◇", "◇"), ("◈", "◈"), ("❖", "❖"), ("✹", "✹"), ("✺", "✺"),
-    ("✵", "✵"), ("✶", "✶"), ("✷", "✷"), ("✸", "✸"), ("✹", "✹"),
-    ("⚘", "⚘"), ("⚚", "⚚"), ("⚝", "⚝"), ("⚞", "⚟"), ("⛧", "⛧"),
-    ("☥", "☥"), ("☬", "☬"), ("☯", "☯"), ("♆", "♆"), ("♨", "♨"),
-    ("⚔️", "⚔️"), ("🛡️", "🛡️"), ("🗡️", "🗡️"), ("🏹", "🏹"), ("🔱", "🔱"),
-    ("🎧", "🎧"), ("🎤", "🎤"), ("🎼", "🎼"), ("🎹", "🎹"), ("🥁", "🥁"),
-    ("⭐", "⭐"), ("🌟", "🌟"), ("💫", "💫"), ("🌠", "🌠"), ("☄️", "☄️"),
-    ("🌪️", "🌪️"), ("🌊", "🌊"), ("🏔️", "🏔️"), ("🌋", "🌋"), ("🌌", "🌌"),
-    ("🍁", "🍁"), ("🍂", "🍂"), ("🌿", "🌿"), ("☘️", "☘️"), ("🍀", "🍀"),
-    ("🌹", "🌹"), ("🥀", "🥀"), ("🌺", "🌺"), ("🌻", "🌻"), ("🌼", "🌼"),
-    ("🦅", "🦅"), ("🦁", "🦁"), ("🐉", "🐉"), ("🦄", "🦄"), ("🐺", "🐺"),
-    ("👾", "👾"), ("👽", "👽"), ("🤖", "🤖"), ("💀", "💀"), ("☠️", "☠️"),
-    ("👻", "👻"), ("😈", "😈"), ("👿", "👿"), ("🤍", "🤍"), ("💙", "💙"),
-    ("💚", "💚"), ("💛", "💛"), ("🧡", "🧡"), ("❤️", "❤️"), ("💜", "💜"),
-    ("🖤", "🖤"), ("🤎", "🤎"), ("💔", "💔"), ("❣️", "❣️"), ("💕", "💕"),
-    ("║▌│█│║▌║", "║▌│█│║▌║"), ("[̲̅", "̲̅]"), ("⫷", "⫸"), ("⚡", "⚡"),
-    ("꧁", "꧂"), ("♛", "♛"), ("⚜", "⚜"), ("༄", "༄"), ("⁀➷", "")
+# ✅ 150+ Heavy Aesthetic Frames (Derived from your examples)
+FRAMES = [
+    "✿્᭄͡ {} ᥫ᭡፝֟፝֟", "꧁༒☬{}☬༒꧂", "༒⚔◥ {} ◤⚔༒", "╰☆☆ {} ☆☆╮",
+    "•´¯`•. {} .•´¯`•", "♡ {} ♡", "𓆩 {} 𓆪", "『 {} 』", "▰▱▰ {} ▰▱▰",
+    "✧･ﾟ: *✧ {} ✧*:･ﾟ✧", "⋆｡°✩ {} ✩°｡⋆", "▄︻デ══━一 {}", "⚡▬▬▬▬ {} ▬▬▬▬⚡",
+    "─╼⃝𖠁{}𖠁⃝╾─•", "⃝🌸𓆩{}𓆪⃟👑", "ᶜᵘᵗᵉ།{}͠", "○༄ {} •》👑", "♡ {} ♡",
+    "🕊️⃝‌❥┽✖ᶦᶰᵈ᭄༺{}༻♕❤", "👑⃟🕊≛⃝{} ≛⃝🕊👑⃟", "𝄞ꠋꠋꠋ┼𝆺𝅥⃝ᶦϻ‌ᵛ‌ᵎᵖ ≛⃝❥︎︎𓆩{}𓆪≛⃝❥︎︎𖣔ꠋꠋꠋ",
+    "─⃝➤ {}", "╰┈➤ {}", "⫸ {} ⫷", "➳ {} ➳", "☬ {} ☬", "༺ {} ༻", "༼ {} ༽", "【 {} 】", "《 {} 》", "〔 {} 〕",
+    "╭ {} ╮", "╰ {} ╯", "┏ {} ┓", "┗ {} ┛", "▰ {} ▰", "◥ {} ◤", "◢ {} ◣", "◆ {} ◆", "❖ {} ❖", "✹ {} ✹",
+    "✵ {} ✵", "✶ {} ✶", "✷ {} ✷", "✸ {} ✸", "⚘ {} ⚘", "⚚ {} ⚚", "⚝ {} ⚝", "⛧ {} ⛧", "☥ {} ☥", "☯ {} ☯",
+    "♆ {} ♆", "⚔️ {} ⚔️", "🛡️ {} 🛡️", "🗡️ {} 🗡️", "🔱 {} 🔱", "🎧 {} 🎧", "🎤 {} 🎤", "🎼 {} 🎼", "🎹 {} 🎹",
+    "🥁 {} 🥁", "⭐ {} ⭐", "🌟 {} 🌟", "💫 {} 💫", "🌠 {} 🌠", "☄️ {} ☄️", "🌪️ {} 🌪️", "🌊 {} 🌊", "🏔️ {} 🏔️",
+    "🌋 {} 🌋", "🌌 {} 🌌", "🍁 {} 🍁", "🍂 {} 🍂", "🌿 {} 🌿", "☘️ {} ☘️", "🍀 {} 🍀", "🌹 {} 🌹", "🥀 {} 🥀",
+    "🌺 {} 🌺", "🌻 {} 🌻", "🌼 {} 🌼", "🦅 {} 🦅", "🦁 {} 🦁", "🐉 {} 🐉", "🦄 {} 🦄", "🐺 {} 🐺", "👾 {} 👾",
+    "👽 {} 👽", "🤖 {} 🤖", "💀 {} 💀", "☠️ {} ☠️", "👻 {} 👻", "😈 {} 😈", "👿 {} 👿", "💙 {} 💙", "💚 {} 💚",
+    "💛 {} 💛", "🧡 {} 🧡", "❤️ {} ❤️", "💜 {} 💜", "🖤 {} 🖤", "🤎 {} 🤎", "💔 {} 💔", "❣️ {} ❣️", "💕 {} 💕",
+    "║▌│█│║▌║ {} ║▌│█│║▌║", "[̲̅{}̲̅]", "░▒▓█ {} █▓▒░", "╔═══ {} ═══╗", "╚═══ {} ═══╝",
+    "•┈••✦ {} ✦••┈•", "─── ⋆⋅☆⋅⋆ ── {} ── ⋆⋅☆⋅⋆ ──", "✩ ₊˚ {} ⊹♡", "♱ {} ♱", "⸸ {} ⸸"
 ]
 
-def apply_font(text: str, font_map: dict) -> str:
-    return "".join(font_map.get(c, c) for c in text)
+EMOJIS = ["🌸", "🦋", "🍃", "🔥", "👑", "🎸", "⚜️", "✨", "🖤", "💎", "🌙", "☀️", "⚡", "🍷", "🕊️", "💀", "☠️", "👾", "🤖", "❤️", "💙", "💚", "💛", "🧡", "💜", "🤍", "🤎", "💔", "💕", "❣️", "🎵", "🎶", "🎧", "🎤", "🎼", "🎹", "🥁", "🎷", "🎺", "🎻"]
 
 def generate_styles(name: str) -> list:
-    styles = []
+    styles = set()
+    stylized_names = {f_name: func(name) for f_name, func in FONTS.items()}
     
-    # 1. Font Variations (Plain)
-    for font_name, mapping in FONTS.items():
-        styles.append(apply_font(name, mapping))
-        
-    # 2. Font Variations with Wrappers (Massive Combinations)
-    for font_name, mapping in FONTS.items():
-        styled_name = apply_font(name, mapping)
-        for pre, suf in WRAPPERS:
-            styles.append(f"{pre} {styled_name} {suf}")
+    # 1. Pure Emoji + Font + Emoji
+    for s_name in stylized_names.values():
+        for emoji in EMOJIS:
+            styles.add(f"{emoji} {s_name} {emoji}")
             
-    # 3. Normal Name with Wrappers
-    for pre, suf in WRAPPERS:
-        styles.append(f"{pre} {name} {suf}")
-        
-    # 4. Special Zalgo / Cursed Text (Randomized)
-    for _ in range(10):
-        zalgo_name = "".join([c + "".join([chr(random.randint(0x0300, 0x036F)) for _ in range(2)]) for c in name])
-        styles.append(f"☠️ {zalgo_name} ☠️")
+    # 2. Apply all frames to all fonts
+    for s_name in stylized_names.values():
+        for frame in FRAMES:
+            styles.add(frame.format(s_name))
 
-    # Remove duplicates and shuffle slightly to mix fonts
-    unique_styles = list(dict.fromkeys(styles))
-    random.shuffle(unique_styles)
-    return unique_styles
+    # 3. Double Emoji + Frame
+    for s_name in stylized_names.values():
+        for i in range(0, len(FRAMES), 3):
+            frame = FRAMES[i]
+            emo1 = random.choice(EMOJIS)
+            emo2 = random.choice(EMOJIS)
+            styles.add(f"{emo1} {frame.format(s_name)} {emo2}")
+
+    # 4. Special Strikethrough / Underline / Zalgo
+    for s_name in stylized_names.values():
+        styles.add("".join([c + "\u0336" for c in s_name]))
+        styles.add("".join([c + "\u0332" for c in s_name]))
+        
+    # 5. Mix and Match until 600+ styles
+    all_frames = FRAMES + [""]
+    all_names = list(stylized_names.values())
+    
+    while len(styles) < 600:
+        frame = random.choice(all_frames)
+        nm = random.choice(all_names)
+        emo1 = random.choice(EMOJIS + [""])
+        emo2 = random.choice(EMOJIS + [""])
+        sp = random.choice([" ", "  ", "", " "])
+        
+        base = frame.format(nm) if frame else nm
+        styles.add(f"{emo1}{sp}{base}{sp}{emo2}".strip())
+
+    style_list = list(styles)
+    random.shuffle(style_list)
+    return style_list
 
 # ✅ In-Memory Cache for Pagination
 STYLE_CACHE = {}
@@ -115,7 +129,7 @@ async def send_style_page(message_obj, user_id: int, page: int, is_edit: bool = 
     styles = data["styles"]
     name = data["name"]
     
-    items_per_page = 25
+    items_per_page = 20
     total_pages = math.ceil(len(styles) / items_per_page)
     page = max(1, min(page, total_pages))
     
@@ -123,7 +137,7 @@ async def send_style_page(message_obj, user_id: int, page: int, is_edit: bool = 
     end_idx = start_idx + items_per_page
     page_styles = styles[start_idx:end_idx]
     
-    # Formatting the Premium Card
+    # Premium Card Format
     text = (
         f"✨ <b>『 ᴘʀᴇᴍɪᴜᴍ ꜱᴛʏʟᴇꜱ 』</b> ✨\n"
         f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
@@ -171,7 +185,7 @@ async def style_pagination_cb(_, cq: CallbackQuery):
     page = int(page)
     
     if cq.from_user.id != user_id:
-        return await cq.answer("🚫 Ye tumhare liye nahi hai! /style command use karo.", show_alert=True)
+        return await cq.answer("🚫 Ye tumhare liye nahi hai! Khud /style command use karo.", show_alert=True)
         
     await send_style_page(cq.message, user_id, page, is_edit=True)
     await cq.answer()
