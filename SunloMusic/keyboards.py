@@ -53,7 +53,6 @@ def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton("❌ ʀᴇᴍᴏᴠᴇ", callback_data=f"cb_del_{track_hash}", style=ButtonStyle.DANGER)]
     ])
 
-# ✅ NORMAL PLAYER KEYBOARD (For trending.py & voteplay.py)
 def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
@@ -73,12 +72,12 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
         [more_btn]
     ])
 
-# ✅ RICH PLAYER BUTTONS (For play.py & calls.py)
 def player_buttons(q, elapsed: int = 0):
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "─" * 7
     
+    # Colorful Styles
     timer_row = rich_button_row(rich_button(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style="primary"))
     
     pause_btn = rich_button("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style="success" if q.paused else "primary")
@@ -93,7 +92,6 @@ def player_buttons(q, elapsed: int = 0):
     
     return timer_row + row2 + row3 + more_btn
 
-# ✅ RICH MORE MENU (4 Pages)
 def more_buttons(q, page: int = 1):
     if page == 1:
         row1 = rich_button_row(rich_button("📋 QUEUE", callback_data="cb_q_show", style="primary"), rich_button("🔀 SHUFFLE", callback_data="cb_q_shuffle", style="success"))
