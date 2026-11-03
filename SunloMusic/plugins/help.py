@@ -64,7 +64,9 @@ HELP_TEXTS = {
         "<b>💝 Dedication:</b>\n"
         "<code>/dedicate @user song</code>\n\n"
         "<b>🤖 AI Voice Features:</b>\n"
-        "<code>/settings</code> — Toggle J.A.R.V.I.S & Voice Search"
+        "<code>/settings</code> — Toggle SunloMusic AI & Voice Search\n\n"
+        "<b>✨ Styling:</b>\n"
+        "<code>/style YourName</code> — Get 200+ Premium Name Designs"
     ),
     "admin": (
         "<b>🛡 Admin & Sudo Commands</b>\n"
@@ -105,7 +107,7 @@ ALL_COMMANDS_TEXT = (
     "<b>🎛 Effects & Tools</b>\n"
     "/bass • /8d • /nightcore • /reset • /sleep\n"
     "/karaoke • /autodj • /lyrics • /dedicate\n"
-    "/settings\n\n"
+    "/settings • /style\n\n"
     "<b>❤️ Favorites</b>\n"
     "/like • /favorites • /playfav\n\n"
     "<b>📀 Personal Playlist</b>\n"
