@@ -1,4 +1,4 @@
-import base64, json
+import base64, json, time
 from pyrogram import filters, enums
 from pyrogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Message, LinkPreviewOptions
 from SunloMusic.bot import bot
@@ -9,7 +9,7 @@ from SunloMusic.ytdlp import extract_audio
 from SunloMusic.decorators import catch_errors
 from pyrogram.enums import ButtonStyle
 
-# ✅ Added {user_mention} for clickable name
+# ✅ EXPANDABLE MESSAGE (Arrow wala feature)
 START_CAPTION = (
     "<blockquote expandable>"
     "<b>🎶 Welcome to SunloMusic 🎶</b>\n\n"
@@ -44,6 +44,23 @@ async def start_cmd(_, m):
         )
 
     await add_user(m.from_user.id, m.from_user.first_name)
+    
+    # ✅ RESTORED & PREMIUM LOG MESSAGE
+    log_text = (
+        f"<b>🚀 『 ɴᴇᴡ ᴜꜱᴇʀ ꜱᴛᴀʀᴛᴇᴅ ʙᴏᴛ 』 🚀</b>\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        f"👤 <b>Name:</b> {m.from_user.mention}\n"
+        f"🆔 <b>ID:</b> <code>{m.from_user.id}</code>\n"
+        f"🔗 <b>Username:</b> @{m.from_user.username if m.from_user.username else 'None'}\n"
+        f"▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        f"⏱ <b>Time:</b> <code>{time.strftime('%Y-%m-%d %H:%M:%S')}</code>"
+    )
+    if config.LOGGER_ID:
+        try: await bot.send_message(config.LOGGER_ID, log_text)
+        except: pass
+    if config.OWNER_ID:
+        try: await bot.send_message(config.OWNER_ID, log_text)
+        except: pass
     
     if len(m.command) > 1 and m.command[1].startswith("dl_"):
         b64_query = m.command[1][3:]
