@@ -2,6 +2,7 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInf
 from pyrogram.enums import ButtonStyle
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration, make_progress_bar
+from SunloMusic.queues import AUTO_DJ_CHATS
 
 def start_keyboard() -> InlineKeyboardMarkup:
     WEB_APP_URL = "https://sunlomusic.onrender.com/app"
@@ -37,52 +38,91 @@ def help_back_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ʜᴇʟᴘ", callback_data="help_menu", style=ButtonStyle.DANGER)]
     ])
 
+# ✅ UNIQUE PREMIUM LAYOUT (Wide Pill Style)
 def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
-    bar = make_progress_bar(elapsed, q.now_playing.duration, length=8) if q.now_playing else "▭" * 8
     
-    timer_btn = InlineKeyboardButton(f"✨ {elapsed_str} {bar} {dur_str} ✨", callback_data="cb_timer", style=ButtonStyle.PRIMARY)
+    # Elegant Progress Bar
+    bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "▭" * 7
+    
+    timer_btn = InlineKeyboardButton(
+        f"✨ {elapsed_str} {bar} {dur_str} ✨", 
+        callback_data="cb_timer", 
+        style=ButtonStyle.PRIMARY
+    )
+    
     pause_text = "▶️ ʀᴇꜱᴜᴍᴇ" if q.paused else "⏸ ᴘᴀᴜꜱᴇ"
-    pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause", style=ButtonStyle.SUCCESS)
-    loop_text = "🔁 ʟᴏᴏᴘ ᴏꜰꜰ" if q.loop == 0 else ("🔂 ʟᴏᴏᴘ ᴏɴᴇ" if q.loop == 1 else "🔁 ʟᴏᴏᴘ ᴀʟʟ")
-    loop_btn = InlineKeyboardButton(loop_text, callback_data="cb_loop", style=ButtonStyle.SUCCESS)
-    skip_btn = InlineKeyboardButton("⏭ ꜱᴋɪᴘ", callback_data="cb_skip", style=ButtonStyle.DANGER)
-    stop_btn = InlineKeyboardButton("⏹ ꜱᴛᴏᴘ", callback_data="cb_stop", style=ButtonStyle.DANGER)
-    more_btn = InlineKeyboardButton("🎵 ᴍᴏʀᴇ", callback_data="cb_more", style=ButtonStyle.PRIMARY)
+    pause_btn = InlineKeyboardButton(
+        f"[ {pause_text} ]", 
+        callback_data="cb_pause", 
+        style=ButtonStyle.SUCCESS
+    )
     
+    skip_btn = InlineKeyboardButton(
+        "[ ⏭ ꜱᴋɪᴘ ]", 
+        callback_data="cb_skip", 
+        style=ButtonStyle.PRIMARY
+    )
+    
+    loop_status = "ᴏɴ" if q.loop > 0 else "ᴏꜰꜰ"
+    loop_btn = InlineKeyboardButton(
+        f"[ 🔁 ʟᴏᴏᴘ: {loop_status} ]", 
+        callback_data="cb_loop", 
+        style=ButtonStyle.SUCCESS if q.loop > 0 else ButtonStyle.PRIMARY
+    )
+    
+    auto_status = "ᴏɴ" if q.chat_id in AUTO_DJ_CHATS else "ᴏꜰꜰ"
+    auto_btn = InlineKeyboardButton(
+        f"[ 🔄 ᴀᴜᴛᴏ: {auto_status} ]", 
+        callback_data="cb_autoplay", 
+        style=ButtonStyle.SUCCESS if q.chat_id in AUTO_DJ_CHATS else ButtonStyle.PRIMARY
+    )
+    
+    more_btn = InlineKeyboardButton(
+        "[ 🎛 ᴍᴏʀᴇ ]", 
+        callback_data="cb_more", 
+        style=ButtonStyle.PRIMARY
+    )
+    
+    stop_btn = InlineKeyboardButton(
+        "[ ❌ ᴄʟᴏꜱᴇ ]", 
+        callback_data="cb_stop", 
+        style=ButtonStyle.DANGER
+    )
+
+    # 2-Column Layout for wider buttons
     return InlineKeyboardMarkup([
         [timer_btn],
-        [pause_btn, loop_btn],
-        [skip_btn, stop_btn],
-        [more_btn]
+        [pause_btn, skip_btn],
+        [loop_btn, auto_btn],
+        [more_btn, stop_btn]
     ])
 
 def more_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📋 ǫᴜᴇᴜᴇ", callback_data="cb_q_show", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("🔀 ꜱʜᴜꜰꜰʟᴇ", callback_data="cb_q_shuffle", style=ButtonStyle.SUCCESS)
+            InlineKeyboardButton("[ 📋 ǫᴜᴇᴜᴇ ]", callback_data="cb_q_show", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("[ 🔀 ꜱʜᴜꜰꜰʟᴇ ]", callback_data="cb_q_shuffle", style=ButtonStyle.SUCCESS)
         ],
         [
-            InlineKeyboardButton("📁 ᴇxᴘᴏʀᴛ", callback_data="cb_q_export", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("⏩ ꜱᴇᴇᴋ ɪɴꜰᴏ", callback_data="cb_seek_info", style=ButtonStyle.SUCCESS)
+            InlineKeyboardButton("[ 📁 ᴇxᴘᴏʀᴛ ]", callback_data="cb_q_export", style=ButtonStyle.PRIMARY),
+            InlineKeyboardButton("[ ⏩ ꜱᴇᴇᴋ ɪɴꜰᴏ ]", callback_data="cb_seek_info", style=ButtonStyle.SUCCESS)
         ],
-        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ᴘʟᴀʏᴇʀ", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
+        [InlineKeyboardButton("[ 🔙 ʙᴀᴄᴋ ᴛᴏ ᴘʟᴀʏᴇʀ ]", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
     ])
 
-# ✅ UPDATED: SunloMusic AI Text
 def settings_keyboard(tts_on: bool, vsearch_on: bool) -> InlineKeyboardMarkup:
-    tts_text = "🟢 ꜱᴜɴʟᴏᴍᴜꜱɪᴄ ᴀɪ: ᴏɴ" if tts_on else "🔴 ꜱᴜɴʟᴏᴍᴜꜱɪᴄ ᴀɪ: ᴏꜰꜰ"
-    vs_text = "🟢 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏɴ" if vsearch_on else "🔴 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏꜰꜰ"
+    tts_text = "[ 🟢 ꜱᴜɴʟᴏ ᴀɪ: ᴏɴ ]" if tts_on else "[ 🔴 ꜱᴜɴʟᴏ ᴀɪ: ᴏꜰꜰ ]"
+    vs_text = "[ 🟢 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏɴ ]" if vsearch_on else "[ 🔴 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏꜰꜰ ]"
     
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(tts_text, callback_data="toggle_tts", style=ButtonStyle.SUCCESS if tts_on else ButtonStyle.DANGER)],
         [InlineKeyboardButton(vs_text, callback_data="toggle_vsearch", style=ButtonStyle.SUCCESS if vsearch_on else ButtonStyle.DANGER)],
-        [InlineKeyboardButton("🔙 ᴄʟᴏꜱᴇ ꜱᴇᴛᴛɪɴɢꜱ", callback_data="close_settings", style=ButtonStyle.PRIMARY)]
+        [InlineKeyboardButton("[ 🔙 ᴄʟᴏꜱᴇ ꜱᴇᴛᴛɪɴɢꜱ ]", callback_data="close_settings", style=ButtonStyle.PRIMARY)]
     ])
 
 def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("❌ ʀᴇᴍᴏᴠᴇ ꜰʀᴏᴍ ǫᴜᴇᴜᴇ", callback_data=f"cb_del_{track_hash}", style=ButtonStyle.DANGER)]
+        [InlineKeyboardButton("[ ❌ ʀᴇᴍᴏᴠᴇ ꜰʀᴏᴍ ǫᴜᴇᴜᴇ ]", callback_data=f"cb_del_{track_hash}", style=ButtonStyle.DANGER)]
     ])

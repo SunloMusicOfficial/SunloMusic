@@ -5,7 +5,7 @@ from SunloMusic.bot import bot
 from SunloMusic.calls import pause_stream, resume_stream, stop_stream, start_next_song, play_stream, update_live_timer, call
 from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import is_sudo
-from SunloMusic.queues import get_queue, clear_queue
+from SunloMusic.queues import get_queue, clear_queue, AUTO_DJ_CHATS
 from SunloMusic.texts import NOT_PLAYING_TEXT
 from SunloMusic.keyboards import player_keyboard, more_menu_keyboard
 from SunloMusic.formatters import format_duration
@@ -121,7 +121,7 @@ async def controls_cb(_, cq: CallbackQuery):
     chat_id = cq.message.chat.id
     user = cq.from_user
     
-    if action not in ["cb_more", "cb_close", "cb_timer", "cb_back_player", "cb_seek_info", "cb_q_show", "cb_q_shuffle", "cb_q_export"]:
+    if action not in ["cb_more", "cb_close", "cb_timer", "cb_back_player", "cb_seek_info", "cb_q_show", "cb_q_shuffle", "cb_q_export", "cb_autoplay"]:
         is_admin = False
         if await is_sudo(user.id): is_admin = True
         else:
@@ -168,6 +168,18 @@ async def controls_cb(_, cq: CallbackQuery):
             except: pass
             modes = {0: "Off", 1: "One", 2: "All"}
             await cq.answer(f"🔁 Loop: {modes[q.loop]}")
+
+        elif action == "cb_autoplay":
+            if chat_id in AUTO_DJ_CHATS:
+                AUTO_DJ_CHATS.discard(chat_id)
+                await cq.answer("🔄 Autoplay Disabled!")
+            else:
+                AUTO_DJ_CHATS.add(chat_id)
+                await cq.answer("🔄 Autoplay Enabled!")
+            
+            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
+            try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
+            except: pass
             
         elif action == "cb_more":
             try: await cq.message.edit_reply_markup(reply_markup=more_menu_keyboard())
