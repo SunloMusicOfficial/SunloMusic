@@ -72,58 +72,46 @@ async def stop_cmd(_, m: Message):
     clear_queue(m.chat.id)
     await m.reply_text("⏹ <b>Stopped and Assistant left VC!</b>")
 
-# ✅ FIXED: Relative Seek (e.g., /seek 30 or /seek -10 or /seek 1:30)
 @bot.on_message(filters.command("seek") & filters.group)
 @catch_errors
 @admin_only
 async def seek_cmd(_, m: Message):
+    try: await m.delete()
+    except: pass
     if len(m.command) < 2:
-        return await m.reply_text(
-            "❌ <b>Usage:</b>\n"
-            "<code>/seek 30</code> — Skip 30s forward\n"
-            "<code>/seek -10</code> — Skip 10s backward\n"
-            "<code>/seek 1:30</code> — Jump to 1m 30s"
-        )
+        return await m.reply_text("❌ <b>Usage:</b> <code>/seek 1:30</code> or <code>/seek 90</code>")
         
     q = get_queue(m.chat.id)
     if not q.now_playing:
         return await m.reply_text(NOT_PLAYING_TEXT)
         
     time_str = m.command[1]
-    target_time = 0
-    
+    seconds = 0
     try:
         if ":" in time_str:
-            # Absolute time (MM:SS)
             parts = list(map(int, time_str.split(':')))
-            if len(parts) == 2: target_time = parts[0] * 60 + parts[1]
-            elif len(parts) == 3: target_time = parts[0] * 3600 + parts[1] * 60 + parts[2]
+            if len(parts) == 2: seconds = parts[0] * 60 + parts[1]
+            elif len(parts) == 3: seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
         else:
-            # Relative time (+30 or -10)
-            seconds_to_add = int(time_str)
-            current_elapsed = int(time.time() - q.start_time - q.total_paused)
-            target_time = current_elapsed + seconds_to_add
+            seconds = int(time_str)
     except:
-        return await m.reply_text("❌ <b>Invalid time format.</b> Use <code>30</code> or <code>1:30</code>")
+        return await m.reply_text("❌ <b>Invalid time format.</b> Use <code>1:30</code> or <code>90</code>")
         
-    if target_time < 0:
-        target_time = 0
-    if q.now_playing.duration > 0 and target_time >= q.now_playing.duration:
-        target_time = q.now_playing.duration - 2
+    if seconds >= q.now_playing.duration:
+        return await m.reply_text("❌ <b>Seek time is greater than song duration!</b>")
         
-    status = await m.reply_text(f"⏳ <b>Seeking to {format_duration(target_time)}...</b>")
+    status = await m.reply_text(f"⏳ <b>Seeking to {format_duration(seconds)}...</b>")
     
-    # Restart stream at new position
-    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, seek_time=target_time)
+    await play_stream(m.chat.id, q.now_playing.url, q.now_playing.video, seek_time=seconds)
     
-    q.start_time = time.time() - target_time
+    q.start_time = time.time() - seconds
     q.total_paused = 0
     q.paused = False
     
     await status.delete()
     try:
         if q.playing_message_id:
-            await bot.edit_message_reply_markup(m.chat.id, q.playing_message_id, reply_markup=player_keyboard(q, target_time))
+            await bot.edit_message_reply_markup(m.chat.id, q.playing_message_id, reply_markup=player_keyboard(q, seconds))
     except: pass
 
 @bot.on_callback_query(filters.regex("^cb_"))

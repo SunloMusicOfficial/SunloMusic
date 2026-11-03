@@ -9,8 +9,9 @@ from SunloMusic.decorators import catch_errors
 from SunloMusic.config import config
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.calls import play_stream, call
-from SunloMusic.queues import get_queue, Track, TTS_CHATS, VOICE_CMD_CHATS
+from SunloMusic.queues import get_queue, Track
 from SunloMusic.logger import LOGGER
+from SunloMusic.database import get_group_setting
 import SunloMusic.bot as bot_module
 
 from pytgcalls.types import MediaStream, AudioQuality
@@ -21,13 +22,12 @@ TTS_DIR = "cache/tts"
 os.makedirs(TTS_DIR, exist_ok=True)
 
 async def speak_in_vc(chat_id: int, text: str):
-    # ✅ Check if TTS is enabled for this chat
-    if chat_id not in TTS_CHATS: return
+    # ✅ Check DB for TTS status
+    if not await get_group_setting(chat_id, "tts", False): return
     
     q = get_queue(chat_id)
     if not call: return
     try:
-        # ✅ INDIAN HINDI FEMALE VOICE (Human-like)
         voice = "hi-IN-SwaraNeural" 
         output_file = f"{TTS_DIR}/voice_{chat_id}_{int(time.time())}.mp3"
         
@@ -39,7 +39,6 @@ async def speak_in_vc(chat_id: int, text: str):
             stream = MediaStream(media_path=output_file, audio_parameters=AudioQuality.HIGH)
             await call.play(chat_id, stream)
             
-            # Wait for TTS to finish based on text length
             await asyncio.sleep(len(text) * 0.1 + 2.0) 
             q.is_playing_tts = False
     except Exception as e:
@@ -48,11 +47,11 @@ async def speak_in_vc(chat_id: int, text: str):
 @bot.on_message(filters.voice & filters.group)
 @catch_errors
 async def voice_command_handler(_, m: Message):
-    # ✅ Check if Voice Search is enabled for this chat
-    if m.chat.id not in VOICE_CMD_CHATS: return
+    # ✅ Check DB for Voice Search status
+    if not await get_group_setting(m.chat.id, "vsearch", False): return
     
     if not groq_client or not config.GROQ_API_KEY:
-        return await m.reply_text("❌ <b>GROQ_API_KEY is missing!</b>\nPlease add it in Render Environment.")
+        return await m.reply_text("❌ <b>GROQ_API_KEY is missing!</b>")
         
     status = await m.reply_text("🎤 <b>SunloMusic AI is listening...</b>\n<i>Samajh raha hu, ek second...</i>")
     

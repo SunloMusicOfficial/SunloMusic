@@ -13,6 +13,7 @@ from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
 from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio, download_media_file, _convert_media
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
+from SunloMusic.database import get_group_setting
 from SunloMusic.lyrics import start_live_karaoke
 
 call = None
@@ -107,6 +108,8 @@ async def update_live_timer(chat_id, msg_id):
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import Track, clear_queue
     from SunloMusic.database import add_recent
+    from SunloMusic.plugins.voice import speak_in_vc
+    
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
     if q.playing_message_id:
@@ -131,6 +134,10 @@ async def start_next_song(chat_id, q):
             try: await bot_module.bot.delete_messages(chat_id, nxt.message_id)
             except: pass
             nxt.message_id = 0
+
+        # ✅ Announce Next Song
+        if await get_group_setting(chat_id, "tts", False):
+            await speak_in_vc(chat_id, f"Agla gaana, {nxt.title}")
 
         await play_stream(chat_id, nxt.url, nxt.video)
         q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
@@ -163,6 +170,10 @@ async def start_next_song(chat_id, q):
         q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         if chat_id in KARAOKE_CHATS: q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
+        # ✅ Announce Queue Empty
+        if await get_group_setting(chat_id, "tts", False):
+            await speak_in_vc(chat_id, "Queue khatam ho gayi hai, main VC se nikal raha hu. Dhanyawad!")
+            
         try:
             if call: await call.leave_call(chat_id)
         except: pass
@@ -176,7 +187,6 @@ async def stream_end_handler(client, update: StreamEnded):
     chat_id = update.chat_id
     q = get_queue(chat_id)
     
-    # ✅ FIXED: TTS khatam hone par VC leave mat karo
     if getattr(q, "is_playing_tts", False):
         q.is_playing_tts = False
         return

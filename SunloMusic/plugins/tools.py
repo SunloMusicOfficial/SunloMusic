@@ -3,14 +3,17 @@ from pyrogram import filters
 from pyrogram.types import Message, CallbackQuery, LinkPreviewOptions
 from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors, admin_only
-from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, TTS_CHATS, VOICE_CMD_CHATS, get_queue
+from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, get_queue
 from SunloMusic.lyrics import fetch_lyrics_text, start_live_karaoke
 from SunloMusic.keyboards import settings_keyboard
+from SunloMusic.database import get_group_setting, set_group_setting
 
 @bot.on_message(filters.command("karaoke") & filters.group)
 @catch_errors
 @admin_only
 async def karaoke_cmd(_, m):
+    try: await m.delete()
+    except: pass
     if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/karaoke on</code>")
     state = m.command[1].lower()
     
@@ -34,6 +37,8 @@ async def karaoke_cmd(_, m):
 @catch_errors
 @admin_only
 async def autodj_cmd(_, m):
+    try: await m.delete()
+    except: pass
     if len(m.command) < 2:
         return await m.reply_text("❌ <b>Usage:</b> <code>/autodj on</code> or <code>/autodj off</code>")
     
@@ -49,8 +54,10 @@ async def autodj_cmd(_, m):
 @catch_errors
 @admin_only
 async def settings_cmd(_, m):
-    tts_status = m.chat.id in TTS_CHATS
-    vsearch_status = m.chat.id in VOICE_CMD_CHATS
+    try: await m.delete()
+    except: pass
+    tts_status = await get_group_setting(m.chat.id, "tts", False)
+    vsearch_status = await get_group_setting(m.chat.id, "vsearch", False)
     
     text = (
         "⚙️ <b>『 GROUP SETTINGS 』</b> ⚙️\n"
@@ -66,15 +73,14 @@ async def settings_cmd(_, m):
 @catch_errors
 async def toggle_tts_cb(_, cq: CallbackQuery):
     chat_id = cq.message.chat.id
-    if chat_id in TTS_CHATS:
-        TTS_CHATS.discard(chat_id)
-        await cq.answer("🔴 SunloMusic AI Voice Disabled")
-    else:
-        TTS_CHATS.add(chat_id)
-        await cq.answer("🟢 SunloMusic AI Voice Enabled")
+    current = await get_group_setting(chat_id, "tts", False)
+    new_state = not current
+    await set_group_setting(chat_id, "tts", new_state)
+    
+    await cq.answer("🟢 SunloMusic AI Voice Enabled" if new_state else "🔴 SunloMusic AI Voice Disabled")
         
-    tts_status = chat_id in TTS_CHATS
-    vsearch_status = chat_id in VOICE_CMD_CHATS
+    tts_status = await get_group_setting(chat_id, "tts", False)
+    vsearch_status = await get_group_setting(chat_id, "vsearch", False)
     try: await cq.message.edit_reply_markup(reply_markup=settings_keyboard(tts_status, vsearch_status))
     except: pass
 
@@ -82,15 +88,14 @@ async def toggle_tts_cb(_, cq: CallbackQuery):
 @catch_errors
 async def toggle_vsearch_cb(_, cq: CallbackQuery):
     chat_id = cq.message.chat.id
-    if chat_id in VOICE_CMD_CHATS:
-        VOICE_CMD_CHATS.discard(chat_id)
-        await cq.answer("🔴 Voice Search Disabled")
-    else:
-        VOICE_CMD_CHATS.add(chat_id)
-        await cq.answer("🟢 Voice Search Enabled")
+    current = await get_group_setting(chat_id, "vsearch", False)
+    new_state = not current
+    await set_group_setting(chat_id, "vsearch", new_state)
+    
+    await cq.answer("🟢 Voice Search Enabled" if new_state else "🔴 Voice Search Disabled")
         
-    tts_status = chat_id in TTS_CHATS
-    vsearch_status = chat_id in VOICE_CMD_CHATS
+    tts_status = await get_group_setting(chat_id, "tts", False)
+    vsearch_status = await get_group_setting(chat_id, "vsearch", False)
     try: await cq.message.edit_reply_markup(reply_markup=settings_keyboard(tts_status, vsearch_status))
     except: pass
 
@@ -103,6 +108,8 @@ async def close_settings_cb(_, cq: CallbackQuery):
 @bot.on_message(filters.command("lyrics"))
 @catch_errors
 async def lyrics_cmd(_, m):
+    try: await m.delete()
+    except: pass
     if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/lyrics song name</code>")
     query = " ".join(m.command[1:])
     status = await m.reply_text("🔎 <b>Searching lyrics...</b>")
