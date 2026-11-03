@@ -7,9 +7,10 @@ from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import is_sudo
 from SunloMusic.queues import get_queue, clear_queue, AUTO_DJ_CHATS
 from SunloMusic.texts import NOT_PLAYING_TEXT
-from SunloMusic.keyboards import player_keyboard, more_menu_keyboard
+from SunloMusic.keyboards import player_buttons, more_menu_keyboard
 from SunloMusic.formatters import format_duration
 from SunloMusic.logger import LOGGER
+from richgram import rich_edit, rich_heading, rich_kv_table, rich_esc
 
 @bot.on_message(filters.command(["skip", "next"]) & filters.group)
 @catch_errors
@@ -82,8 +83,7 @@ async def seek_cmd(_, m: Message):
         return await m.reply_text("❌ <b>Usage:</b> <code>/seek 1:30</code> or <code>/seek 90</code>")
         
     q = get_queue(m.chat.id)
-    if not q.now_playing:
-        return await m.reply_text(NOT_PLAYING_TEXT)
+    if not q.now_playing: return await m.reply_text(NOT_PLAYING_TEXT)
         
     time_str = m.command[1]
     seconds = 0
@@ -95,7 +95,7 @@ async def seek_cmd(_, m: Message):
         else:
             seconds = int(time_str)
     except:
-        return await m.reply_text("❌ <b>Invalid time format.</b> Use <code>1:30</code> or <code>90</code>")
+        return await m.reply_text("❌ <b>Invalid time format.</b>")
         
     if seconds >= q.now_playing.duration:
         return await m.reply_text("❌ <b>Seek time is greater than song duration!</b>")
@@ -109,10 +109,6 @@ async def seek_cmd(_, m: Message):
     q.paused = False
     
     await status.delete()
-    try:
-        if q.playing_message_id:
-            await bot.edit_message_reply_markup(m.chat.id, q.playing_message_id, reply_markup=player_keyboard(q, seconds))
-    except: pass
 
 @bot.on_callback_query(filters.regex("^cb_"))
 @catch_errors
@@ -143,8 +139,10 @@ async def controls_cb(_, cq: CallbackQuery):
                 else:
                     await pause_stream(chat_id); q.paused = True; q.paused_at = time.time()
                     await cq.answer("⏸ Paused")
-                try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
-                except: pass
+                
+                # ✅ Rich Edit for pause
+                card_text = rich_heading("🎧🎶 Music Time 🎶🎧", level=3) + rich_kv_table([("🎵 Title", rich_esc(q.now_playing.title)),("⏱ Duration", format_duration(q.now_playing.duration)),("🙋 Requested by", rich_esc(q.now_playing.requester))])
+                await rich_edit(cq.message, card_text + player_buttons(q, elapsed))
             else: await cq.answer("Nothing playing", show_alert=True)
                 
         elif action == "cb_skip":
@@ -161,14 +159,6 @@ async def controls_cb(_, cq: CallbackQuery):
             try: await cq.message.delete()
             except: pass
             
-        elif action == "cb_loop":
-            q.loop = (q.loop + 1) % 3
-            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
-            try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
-            except: pass
-            modes = {0: "Off", 1: "One", 2: "All"}
-            await cq.answer(f"🔁 Loop: {modes[q.loop]}")
-
         elif action == "cb_autoplay":
             if chat_id in AUTO_DJ_CHATS:
                 AUTO_DJ_CHATS.discard(chat_id)
@@ -178,41 +168,17 @@ async def controls_cb(_, cq: CallbackQuery):
                 await cq.answer("🔄 Autoplay Enabled!")
             
             elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
-            try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
-            except: pass
+            card_text = rich_heading("🎧🎶 Music Time 🎶🎧", level=3) + rich_kv_table([("🎵 Title", rich_esc(q.now_playing.title)),("⏱ Duration", format_duration(q.now_playing.duration)),("🙋 Requested by", rich_esc(q.now_playing.requester))])
+            await rich_edit(cq.message, card_text + player_buttons(q, elapsed))
             
         elif action == "cb_more":
-            try: await cq.message.edit_reply_markup(reply_markup=more_menu_keyboard())
-            except: pass
-            await cq.answer()
+            await cq.answer("Use /queue, /shuffle, /seek commands!", show_alert=True)
 
-        elif action == "cb_back_player":
-            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
-            try: await cq.message.edit_reply_markup(reply_markup=player_keyboard(q, elapsed))
-            except: pass
-            await cq.answer()
-
-        elif action == "cb_seek_info":
-            await cq.answer("⏩ Use: /seek 30 (forward) or /seek -10 (backward)", show_alert=True)
-
-        elif action == "cb_q_show":
-            if not q.now_playing and not q.queue:
-                return await cq.answer("Queue is empty.", show_alert=True)
-            text = f"▶️ Playing: {q.now_playing.title[:30] if q.now_playing else 'None'}\n"
-            text += f"⏭ Up Next: {len(q.queue)} songs"
-            await cq.answer(text, show_alert=True)
-
-        elif action == "cb_q_shuffle":
-            if not q.queue:
-                return await cq.answer("Queue is empty.", show_alert=True)
-            random.shuffle(q.queue)
-            await cq.answer("🔀 Queue Shuffled!", show_alert=True)
-
-        elif action == "cb_q_export":
-            if not q.now_playing and not q.queue:
-                return await cq.answer("Queue is empty.", show_alert=True)
-            await cq.answer("Please use /export in chat to get the file.", show_alert=True)
+        elif action == "cb_timer":
+            await cq.answer("Live Timer", show_alert=False)
 
         elif action == "cb_close":
             await cq.message.delete(); await cq.answer()
-    except Exception: pass
+    except Exception as e:
+        LOGGER.error(f"Callback Error: {e}")
+        await cq.answer("An error occurred", show_alert=True)
