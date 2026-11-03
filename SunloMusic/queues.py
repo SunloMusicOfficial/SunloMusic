@@ -29,12 +29,14 @@ class ChatQueue:
     votes: set = field(default_factory=set)
     karaoke_task: Optional[asyncio.Task] = None
     karaoke_msg_id: int = 0
-    is_playing_tts: bool = False # ✅ Added TTS State
+    is_playing_tts: bool = False
 
 _queues: dict[int, ChatQueue] = {}
 
 KARAOKE_CHATS = set()
 AUTO_DJ_CHATS = set()
+TTS_CHATS = set() # ✅ Track TTS Enabled Chats
+VOICE_CMD_CHATS = set() # ✅ Track Voice Command Enabled Chats
 
 def get_queue(chat_id: int) -> ChatQueue:
     if chat_id not in _queues: _queues[chat_id] = ChatQueue(chat_id=chat_id)

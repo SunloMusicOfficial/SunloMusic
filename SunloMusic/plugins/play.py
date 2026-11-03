@@ -6,7 +6,7 @@ from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import catch_errors
 from SunloMusic.database import add_user, SPAM_DICT, add_lb_point, add_recent, is_sudo
-from SunloMusic.queues import get_queue, Track, KARAOKE_CHATS
+from SunloMusic.queues import get_queue, Track, KARAOKE_CHATS, TTS_CHATS
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
@@ -132,10 +132,11 @@ async def play_cmd(_, m):
             except: pass
         return await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
     
-    # ✅ Integrated TTS for /play too
     from SunloMusic.plugins.voice import speak_in_vc
     async def play_with_tts():
-        await speak_in_vc(m.chat.id, f"Now playing, {track.title}")
+        # ✅ Check if TTS is enabled for this chat
+        if m.chat.id in TTS_CHATS:
+            await speak_in_vc(m.chat.id, f"Now playing, {track.title}")
         await play_stream(m.chat.id, track.url, track.video)
         
     sent_msg, _ = await asyncio.gather(send_card(), play_with_tts())

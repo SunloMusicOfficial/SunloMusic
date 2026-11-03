@@ -2,7 +2,7 @@ import asyncio
 from pyrogram import filters
 from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors, admin_only
-from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, get_queue
+from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, TTS_CHATS, VOICE_CMD_CHATS, get_queue
 from SunloMusic.lyrics import fetch_lyrics_text, start_live_karaoke
 
 @bot.on_message(filters.command("karaoke") & filters.group)
@@ -29,7 +29,6 @@ async def karaoke_cmd(_, m):
             q.karaoke_task = None
         await m.reply_text("🎤 <b>Karaoke Mode OFF.</b>")
 
-# ✅ Added /autodj back
 @bot.on_message(filters.command("autodj") & filters.group)
 @catch_errors
 @admin_only
@@ -44,6 +43,42 @@ async def autodj_cmd(_, m):
     elif state == "off":
         AUTO_DJ_CHATS.discard(m.chat.id)
         await m.reply_text("🛑 <b>Auto-DJ Disabled.</b>")
+    else:
+        await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
+
+# ✅ NEW: TTS Toggle Command
+@bot.on_message(filters.command("tts") & filters.group)
+@catch_errors
+@admin_only
+async def tts_cmd(_, m):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/tts on</code> or <code>/tts off</code>\n<i>(Announces song name in VC)</i>")
+    
+    state = m.command[1].lower()
+    if state == "on":
+        TTS_CHATS.add(m.chat.id)
+        await m.reply_text("🎙️ <b>J.A.R.V.I.S Mode Enabled!</b>\nBot will announce songs in VC with a female voice.")
+    elif state == "off":
+        TTS_CHATS.discard(m.chat.id)
+        await m.reply_text("🔇 <b>J.A.R.V.I.S Mode Disabled.</b>\nBot will not speak in VC.")
+    else:
+        await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
+
+# ✅ NEW: Voice Command Toggle Command
+@bot.on_message(filters.command("vsearch") & filters.group)
+@catch_errors
+@admin_only
+async def vsearch_cmd(_, m):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/vsearch on</code> or <code>/vsearch off</code>\n<i>(Search songs by sending voice notes)</i>")
+    
+    state = m.command[1].lower()
+    if state == "on":
+        VOICE_CMD_CHATS.add(m.chat.id)
+        await m.reply_text("🎤 <b>Voice Search Enabled!</b>\nSend a voice note saying 'Play [song name]'.")
+    elif state == "off":
+        VOICE_CMD_CHATS.discard(m.chat.id)
+        await m.reply_text("🛑 <b>Voice Search Disabled.</b>")
     else:
         await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
 

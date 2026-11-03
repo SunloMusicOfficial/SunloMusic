@@ -1,5 +1,5 @@
 from pyrogram import filters
-from pyrogram.types import Message, CallbackQuery, LinkPreviewOptions
+from pyrogram.types import Message, CallbackQuery
 from SunloMusic.bot import bot
 from SunloMusic.config import config
 from SunloMusic.decorators import catch_errors
@@ -50,7 +50,7 @@ HELP_TEXTS = {
         "<code>/eq rock</code> — EQ: bass/pop/rock/jazz/vocal/flat"
     ),
     "effects": (
-        "<b>🎛 Audio Effects</b>\n"
+        "<b>🎛 Audio Effects & Tools</b>\n"
         "━━━━━━━━━━━━━\n\n"
         "<code>/bass</code> — Bass boost\n"
         "<code>/8d</code> — 8D audio\n"
@@ -62,7 +62,10 @@ HELP_TEXTS = {
         "<code>/lyrics song name</code> — Fetch lyrics\n"
         "<code>/autodj on/off</code> — Auto-play\n\n"
         "<b>💝 Dedication:</b>\n"
-        "<code>/dedicate @user song</code>"
+        "<code>/dedicate @user song</code>\n\n"
+        "<b>🤖 AI Voice Features:</b>\n"
+        "<code>/tts on/off</code> — J.A.R.V.I.S Voice Announcements\n"
+        "<code>/vsearch on/off</code> — Voice Note Search (Groq AI)"
     ),
     "admin": (
         "<b>🛡 Admin & Sudo Commands</b>\n"
@@ -99,10 +102,10 @@ ALL_COMMANDS_TEXT = (
     "/pause • /resume • /skip • /stop • /seek • /queue • /export • /clear • /shuffle\n\n"
     "<b>⚡ Audio</b>\n"
     "/speed • /volume • /eq\n\n"
-    "<b>🎛 Effects</b>\n"
-    "/bass • /8d • /nightcore • /reset • /sleep\n\n"
-    "<b>🎤 Tools</b>\n"
-    "/karaoke • /autodj • /lyrics • /dedicate\n\n"
+    "<b>🎛 Effects & Tools</b>\n"
+    "/bass • /8d • /nightcore • /reset • /sleep\n"
+    "/karaoke • /autodj • /lyrics • /dedicate\n"
+    "/tts • /vsearch\n\n"
     "<b>❤️ Favorites</b>\n"
     "/like • /favorites • /playfav\n\n"
     "<b>📀 Personal Playlist</b>\n"
@@ -162,19 +165,21 @@ async def all_commands_cb(_, cq: CallbackQuery):
 @bot.on_callback_query(filters.regex(r"^back_start$"))
 @catch_errors
 async def back_start_cb(_, cq: CallbackQuery):
-    # ✅ UPDATED BACK TO START TEXT
     caption = (
-        "<b>✨ ──『 ꜱᴜɴʟᴏ ᴍᴜꜱɪᴄ 』── ✨</b>\n\n"
-        "🎶 <b>Welcome to SunloMusic!</b>\n"
-        "<i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
+        "<blockquote expandable>"
+        "<b>🎶 Welcome to SunloMusic 🎶</b>\n\n"
+        "👋 <b>Hey {user_mention}!</b>\n"
+        "✨ <i>Your ultimate ultra-fast Voice Chat Music Companion.</i>\n\n"
         "<b>🔥 ᴘʀᴇᴍɪᴜᴍ ꜰᴇᴀᴛᴜʀᴇꜱ:</b>\n"
         "• 🎧 <b>High-Quality</b> Audio & Video\n"
         "• 🚀 <b>Zero Lag</b> & Turbo Speed\n"
         "• 🛡 <b>24/7 Uptime</b> & Stability\n"
         "• 💎 <b>Elegant</b> & Next-Gen UI\n"
-        "• 📥 <b>Unlimited Downloads</b> (MP3/MP4)\n\n"
-        "💡 <i>Over 100+ commands available!</i>\n"
-        "👇 <b>Tap the buttons below to explore.</b>"
+        "• 📥 <b>Unlimited Downloads</b> (MP3/MP4)\n"
+        "• ⏩ <b>Seek</b> anywhere in the song\n"
+        "• 🎯 <b>Interactive</b> Player Controls\n\n"
+        "<i>Over 100+ commands available! Tap the buttons below to start.</i>"
+        "</blockquote>"
     )
     await _safe_edit(cq, caption, reply_markup=start_keyboard())
     await cq.answer()
