@@ -12,3 +12,4 @@ tgcrypto
 shazamio
 edge-tts
 groq
+richgram

@@ -1,6 +1,5 @@
 import asyncio, time, base64, random
 from pyrogram import filters, enums
-from pyrogram.types import LinkPreviewOptions
 from SunloMusic.bot import bot, ensure_assistant_in_chat
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
@@ -10,9 +9,9 @@ from SunloMusic.queues import get_queue, Track, KARAOKE_CHATS
 from SunloMusic.ytdlp import extract_audio
 from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
-from SunloMusic.keyboards import player_keyboard, queue_add_keyboard
-from SunloMusic.lyrics import start_live_karaoke
+from SunloMusic.keyboards import player_buttons, start_buttons
 from SunloMusic.logger import LOGGER
+from richgram import rich_send, rich_heading, rich_kv_table, rich_esc
 
 LOADING_EMOJIS = ["✨", "🌸", "🪄", "🌟", "🦋", "🎧", "🎶", "🍃", "🔥", "💫", "🪐", "🌈"]
 
@@ -87,26 +86,9 @@ async def play_cmd(_, m):
     
     if q.now_playing:
         q.queue.append(track)
-        track_hash = str(abs(hash(track.url)))
         await status.delete()
-        
-        thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
-        b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
-        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-        caption = f"<b>📥 Added to Queue 📥</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━\n📌 Position: {len(q.queue)}\n━━━━━━━━━━━━━"
-        
-        sent_msg = None
-        if thumb:
-            try: sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
-            except Exception: pass
-        if not sent_msg:
-            local_thumb = get_default_thumb()
-            if local_thumb:
-                try: sent_msg = await m.reply_photo(local_thumb, caption=caption, reply_markup=queue_add_keyboard(track_hash))
-                except Exception: pass
-        if not sent_msg:
-            sent_msg = await bot.send_message(m.chat.id, caption, reply_markup=queue_add_keyboard(track_hash), link_preview_options=LinkPreviewOptions(is_disabled=True))
-        track.message_id = sent_msg.id
+        # Queue me add karne ka simple message
+        await m.reply_text(f"📥 <b>Added to Queue:</b> {track.title}")
         return
     
     q.now_playing = track
@@ -117,39 +99,32 @@ async def play_cmd(_, m):
     
     await status.delete()
     
-    b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
-    title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-    thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
-    caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(track.duration)}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={track.requester_id}'>{track.requester}</a>\n━━━━━━━━━━━━━"
+    # ✅ RICH MESSAGE SE PLAYER CARD BHEJNA
+    card_text = (
+        rich_heading("🎧🎶 Music Time 🎶🎧", level=3) +
+        rich_kv_table([
+            ("🎵 Title", rich_esc(track.title)),
+            ("⏱ Duration", format_duration(track.duration)),
+            ("🙋 Requested by", rich_esc(track.requester)),
+        ])
+    )
     
-    async def send_card():
-        if thumb:
-            try: return await m.reply_photo(thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-            except: pass
-        local_thumb = get_default_thumb()
-        if local_thumb:
-            try: return await m.reply_photo(local_thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-            except: pass
-        return await bot.send_message(m.chat.id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
+    buttons = player_buttons(q, 0)
     
-    from SunloMusic.plugins.voice import speak_in_vc
-    async def play_with_tts():
-        # ✅ Check DB for TTS
-        if await get_group_setting(m.chat.id, "tts", False):
-            await speak_in_vc(m.chat.id, f"Ab play ho raha hai, {track.title}")
-        await play_stream(m.chat.id, track.url, track.video)
-        
-    sent_msg, _ = await asyncio.gather(send_card(), play_with_tts())
-    
+    sent_msg = await rich_send(m.chat.id, card_text + buttons)
     q.playing_message_id = sent_msg.id
+    
     try: await sent_msg.pin(disable_notification=True)
     except: pass
     
     if q.timer_task: q.timer_task.cancel()
     q.timer_task = asyncio.create_task(update_live_timer(m.chat.id, sent_msg.id))
 
-    if m.chat.id in KARAOKE_CHATS:
-        q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, track.title, track.duration, q))
+    # TTS & Play
+    from SunloMusic.plugins.voice import speak_in_vc
+    if await get_group_setting(m.chat.id, "tts", False):
+        await speak_in_vc(m.chat.id, f"Ab play ho raha hai, {track.title}")
+    await play_stream(m.chat.id, track.url, track.video)
 
     asyncio.create_task(add_recent(m.chat.id, {
         "title": track.title, "url": track.url,

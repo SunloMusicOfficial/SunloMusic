@@ -9,12 +9,14 @@ import SunloMusic.bot as bot_module
 from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration
-from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
-from SunloMusic.keyboards import player_keyboard
 from SunloMusic.ytdlp import extract_audio, download_media_file, _convert_media
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
-from SunloMusic.database import get_group_setting
+from SunloMusic.database import add_recent, get_group_setting
 from SunloMusic.lyrics import start_live_karaoke
+
+# ✅ RichGram Imports
+from richgram import rich_send, rich_edit, rich_heading, rich_kv_table, rich_esc
+from SunloMusic.keyboards import player_buttons
 
 call = None
 EMPTY_VC_TIMERS = {}
@@ -76,6 +78,7 @@ async def check_empty_vc(chat_id):
     except: pass
     return False
 
+# ✅ RICH MESSAGE TIMER UPDATE
 async def update_live_timer(chat_id, msg_id):
     from SunloMusic.queues import get_queue
     while True:
@@ -85,31 +88,29 @@ async def update_live_timer(chat_id, msg_id):
         if q.paused: continue
         if await check_empty_vc(chat_id): break
         
-        dur_str = "Live" if q.now_playing.duration <= 0 else format_duration(q.now_playing.duration)
         elapsed = int(time.time() - q.start_time - q.total_paused)
-        
         if q.now_playing.duration > 0 and elapsed >= q.now_playing.duration: break
         
         try:
-            b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
-            title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-            caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{q.now_playing.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{q.now_playing.requester}</a>\n━━━━━━━━━━━━━"
+            # Format Text for Rich Message
+            card_text = (
+                rich_heading("🎧🎶 Music Time 🎶🎧", level=3) +
+                rich_kv_table([
+                    ("🎵 Title", rich_esc(q.now_playing.title)),
+                    ("⏱ Duration", format_duration(q.now_playing.duration)),
+                    ("🙋 Requested by", rich_esc(q.now_playing.requester)),
+                ])
+            )
+            buttons = player_buttons(q, elapsed)
             
-            try: 
-                await bot_module.bot.edit_message_caption(chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=player_keyboard(q, elapsed))
-            except FloodWait as e:
-                await asyncio.sleep(e.value)
-            except: 
-                try: 
-                    await bot_module.bot.edit_message_text(chat_id=chat_id, message_id=msg_id, text=caption, reply_markup=player_keyboard(q, elapsed), link_preview_options=LinkPreviewOptions(is_disabled=True))
-                except: pass
-        except: pass
+            # Fetch message and edit
+            msg = await bot_module.bot.get_messages(chat_id, msg_id)
+            await rich_edit(msg, card_text + buttons)
+        except Exception as e:
+            LOGGER.error(f"Rich Edit Error: {e}")
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import Track, clear_queue
-    from SunloMusic.database import add_recent
-    from SunloMusic.plugins.voice import speak_in_vc
-    
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
     if q.playing_message_id:
@@ -135,7 +136,8 @@ async def start_next_song(chat_id, q):
             except: pass
             nxt.message_id = 0
 
-        # ✅ Announce Next Song
+        # TTS Announcement
+        from SunloMusic.plugins.voice import speak_in_vc
         if await get_group_setting(chat_id, "tts", False):
             await speak_in_vc(chat_id, f"Agla gaana, {nxt.title}")
 
@@ -146,31 +148,29 @@ async def start_next_song(chat_id, q):
             await add_recent(chat_id, {"title": nxt.title, "url": nxt.url, "duration": nxt.duration, "thumbnail": nxt.thumbnail, "requester": nxt.requester, "requester_id": nxt.requester_id, "video": nxt.video})
         except: pass
         
-        thumb = await generate_thumbnail(chat_id, nxt.thumbnail, nxt.title, format_duration(nxt.duration), nxt.requester)
-        dur_str = format_duration(nxt.duration) if nxt.duration > 0 else "Live"
-        b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
-        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
-        caption = f"<b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{nxt.title}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {dur_str}\n━━━━━━━━━━━━━\n🙋‍♂️ Request: <a href='tg://user?id={nxt.requester_id}'>{nxt.requester}</a>\n━━━━━━━━━━━━━"
+        # ✅ SEND RICH PLAYER CARD
+        card_text = (
+            rich_heading("🎧🎶 Music Time 🎶🎧", level=3) +
+            rich_kv_table([
+                ("🎵 Title", rich_esc(nxt.title)),
+                ("⏱ Duration", format_duration(nxt.duration)),
+                ("🙋 Requested by", rich_esc(nxt.requester)),
+            ])
+        )
+        buttons = player_buttons(q, 0)
         
-        sent_msg = None
-        if thumb:
-            try: sent_msg = await bot_module.bot.send_photo(chat_id, thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-            except Exception: pass
-        if not sent_msg:
-            local_thumb = get_default_thumb()
-            if local_thumb:
-                try: sent_msg = await bot_module.bot.send_photo(chat_id, local_thumb, caption=caption, reply_markup=player_keyboard(q, 0))
-                except Exception: pass
-        if not sent_msg:
-            sent_msg = await bot_module.bot.send_message(chat_id, caption, reply_markup=player_keyboard(q, 0), link_preview_options=LinkPreviewOptions(is_disabled=True))
-            
-        q.playing_message_id = sent_msg.id
-        try: await sent_msg.pin(disable_notification=True)
-        except: pass
-        q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
-        if chat_id in KARAOKE_CHATS: q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
+        try:
+            sent_msg = await rich_send(chat_id, card_text + buttons)
+            q.playing_message_id = sent_msg.id
+            try: await sent_msg.pin(disable_notification=True)
+            except: pass
+            q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
+        except Exception as e:
+            LOGGER.error(f"Rich Send Next Error: {e}")
+
+        if chat_id in KARAOKE_CHATS: 
+            q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
-        # ✅ Announce Queue Empty
         if await get_group_setting(chat_id, "tts", False):
             await speak_in_vc(chat_id, "Queue khatam ho gayi hai, main VC se nikal raha hu. Dhanyawad!")
             

@@ -1,102 +1,45 @@
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from pyrogram.enums import ButtonStyle
+from richgram import rich_button, rich_button_row
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration, make_progress_bar
 from SunloMusic.queues import AUTO_DJ_CHATS
 
-def start_keyboard() -> InlineKeyboardMarkup:
-    WEB_APP_URL = "https://sunlomusic.onrender.com/app"
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✨ ᴏᴘᴇɴ ᴘʀᴇᴍɪᴜᴍ ᴍᴇɴᴜ ✨", web_app=WebAppInfo(url=WEB_APP_URL), style=ButtonStyle.SUCCESS)],
-        [InlineKeyboardButton("🚀 ᴀᴅᴅ ᴍᴇ ᴛᴏ ɢʀᴏᴜᴘ 🚀", url=f"https://t.me/{config.BOT_USERNAME.strip('@')}?startgroup=true", style=ButtonStyle.PRIMARY)],
-        [
-            InlineKeyboardButton("⚙️ ʜᴇʟᴘ", callback_data="help_menu", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("💬 ꜱᴜᴘᴘᴏʀᴛ", url=config.SUPPORT_CHAT, style=ButtonStyle.SUCCESS)
-        ],
-        [
-            InlineKeyboardButton("📢 ᴜᴘᴅᴀᴛᴇꜱ", url=config.UPDATES_CHANNEL, style=ButtonStyle.DANGER),
-            InlineKeyboardButton("👨‍💻 ᴅᴇᴠ", url="https://t.me/YO_UR_OFFICIAL_CRUSH", style=ButtonStyle.SUCCESS)
-        ]
-    ])
-
-def help_main_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🎵 ᴍᴜꜱɪᴄ", callback_data="help_music", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("⏯ ᴄᴏɴᴛʀᴏʟꜱ", callback_data="help_controls", style=ButtonStyle.SUCCESS)
-        ],
-        [
-            InlineKeyboardButton("🎛 ᴇꜰꜰᴇᴄᴛꜱ", callback_data="help_effects", style=ButtonStyle.SUCCESS),
-            InlineKeyboardButton("🛡 ᴀᴅᴍɪɴ", callback_data="help_admin", style=ButtonStyle.DANGER)
-        ],
-        [InlineKeyboardButton("📜 ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅꜱ", callback_data="all_commands", style=ButtonStyle.PRIMARY)],
-        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ", callback_data="back_start", style=ButtonStyle.DANGER)]
-    ])
-
-def help_back_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ʜᴇʟᴘ", callback_data="help_menu", style=ButtonStyle.DANGER)]
-    ])
-
-# ✅ EXACTLY AS YOU ASKED (4 Lines)
-def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
+# ✅ Rich Message Buttons (Gol Shape)
+def player_buttons(q, elapsed: int = 0):
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
-    
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "─" * 7
     
-    # Line 1: Timer
-    timer_btn = InlineKeyboardButton(
-        f"{elapsed_str}  {bar}○  {dur_str}", 
-        callback_data="cb_timer", 
-        style=ButtonStyle.PRIMARY
+    # Timer Bar (Full Width)
+    timer_row = rich_button_row(
+        rich_button(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style="primary")
     )
     
     # Line 2: Pause | Autoplay
-    pause_text = "▶️ RESUME" if q.paused else "⏸️ PAUSE"
-    pause_btn = InlineKeyboardButton(pause_text, callback_data="cb_pause", style=ButtonStyle.SUCCESS if q.paused else ButtonStyle.PRIMARY)
-    
-    auto_status = "ON" if q.chat_id in AUTO_DJ_CHATS else "OFF"
-    auto_btn = InlineKeyboardButton(f"🔄 AUTOPLAY: {auto_status}", callback_data="cb_autoplay", style=ButtonStyle.SUCCESS if q.chat_id in AUTO_DJ_CHATS else ButtonStyle.PRIMARY)
+    pause_btn = rich_button("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style="success" if q.paused else "primary")
+    auto_btn = rich_button(f"🔄 AUTOPLAY: {'ON' if q.chat_id in AUTO_DJ_CHATS else 'OFF'}", callback_data="cb_autoplay", style="success" if q.chat_id in AUTO_DJ_CHATS else "primary")
+    row2 = rich_button_row(pause_btn, auto_btn)
     
     # Line 3: Skip | Stop
-    skip_btn = InlineKeyboardButton("⏭️ SKIP", callback_data="cb_skip", style=ButtonStyle.PRIMARY)
-    stop_btn = InlineKeyboardButton("⏹️ STOP", callback_data="cb_stop", style=ButtonStyle.DANGER)
+    skip_btn = rich_button("⏭️ SKIP", callback_data="cb_skip", style="primary")
+    stop_btn = rich_button("⏹️ STOP", callback_data="cb_stop", style="danger")
+    row3 = rich_button_row(skip_btn, stop_btn)
     
     # Line 4: More Control (Full Width)
-    more_btn = InlineKeyboardButton("🎛 MORE CONTROL", callback_data="cb_more", style=ButtonStyle.SUCCESS)
-
-    return InlineKeyboardMarkup([
-        [timer_btn],
-        [pause_btn, auto_btn],
-        [skip_btn, stop_btn],
-        [more_btn]
-    ])
-
-def more_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("📋 QUEUE", callback_data="cb_q_show", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("🔀 SHUFFLE", callback_data="cb_q_shuffle", style=ButtonStyle.SUCCESS)
-        ],
-        [
-            InlineKeyboardButton("📁 EXPORT", callback_data="cb_q_export", style=ButtonStyle.PRIMARY),
-            InlineKeyboardButton("⏩ SEEK", callback_data="cb_seek_info", style=ButtonStyle.SUCCESS)
-        ],
-        [InlineKeyboardButton("🔙 BACK TO PLAYER", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
-    ])
-
-def settings_keyboard(tts_on: bool, vsearch_on: bool) -> InlineKeyboardMarkup:
-    tts_text = "🟢 SUNLO AI: ON" if tts_on else "🔴 SUNLO AI: OFF"
-    vs_text = "🟢 VOICE SEARCH: ON" if vsearch_on else "🔴 VOICE SEARCH: OFF"
+    more_btn = rich_button_row(rich_button("🎛 MORE CONTROL", callback_data="cb_more", style="success"))
     
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(tts_text, callback_data="toggle_tts", style=ButtonStyle.SUCCESS if tts_on else ButtonStyle.DANGER)],
-        [InlineKeyboardButton(vs_text, callback_data="toggle_vsearch", style=ButtonStyle.SUCCESS if vsearch_on else ButtonStyle.DANGER)],
-        [InlineKeyboardButton("🔙 CLOSE SETTINGS", callback_data="close_settings", style=ButtonStyle.PRIMARY)]
-    ])
+    return timer_row + row2 + row3 + more_btn
 
-def queue_add_keyboard(track_hash: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("❌ REMOVE FROM QUEUE", callback_data=f"cb_del_{track_hash}", style=ButtonStyle.DANGER)]
-    ])
+# ✅ Start Menu Buttons (Optional, if you want Rich there too)
+def start_buttons():
+    return (
+        rich_button_row(rich_button("✨ OPEN PREMIUM MENU ✨", callback_data="start_menu", style="success")) +
+        rich_button_row(rich_button("🚀 ADD ME TO GROUP 🚀", url=f"https://t.me/{config.BOT_USERNAME.strip('@')}?startgroup=true", style="primary")) +
+        rich_button_row(
+            rich_button("⚙️ HELP", callback_data="help_menu", style="primary"),
+            rich_button("💬 SUPPORT", url=config.SUPPORT_CHAT, style="success")
+        ) +
+        rich_button_row(
+            rich_button("📢 UPDATES", url=config.UPDATES_CHANNEL, style="danger"),
+            rich_button("👨‍💻 DEV", url="https://t.me/YO_UR_OFFICIAL_CRUSH", style="success")
+        )
+    )
