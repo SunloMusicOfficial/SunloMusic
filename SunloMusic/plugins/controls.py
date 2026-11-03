@@ -7,10 +7,12 @@ from SunloMusic.decorators import admin_only, catch_errors
 from SunloMusic.database import is_sudo
 from SunloMusic.queues import get_queue, clear_queue, AUTO_DJ_CHATS
 from SunloMusic.texts import NOT_PLAYING_TEXT
-from SunloMusic.keyboards import player_buttons, more_menu_keyboard
+from SunloMusic.keyboards import player_buttons, more_buttons
 from SunloMusic.formatters import format_duration
 from SunloMusic.logger import LOGGER
 from richgram import rich_edit, rich_heading, rich_kv_table, rich_esc
+import base64
+from SunloMusic.config import config
 
 @bot.on_message(filters.command(["skip", "next"]) & filters.group)
 @catch_errors
@@ -110,6 +112,23 @@ async def seek_cmd(_, m: Message):
     
     await status.delete()
 
+def get_card_text(q, page_title="🎧🎶 Music Time 🎶🎧"):
+    thumb_url = q.now_playing.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
+    b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
+    title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+    
+    return (
+        f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
+        f"<b>{page_title}</b>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"🎵 <a href='{title_link}'>{rich_esc(q.now_playing.title)}</a>\n"
+        f"━━━━━━━━━━━━━\n"
+        f"⏱ Duration: {format_duration(q.now_playing.duration)}\n"
+        f"━━━━━━━━━━━━━\n"
+        f"🙋‍♂️ Request: <a href='tg://user?id={q.now_playing.requester_id}'>{rich_esc(q.now_playing.requester)}</a>\n"
+        f"━━━━━━━━━━━━━"
+    )
+
 @bot.on_callback_query(filters.regex("^cb_"))
 @catch_errors
 async def controls_cb(_, cq: CallbackQuery):
@@ -117,7 +136,7 @@ async def controls_cb(_, cq: CallbackQuery):
     chat_id = cq.message.chat.id
     user = cq.from_user
     
-    if action not in ["cb_more", "cb_close", "cb_timer", "cb_back_player", "cb_seek_info", "cb_q_show", "cb_q_shuffle", "cb_q_export", "cb_autoplay"]:
+    if action not in ["cb_more", "cb_close", "cb_timer", "cb_back_player", "cb_autoplay", "cb_info_seek", "cb_info_speed", "cb_info_volume", "cb_info_eq", "cb_info_sleep", "cb_info_karaoke", "cb_info_dedicate", "cb_q_clear"] and not action.startswith("cb_more_page_"):
         is_admin = False
         if await is_sudo(user.id): is_admin = True
         else:
@@ -140,8 +159,7 @@ async def controls_cb(_, cq: CallbackQuery):
                     await pause_stream(chat_id); q.paused = True; q.paused_at = time.time()
                     await cq.answer("⏸ Paused")
                 
-                card_text = rich_heading("🎧🎶 Music Time 🎶🎧", level=3) + rich_kv_table([("🎵 Title", rich_esc(q.now_playing.title)),("⏱ Duration", format_duration(q.now_playing.duration)),("🙋 Requested by", rich_esc(q.now_playing.requester))])
-                await rich_edit(cq.message, card_text + player_buttons(q, elapsed))
+                await rich_edit(cq.message, get_card_text(q) + player_buttons(q, elapsed))
             else: await cq.answer("Nothing playing", show_alert=True)
                 
         elif action == "cb_skip":
@@ -167,14 +185,79 @@ async def controls_cb(_, cq: CallbackQuery):
                 await cq.answer("🔄 Autoplay Enabled!")
             
             elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
-            card_text = rich_heading("🎧🎶 Music Time 🎶🎧", level=3) + rich_kv_table([("🎵 Title", rich_esc(q.now_playing.title)),("⏱ Duration", format_duration(q.now_playing.duration)),("🙋 Requested by", rich_esc(q.now_playing.requester))])
-            await rich_edit(cq.message, card_text + player_buttons(q, elapsed))
+            await rich_edit(cq.message, get_card_text(q) + player_buttons(q, elapsed))
             
         elif action == "cb_more":
-            await cq.answer("Use /queue, /shuffle, /seek commands!", show_alert=True)
+            page = 1
+            await rich_edit(cq.message, get_card_text(q, f"🎛 Control Panel (Page {page}/4)") + more_buttons(q, page))
+            await cq.answer()
 
-        elif action == "cb_timer":
-            await cq.answer("Live Timer", show_alert=False)
+        elif action.startswith("cb_more_page_"):
+            page = int(action.replace("cb_more_page_", ""))
+            await rich_edit(cq.message, get_card_text(q, f"🎛 Control Panel (Page {page}/4)") + more_buttons(q, page))
+            await cq.answer(f"Page {page}")
+
+        elif action == "cb_back_player":
+            elapsed = int(time.time() - q.start_time - q.total_paused) if q.now_playing else 0
+            await rich_edit(cq.message, get_card_text(q) + player_buttons(q, elapsed))
+            await cq.answer()
+
+        elif action == "cb_loop":
+            q.loop = (q.loop + 1) % 3
+            await rich_edit(cq.message, get_card_text(q, "🎛 Control Panel (Page 2/4)") + more_buttons(q, 2))
+            modes = {0: "Off", 1: "One", 2: "All"}
+            await cq.answer(f"🔁 Loop: {modes[q.loop]}")
+
+        # ✅ Audio Effects
+        elif action.startswith("cb_effect_"):
+            effect = action.replace("cb_effect_", "")
+            if q.now_playing:
+                await cq.answer(f"Applying {effect.upper()}...")
+                await play_stream(chat_id, q.now_playing.url, q.now_playing.video, effect=effect)
+                await rich_edit(cq.message, get_card_text(q, "🎛 Control Panel (Page 2/4)") + more_buttons(q, 2))
+            else:
+                await cq.answer("Nothing playing", show_alert=True)
+
+        # ✅ Info Alerts
+        elif action == "cb_info_seek":
+            await cq.answer("Use: /seek 1:30 (or /seek 30 to skip forward)", show_alert=True)
+        elif action == "cb_info_speed":
+            await cq.answer("Use: /speed 1.5 (Values: 0.5 to 2.0)", show_alert=True)
+        elif action == "cb_info_volume":
+            await cq.answer("Use: /volume 150 (Values: 0 to 200)", show_alert=True)
+        elif action == "cb_info_eq":
+            await cq.answer("Use: /eq rock (Options: bass, pop, rock, jazz, vocal, flat)", show_alert=True)
+        elif action == "cb_info_sleep":
+            await cq.answer("Use: /sleep 10m (Bot leaves VC after time)", show_alert=True)
+        elif action == "cb_info_karaoke":
+            await cq.answer("Use: /karaoke on/off", show_alert=True)
+        elif action == "cb_info_dedicate":
+            await cq.answer("Use: /dedicate @user song_name", show_alert=True)
+
+        elif action == "cb_q_show":
+            if not q.now_playing and not q.queue:
+                return await cq.answer("Queue is empty.", show_alert=True)
+            text = f"▶️ Playing: {q.now_playing.title[:30] if q.now_playing else 'None'}\n"
+            text += f"⏭ Up Next: {len(q.queue)} songs"
+            await cq.answer(text, show_alert=True)
+
+        elif action == "cb_q_shuffle":
+            if not q.queue:
+                return await cq.answer("Queue is empty.", show_alert=True)
+            random.shuffle(q.queue)
+            await cq.answer("🔀 Queue Shuffled!", show_alert=True)
+
+        elif action == "cb_q_export":
+            if not q.now_playing and not q.queue:
+                return await cq.answer("Queue is empty.", show_alert=True)
+            await cq.answer("Please use /export in chat to get the file.", show_alert=True)
+
+        elif action == "cb_q_clear":
+            if q.queue:
+                q.queue.clear()
+                await cq.answer("🗑 Queue Cleared!", show_alert=True)
+            else:
+                await cq.answer("Queue is already empty.", show_alert=True)
 
         elif action == "cb_close":
             await cq.message.delete(); await cq.answer()
