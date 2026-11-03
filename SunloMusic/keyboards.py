@@ -71,9 +71,9 @@ def more_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🔙 ʙᴀᴄᴋ ᴛᴏ ᴘʟᴀʏᴇʀ", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
     ])
 
-# ✅ NEW: Premium Settings Keyboard
+# ✅ UPDATED: SunloMusic AI Text
 def settings_keyboard(tts_on: bool, vsearch_on: bool) -> InlineKeyboardMarkup:
-    tts_text = "🟢 ᴊ.ᴀ.ʀ.ᴠ.ɪ.ꜱ ᴠᴏɪᴄᴇ: ᴏɴ" if tts_on else "🔴 ᴊ.ᴀ.ʀ.ᴠ.ɪ.ꜱ ᴠᴏɪᴄᴇ: ᴏꜰꜰ"
+    tts_text = "🟢 ꜱᴜɴʟᴏᴍᴜꜱɪᴄ ᴀɪ: ᴏɴ" if tts_on else "🔴 ꜱᴜɴʟᴏᴍᴜꜱɪᴄ ᴀɪ: ᴏꜰꜰ"
     vs_text = "🟢 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏɴ" if vsearch_on else "🔴 ᴠᴏɪᴄᴇ ꜱᴇᴀʀᴄʜ: ᴏꜰꜰ"
     
     return InlineKeyboardMarkup([

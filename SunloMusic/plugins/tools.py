@@ -18,11 +18,10 @@ async def karaoke_cmd(_, m):
         KARAOKE_CHATS.add(m.chat.id)
         q = get_queue(m.chat.id)
         if q.now_playing:
-            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>\nStarting live lyrics for the current song...")
+            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>")
             q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, q.now_playing.title, q.now_playing.duration, q))
         else:
-            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>\nBot will send live lyrics for upcoming songs.")
-            
+            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>")
     elif state == "off":
         KARAOKE_CHATS.discard(m.chat.id)
         q = get_queue(m.chat.id)
@@ -45,10 +44,7 @@ async def autodj_cmd(_, m):
     elif state == "off":
         AUTO_DJ_CHATS.discard(m.chat.id)
         await m.reply_text("🛑 <b>Auto-DJ Disabled.</b>")
-    else:
-        await m.reply_text("❌ Invalid option. Use 'on' or 'off'.")
 
-# ✅ NEW: Premium Settings Dashboard
 @bot.on_message(filters.command("settings") & filters.group)
 @catch_errors
 @admin_only
@@ -59,7 +55,7 @@ async def settings_cmd(_, m):
     text = (
         "⚙️ <b>『 GROUP SETTINGS 』</b> ⚙️\n"
         "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-        "🎙️ <b>J.A.R.V.I.S Voice:</b> Bot will announce the song name in VC.\n"
+        "🎙️ <b>SunloMusic AI:</b> Bot will announce the song name in VC.\n"
         "🎤 <b>Voice Search:</b> Users can send voice notes to play songs.\n"
         "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
         "👇 <i>Click buttons to toggle ON/OFF</i>"
@@ -72,10 +68,10 @@ async def toggle_tts_cb(_, cq: CallbackQuery):
     chat_id = cq.message.chat.id
     if chat_id in TTS_CHATS:
         TTS_CHATS.discard(chat_id)
-        await cq.answer("🔴 J.A.R.V.I.S Voice Disabled")
+        await cq.answer("🔴 SunloMusic AI Voice Disabled")
     else:
         TTS_CHATS.add(chat_id)
-        await cq.answer("🟢 J.A.R.V.I.S Voice Enabled")
+        await cq.answer("🟢 SunloMusic AI Voice Enabled")
         
     tts_status = chat_id in TTS_CHATS
     vsearch_status = chat_id in VOICE_CMD_CHATS

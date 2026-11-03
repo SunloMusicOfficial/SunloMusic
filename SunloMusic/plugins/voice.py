@@ -27,7 +27,8 @@ async def speak_in_vc(chat_id: int, text: str):
     q = get_queue(chat_id)
     if not call: return
     try:
-        voice = "en-US-JennyNeural" 
+        # ✅ INDIAN HINDI FEMALE VOICE (Human-like)
+        voice = "hi-IN-SwaraNeural" 
         output_file = f"{TTS_DIR}/voice_{chat_id}_{int(time.time())}.mp3"
         
         communicate = edge_tts.Communicate(text, voice)
@@ -38,7 +39,8 @@ async def speak_in_vc(chat_id: int, text: str):
             stream = MediaStream(media_path=output_file, audio_parameters=AudioQuality.HIGH)
             await call.play(chat_id, stream)
             
-            await asyncio.sleep(len(text) * 0.08 + 1.5) 
+            # Wait for TTS to finish based on text length
+            await asyncio.sleep(len(text) * 0.1 + 2.0) 
             q.is_playing_tts = False
     except Exception as e:
         LOGGER.error(f"TTS Error: {e}")
@@ -52,7 +54,7 @@ async def voice_command_handler(_, m: Message):
     if not groq_client or not config.GROQ_API_KEY:
         return await m.reply_text("❌ <b>GROQ_API_KEY is missing!</b>\nPlease add it in Render Environment.")
         
-    status = await m.reply_text("🎤 <b>Listening...</b>\n<i>Converting your voice to text...</i>")
+    status = await m.reply_text("🎤 <b>SunloMusic AI is listening...</b>\n<i>Samajh raha hu, ek second...</i>")
     
     try:
         file_path = f"cache/downloads/voice_{m.id}.ogg"
@@ -69,36 +71,36 @@ async def voice_command_handler(_, m: Message):
         if os.path.exists(file_path): os.remove(file_path)
         
         if not text_query:
-            return await status.edit_text("❌ <b>Could not understand the audio.</b>")
+            return await status.edit_text("❌ <b>Awaz samajh nahi aayi, dubara bolo.</b>")
             
         query = text_query.lower().replace("play", "").replace("bajao", "").replace("song", "").strip()
         
         if not query:
-            return await status.edit_text("❌ <b>Please say a song name clearly.</b>")
+            return await status.edit_text("❌ <b>Gaane ka naam bolna.</b>")
             
-        await status.edit_text(f"✨ <b>Heard:</b> <code>{text_query}</code>\n\n⏳ <b>Searching & Downloading...</b>")
+        await status.edit_text(f"✨ <b>Heard:</b> <code>{text_query}</code>\n\n⏳ <b>Gaana dhundh raha hu...</b>")
         
         info = await extract_audio(query)
         if not info:
-            return await status.edit_text("❌ <b>Song not found.</b>")
+            return await status.edit_text("❌ <b>Gaana nahi mila.</b>")
             
         q = get_queue(m.chat.id)
         track = Track(info["title"], info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, False)
         
         if q.now_playing:
             q.queue.append(track)
-            await status.edit_text(f"📥 <b>Added to Queue:</b> {info['title']}")
-            asyncio.create_task(speak_in_vc(m.chat.id, f"Added {info['title']} to the queue."))
+            await status.edit_text(f"📥 <b>Queue me add kiya:</b> {info['title']}")
+            asyncio.create_task(speak_in_vc(m.chat.id, f"{info['title']} ko queue me add kar diya hai."))
         else:
-            await status.edit_text("⚡ <b>Connecting to VC...</b>")
-            await speak_in_vc(m.chat.id, f"Now playing, {info['title']}")
+            await status.edit_text("⚡ <b>VC se connect kar raha hu...</b>")
+            await speak_in_vc(m.chat.id, f"Ab play ho raha hai, {info['title']}")
             q.now_playing = track
             q.start_time = time.time()
             q.paused = False
             q.votes = set()
             await play_stream(m.chat.id, track.url, track.video)
-            await status.edit_text(f"🎧 <b>Now Playing:</b> {info['title']}")
+            await status.edit_text(f"🎧 <b>Ab play ho raha hai:</b> {info['title']}")
             
     except Exception as e:
         LOGGER.error(f"Voice Command Error: {e}")
-        await status.edit_text("❌ <b>Failed to process voice command.</b>")
+        await status.edit_text("❌ <b>Awaz process nahi ho payi.</b>")
