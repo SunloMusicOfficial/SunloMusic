@@ -36,7 +36,7 @@ def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0)
     elif effect == "nightcore": af_filters.append("atempo=1.25,asetrate=44100*1.25")
     else:
         if eq != "none":
-            eq_map = {"bass": "bass=g=12", "pop": "equalizer=f=1000:width_type=h:width=200:g=5", "rock": "equalizer=f=100:width_type=h:width=200:g=3,equalizer=f=3000:width_type=h:width=200:g=4", "jazz": "equalizer=f=200:width_type=h:width=200:g=2,equalizer=f=2000:width_type=h:width=200:g=3", "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5"}
+            eq_map = {"bass": "bass=g=12", "pop": "equalizer=f=1000:width_type=h:width=200:g=5", "rock": "equalizer=f=100:width_type=h:width=200:g=3,equalizer=f=3000:width_type=h:width=200:g=4", "jazz": "equalizer=f=200:width_type=h:width=200:g=2", "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5"}
             if eq in eq_map: af_filters.append(eq_map[eq])
     if speed != 1.0: af_filters.append(f"atempo={speed}")
     if volume != 1.0: af_filters.append(f"volume={volume}")
@@ -76,14 +76,16 @@ async def update_live_timer(chat_id, msg_id):
         if q.now_playing.duration > 0 and elapsed >= q.now_playing.duration: break
         
         try:
-            card_text = (
-                rich_heading("🎧🎶 Music Time 🎶🎧", level=3) +
-                rich_kv_table([
-                    ("🎵 Title", rich_esc(q.now_playing.title)),
-                    ("⏱ Duration", format_duration(q.now_playing.duration)),
-                    ("🙋 Requested by", rich_esc(q.now_playing.requester)),
-                ])
-            )
+            thumb_url = q.now_playing.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
+            card_text = f"""
+            <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+                <h3 style="text-align: center; color: #00e0ff; margin-top: 0;">🎧🎶 Music Time 🎶🎧</h3>
+                <img src="{thumb_url}" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" />
+                <p style="margin: 5px 0;"><b>🎵 Title:</b> {rich_esc(q.now_playing.title)}</p>
+                <p style="margin: 5px 0;"><b>⏱ Duration:</b> {format_duration(q.now_playing.duration)}</p>
+                <p style="margin: 5px 0;"><b>🙋 Requested by:</b> {rich_esc(q.now_playing.requester)}</p>
+            </div>
+            """
             buttons = player_buttons(q, elapsed)
             msg = await bot_module.bot.get_messages(chat_id, msg_id)
             await rich_edit(msg, card_text + buttons)
@@ -128,14 +130,16 @@ async def start_next_song(chat_id, q):
             await add_recent(chat_id, {"title": nxt.title, "url": nxt.url, "duration": nxt.duration, "thumbnail": nxt.thumbnail, "requester": nxt.requester, "requester_id": nxt.requester_id, "video": nxt.video})
         except: pass
         
-        card_text = (
-            rich_heading("🎧🎶 Music Time 🎶🎧", level=3) +
-            rich_kv_table([
-                ("🎵 Title", rich_esc(nxt.title)),
-                ("⏱ Duration", format_duration(nxt.duration)),
-                ("🙋 Requested by", rich_esc(nxt.requester)),
-            ])
-        )
+        thumb_url = nxt.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
+        card_text = f"""
+        <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+            <h3 style="text-align: center; color: #00e0ff; margin-top: 0;">🎧🎶 Music Time 🎶🎧</h3>
+            <img src="{thumb_url}" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" />
+            <p style="margin: 5px 0;"><b>🎵 Title:</b> {rich_esc(nxt.title)}</p>
+            <p style="margin: 5px 0;"><b>⏱ Duration:</b> {format_duration(nxt.duration)}</p>
+            <p style="margin: 5px 0;"><b>🙋 Requested by:</b> {rich_esc(nxt.requester)}</p>
+        </div>
+        """
         buttons = player_buttons(q, 0)
         try:
             sent_msg = await rich_send(bot_module.bot, chat_id, card_text + buttons)

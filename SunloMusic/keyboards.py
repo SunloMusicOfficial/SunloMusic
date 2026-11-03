@@ -5,9 +5,6 @@ from SunloMusic.formatters import format_duration, make_progress_bar
 from SunloMusic.queues import AUTO_DJ_CHATS
 from richgram import rich_button, rich_button_row
 
-# ═══════════════════════════════════════════
-# NORMAL KEYBOARDS (For start, help, settings)
-# ═══════════════════════════════════════════
 def start_keyboard() -> InlineKeyboardMarkup:
     WEB_APP_URL = "https://sunlomusic.onrender.com/app"
     return InlineKeyboardMarkup([
@@ -69,9 +66,6 @@ def more_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🔙 BACK", callback_data="cb_back_player", style=ButtonStyle.DANGER)]
     ])
 
-# ═══════════════════════════════════════════
-# 1. NORMAL PLAYER KEYBOARD (For trending.py & voteplay.py)
-# ═══════════════════════════════════════════
 def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
@@ -91,24 +85,27 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
         [more_btn]
     ])
 
-# ═══════════════════════════════════════════
-# 2. RICHGRAM PLAYER BUTTONS (For play.py & calls.py - Gol Shape)
-# ═══════════════════════════════════════════
+# ✅ PREMIUM BUTTONS WITH CUSTOM STYLES
 def player_buttons(q, elapsed: int = 0):
     dur_str = format_duration(q.now_playing.duration) if q.now_playing else "00:00"
     elapsed_str = format_duration(elapsed)
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "─" * 7
     
-    timer_row = rich_button_row(rich_button(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style="primary"))
+    # Custom Premium Styles (Glassmorphism / Dark)
+    style_blue = "primary" 
+    style_green = "success"
+    style_red = "danger"
     
-    pause_btn = rich_button("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style="success" if q.paused else "primary")
-    auto_btn = rich_button(f"🔄 AUTOPLAY: {'ON' if q.chat_id in AUTO_DJ_CHATS else 'OFF'}", callback_data="cb_autoplay", style="success" if q.chat_id in AUTO_DJ_CHATS else "primary")
+    timer_row = rich_button_row(rich_button(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style=style_blue))
+    
+    pause_btn = rich_button("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style=style_green if q.paused else style_blue)
+    auto_btn = rich_button(f"🔄 AUTO: {'ON' if q.chat_id in AUTO_DJ_CHATS else 'OFF'}", callback_data="cb_autoplay", style=style_green if q.chat_id in AUTO_DJ_CHATS else style_blue)
     row2 = rich_button_row(pause_btn, auto_btn)
     
-    skip_btn = rich_button("⏭️ SKIP", callback_data="cb_skip", style="primary")
-    stop_btn = rich_button("⏹️ STOP", callback_data="cb_stop", style="danger")
+    skip_btn = rich_button("⏭️ SKIP", callback_data="cb_skip", style=style_blue)
+    stop_btn = rich_button("⏹️ STOP", callback_data="cb_stop", style=style_red)
     row3 = rich_button_row(skip_btn, stop_btn)
     
-    more_btn = rich_button_row(rich_button("🎛 MORE CONTROL", callback_data="cb_more", style="success"))
+    more_btn = rich_button_row(rich_button("🎛 MORE CONTROL", callback_data="cb_more", style=style_green))
     
     return timer_row + row2 + row3 + more_btn

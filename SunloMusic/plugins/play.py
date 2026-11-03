@@ -12,7 +12,7 @@ from SunloMusic.formatters import format_duration
 from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
 from SunloMusic.keyboards import player_buttons, queue_add_keyboard
 from SunloMusic.logger import LOGGER
-from richgram import rich_send, rich_heading, rich_kv_table, rich_esc
+from richgram import rich_send, rich_esc
 
 LOADING_EMOJIS = ["✨", "🌸", "🪄", "🌟", "🦋", "🎧", "🎶", "🍃", "🔥", "💫", "🪐", "🌈"]
 
@@ -111,14 +111,19 @@ async def play_cmd(_, m):
     q.votes = set()
     await status.delete()
     
-    card_text = (
-        rich_heading("🎧🎶 Music Time 🎶🎧", level=3) +
-        rich_kv_table([
-            ("🎵 Title", rich_esc(track.title)),
-            ("⏱ Duration", format_duration(track.duration)),
-            ("🙋 Requested by", rich_esc(track.requester)),
-        ])
-    )
+    # ✅ PREMIUM HTML CARD WITH THUMBNAIL
+    thumb_url = track.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
+    
+    card_text = f"""
+    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+        <h3 style="text-align: center; color: #00e0ff; margin-top: 0;">🎧🎶 Music Time 🎶🎧</h3>
+        <img src="{thumb_url}" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" />
+        <p style="margin: 5px 0;"><b>🎵 Title:</b> {rich_esc(track.title)}</p>
+        <p style="margin: 5px 0;"><b>⏱ Duration:</b> {format_duration(track.duration)}</p>
+        <p style="margin: 5px 0;"><b>🙋 Requested by:</b> {rich_esc(track.requester)}</p>
+    </div>
+    """
+    
     buttons = player_buttons(q, 0)
     
     from SunloMusic.plugins.voice import speak_in_vc
