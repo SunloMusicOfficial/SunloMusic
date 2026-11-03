@@ -5,10 +5,8 @@ def format_duration(seconds: int) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 def make_progress_bar(current: int, total: int, length: int = 7) -> str:
-    """Generates a clean thick bar with a music note."""
-    if total <= 0: return "▭" * length
+    if total <= 0: return "─" * length
     pos = int(length * current / total)
     pos = max(0, min(pos, length - 1))
-    
-    # ✅ Wapas thick lines aur music note pe set kiya hai
-    return "━" * pos + "🎵" + "▭" * (length - pos)
+    # Thin line with circle
+    return "─" * pos + "○" + "─" * (length - pos - 1) if length > 1 else "○"
