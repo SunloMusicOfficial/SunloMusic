@@ -13,3 +13,4 @@ shazamio
 edge-tts
 groq
 richgram
+richpyro

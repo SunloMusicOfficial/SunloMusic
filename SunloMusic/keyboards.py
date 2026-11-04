@@ -5,6 +5,13 @@ from SunloMusic.formatters import format_duration, make_progress_bar
 from SunloMusic.queues import AUTO_DJ_CHATS
 from richgram import rich_button, rich_button_row
 
+# Custom Emoji IDs (Replace with your own premium emoji IDs)
+# Ye sirf premium bots ke liye kaam karta hai
+CUSTOM_EMOJI_PLAY = "5368324170671202286" # Example ID
+CUSTOM_EMOJI_PAUSE = "5368324170671202286"
+CUSTOM_EMOJI_SKIP = "5368324170671202286"
+CUSTOM_EMOJI_STOP = "5368324170671202286"
+
 def start_keyboard() -> InlineKeyboardMarkup:
     WEB_APP_URL = "https://sunlomusic.onrender.com/app"
     return InlineKeyboardMarkup([
@@ -59,10 +66,10 @@ def player_keyboard(q, elapsed: int = 0) -> InlineKeyboardMarkup:
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "─" * 7
     
     timer_btn = InlineKeyboardButton(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style=ButtonStyle.PRIMARY)
-    pause_btn = InlineKeyboardButton("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style=ButtonStyle.SUCCESS if q.paused else ButtonStyle.PRIMARY)
+    pause_btn = InlineKeyboardButton("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style=ButtonStyle.SUCCESS if q.paused else ButtonStyle.PRIMARY, icon_custom_emoji_id=CUSTOM_EMOJI_PLAY)
     auto_btn = InlineKeyboardButton(f"🔄 AUTOPLAY: {'ON' if q.chat_id in AUTO_DJ_CHATS else 'OFF'}", callback_data="cb_autoplay", style=ButtonStyle.SUCCESS if q.chat_id in AUTO_DJ_CHATS else ButtonStyle.PRIMARY)
-    skip_btn = InlineKeyboardButton("⏭️ SKIP", callback_data="cb_skip", style=ButtonStyle.PRIMARY)
-    stop_btn = InlineKeyboardButton("⏹️ STOP", callback_data="cb_stop", style=ButtonStyle.DANGER)
+    skip_btn = InlineKeyboardButton("⏭️ SKIP", callback_data="cb_skip", style=ButtonStyle.PRIMARY, icon_custom_emoji_id=CUSTOM_EMOJI_SKIP)
+    stop_btn = InlineKeyboardButton("⏹️ STOP", callback_data="cb_stop", style=ButtonStyle.DANGER, icon_custom_emoji_id=CUSTOM_EMOJI_STOP)
     more_btn = InlineKeyboardButton("🎛 MORE", callback_data="cb_more", style=ButtonStyle.SUCCESS)
 
     return InlineKeyboardMarkup([
@@ -77,7 +84,6 @@ def player_buttons(q, elapsed: int = 0):
     elapsed_str = format_duration(elapsed)
     bar = make_progress_bar(elapsed, q.now_playing.duration, length=7) if q.now_playing else "─" * 7
     
-    # Colorful Styles
     timer_row = rich_button_row(rich_button(f"{elapsed_str}  {bar}○  {dur_str}", callback_data="cb_timer", style="primary"))
     
     pause_btn = rich_button("▶️ RESUME" if q.paused else "⏸️ PAUSE", callback_data="cb_pause", style="success" if q.paused else "primary")
@@ -91,29 +97,3 @@ def player_buttons(q, elapsed: int = 0):
     more_btn = rich_button_row(rich_button("🎛 MORE CONTROL", callback_data="cb_more", style="success"))
     
     return timer_row + row2 + row3 + more_btn
-
-def more_buttons(q, page: int = 1):
-    if page == 1:
-        row1 = rich_button_row(rich_button("📋 QUEUE", callback_data="cb_q_show", style="primary"), rich_button("🔀 SHUFFLE", callback_data="cb_q_shuffle", style="success"))
-        row2 = rich_button_row(rich_button("📁 EXPORT", callback_data="cb_q_export", style="primary"), rich_button("⏩ SEEK", callback_data="cb_info_seek", style="success"))
-        row3 = rich_button_row(rich_button("🗑 CLEAR", callback_data="cb_q_clear", style="danger"), rich_button("🔄 AUTOPLAY", callback_data="cb_autoplay", style="primary"))
-        row4 = rich_button_row(rich_button("➡️ NEXT", callback_data="cb_more_page_2", style="primary"), rich_button("🔙 BACK", callback_data="cb_back_player", style="danger"))
-        return row1 + row2 + row3 + row4
-    elif page == 2:
-        loop_status = "ON" if q.loop > 0 else "OFF"
-        row1 = rich_button_row(rich_button(f"🔁 LOOP: {loop_status}", callback_data="cb_loop", style="primary"), rich_button("🎛 BASS BOOST", callback_data="cb_effect_bass", style="success"))
-        row2 = rich_button_row(rich_button("🎧 8D AUDIO", callback_data="cb_effect_8d", style="primary"), rich_button("⚡ NIGHTCORE", callback_data="cb_effect_nightcore", style="success"))
-        row3 = rich_button_row(rich_button("🔄 RESET FX", callback_data="cb_effect_reset", style="danger"), rich_button("➡️ NEXT", callback_data="cb_more_page_3", style="primary"))
-        row4 = rich_button_row(rich_button("⬅️ PREV", callback_data="cb_more_page_1", style="primary"), rich_button("🔙 BACK", callback_data="cb_back_player", style="danger"))
-        return row1 + row2 + row3 + row4
-    elif page == 3:
-        row1 = rich_button_row(rich_button("⚡ SPEED", callback_data="cb_info_speed", style="primary"), rich_button("🔊 VOLUME", callback_data="cb_info_volume", style="success"))
-        row2 = rich_button_row(rich_button("🎛 EQ", callback_data="cb_info_eq", style="primary"), rich_button("💤 SLEEP", callback_data="cb_info_sleep", style="success"))
-        row3 = rich_button_row(rich_button("➡️ NEXT", callback_data="cb_more_page_4", style="primary"), rich_button("⬅️ PREV", callback_data="cb_more_page_2", style="primary"))
-        row4 = rich_button_row(rich_button("🔙 BACK TO PLAYER", callback_data="cb_back_player", style="danger"))
-        return row1 + row2 + row3 + row4
-    elif page == 4:
-        row1 = rich_button_row(rich_button("🎤 KARAOKE", callback_data="cb_info_karaoke", style="success"), rich_button("💝 DEDICATE", callback_data="cb_info_dedicate", style="primary"))
-        row2 = rich_button_row(rich_button("⬅️ PREV PAGE", callback_data="cb_more_page_3", style="primary"))
-        row3 = rich_button_row(rich_button("🔙 BACK TO PLAYER", callback_data="cb_back_player", style="danger"))
-        return row1 + row2 + row3
