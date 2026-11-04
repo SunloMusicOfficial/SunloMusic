@@ -61,9 +61,7 @@ async def _api_request(endpoint: str, params: dict) -> dict | None:
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=API_HEADERS, params=params, timeout=15) as resp:
-                if resp.status != 200: 
-                    LOGGER.error(f"API Error {resp.status}: {await resp.text()}")
-                    return None
+                if resp.status != 200: return None
                 return await resp.json()
     except Exception as e: 
         LOGGER.error(f"API Request Error: {e}")
@@ -83,18 +81,15 @@ async def _download_telegram_cdn(cdnurl: str) -> str | None:
 
 async def _convert_media(input_path, is_video=False):
     if not os.path.exists(input_path): return None
-    if not is_video: return input_path # Audio VC streaming doesn't need conversion
+    if not is_video: return input_path
     if not input_path.endswith(".webm"): return input_path
     
     output_path = os.path.splitext(input_path)[0] + ".mp4"
-    if os.path.exists(output_path) and os.path.getsize(output_path) > 0: 
-        return output_path
+    if os.path.exists(output_path): return output_path
     try:
-        LOGGER.info(f"🎬 Fast Converting Video {input_path}...")
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "copy", "-c:a", "aac", output_path]
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "copy", "-c:a", "aac", "-threads", "0", output_path]
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         await process.communicate()
-        
         if os.path.exists(output_path):
             os.remove(input_path)
             return output_path
@@ -102,17 +97,18 @@ async def _convert_media(input_path, is_video=False):
         LOGGER.error(f"FFmpeg error: {e}")
     return input_path
 
-# ✅ NEW: Force MP3 conversion for downloads
-async def _convert_to_mp3(input_path):
+# ✅ ULTRA FAST AUDIO DOWNLOAD (Converts to M4A instead of MP3)
+async def _convert_to_fast_audio(input_path):
     if not os.path.exists(input_path): return None
-    if input_path.endswith(".mp3"): return input_path
+    if input_path.endswith((".mp3", ".m4a")): return input_path
     
-    output_path = os.path.splitext(input_path)[0] + ".mp3"
-    if os.path.exists(output_path) and os.path.getsize(output_path) > 0: return output_path
+    output_path = os.path.splitext(input_path)[0] + ".m4a"
+    if os.path.exists(output_path): return output_path
     
     try:
-        LOGGER.info(f"🎬 Converting download to MP3: {input_path}...")
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "libmp3lame", "-q:a", "2", output_path]
+        LOGGER.info(f"⚡ Fast converting to M4A (AAC)...")
+        # AAC is 10x faster than MP3
+        cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "aac", "-b:a", "192k", "-threads", "0", output_path]
         process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
         await process.communicate()
         
@@ -120,7 +116,7 @@ async def _convert_to_mp3(input_path):
             os.remove(input_path)
             return output_path
     except Exception as e:
-        LOGGER.error(f"MP3 Conversion error: {e}")
+        LOGGER.error(f"Audio Conversion error: {e}")
     return input_path
 
 async def _download_file(url: str, is_audio: bool) -> str | None:
@@ -160,14 +156,12 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if not query.startswith("http"):
         try: 
             ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
-        except: 
-            ytdlp_info = None
+        except: ytdlp_info = None
             
         if ytdlp_info and ytdlp_info.get("url"):
             webpage_url = ytdlp_info["url"]
             meta = ytdlp_info
         else:
-            LOGGER.info("yt-dlp search failed, using API search...")
             search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
             if search_data and search_data.get("results"):
                 track = search_data["results"][0]
@@ -181,22 +175,16 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if not webpage_url: return None
 
     req_type = "video" if video else "audio"
-    LOGGER.info(f"Fetching stream from API for: {webpage_url}")
     track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
     
-    if not track_data:
-        LOGGER.error("❌ API /api/track returned None")
-        return None
+    if not track_data: return None
 
     result = track_data
     if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
         result = track_data["results"][0]
 
     cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
-    
-    if not cdnurl:
-        LOGGER.error(f"❌ API response missing CDN URL: {track_data}")
-        return None
+    if not cdnurl: return None
 
     final_thumb = meta.get("thumbnail") or result.get("thumbnail", "")
     final_dur = meta.get("duration") or int(result.get("duration") or 0)
@@ -209,12 +197,11 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             _SEARCH_CACHE[cache_key] = (res, time.time())
             return res
     else:
-        LOGGER.info(f"⬇️ Downloading from API CDN: {cdnurl[:50]}...")
         local_path = await _download_file(cdnurl, not video)
         if local_path:
             if video:
                 local_path = await _convert_media(local_path, video=True)
-            # We don't convert to MP3 here, so /play remains fast with .webm
+            # Audio is kept as .webm for fast VC play, we convert it in download_media_file
             res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
             _SEARCH_CACHE[cache_key] = (res, time.time())
             return res
@@ -225,7 +212,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     
     return None
 
-# ✅ FIXED: Force MP3 for downloads
 async def download_media_file(query: str, video: bool = False, max_duration: int = 3600):
     res = await extract_audio(query, video)
     if res and res.get("url"):
@@ -235,11 +221,11 @@ async def download_media_file(query: str, video: bool = False, max_duration: int
                 if video:
                     path = await _convert_media(path, video=True)
                 else:
-                    path = await _convert_to_mp3(path)  # ✅ Convert to MP3 for /song
+                    path = await _convert_to_fast_audio(path) 
                 return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
         else:
-            if not video and not res["url"].endswith(".mp3"):
-                path = await _convert_to_mp3(res["url"]) # ✅ Convert local .webm to .mp3
+            if not video and not res["url"].endswith((".mp3", ".m4a")):
+                path = await _convert_to_fast_audio(res["url"])
             else:
                 path = res["url"]
             return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
