@@ -9,7 +9,7 @@ import SunloMusic.bot as bot_module
 from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration
-from SunloMusic.ytdlp import extract_audio, get_autoplay, download_media_file, _convert_media
+from SunloMusic.ytdlp import extract_audio, get_autoplay, download_media_file
 from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
 from SunloMusic.database import add_recent, get_group_setting
 from SunloMusic.lyrics import start_live_karaoke
@@ -119,9 +119,7 @@ async def start_next_song(chat_id, q):
                 track = autoplay_tracks[0]
                 info = await extract_audio(f"https://youtube.com/watch?v={track['video_id']}")
                 if info:
-                    q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0))
-                    # Set video_id for next autoplay loop
-                    q.queue[0].video_id = info.get("video_id")
+                    q.queue.append(Track(info["title"], info["url"], info["duration"], info["thumbnail"], "Auto-DJ", 0, video_id=info.get("video_id")))
         except Exception as e: 
             LOGGER.error(f"Auto-DJ error: {e}")
 
@@ -211,7 +209,11 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     if not url.startswith("http") and not os.path.exists(url):
         LOGGER.error(f"❌ File not found before playing: {url}")
         return False
-    if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
+        
+    # Audio direct .mp3 hai, toh video=False handle ho jayega
+    if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
+        video = False
+        
     ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time)
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
