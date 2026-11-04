@@ -63,7 +63,7 @@ async def play_cmd(_, m):
     
     if not is_admin: return await status.edit_text("🚫 <b>Only admins can use this.</b>")
     if not assist_ok: return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
-    if not info: return await status.edit_text("❌ <b>Failed to fetch media.</b>")
+    if not info: return await status.edit_text("❌ <b>Failed to fetch media (API Quota or Link Error).</b>")
 
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -79,7 +79,8 @@ async def play_cmd(_, m):
     if is_duplicate:
         return await status.edit_text("⚠️ <b>This song is already playing or in the queue!</b>")
     
-    track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video)
+    # ✅ Added video_id
+    track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video, video_id=info.get("video_id", ""))
     
     if q.now_playing:
         q.queue.append(track)
@@ -115,7 +116,6 @@ async def play_cmd(_, m):
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
     
-    # ✅ EXACT OLD FORMAT (Clickable Title & Request)
     card_text = (
         f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" />'
         f"<b>🎧🎶 Music Time 🎶🎧</b>\n"

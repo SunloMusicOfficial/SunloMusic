@@ -1,10 +1,8 @@
-import aiohttp, asyncio, yt_dlp, os, time, subprocess
-from urllib.parse import urlparse
+import aiohttp, asyncio, yt_dlp, os, time
 from SunloMusic.config import config
 from SunloMusic.logger import LOGGER
 import SunloMusic.bot as bot_module
 
-API_HEADERS = {"X-API-Key": config.ONEGRAB_API_KEY, "Accept": "application/json"}
 DOWNLOAD_DIR = "cache/downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -18,7 +16,7 @@ def _search_ytdlp_sync(query: str):
         ydl_opts = {
             "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
             "extractor_args": EXTRACTOR_ARGS,
-            "match_filter": yt_dlp.utils.match_filter_func("duration < 600")
+            "match_filter": yt_dlp.utils.match_filter_func("duration < 1800") # Filter > 30 mins
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
@@ -28,7 +26,7 @@ def _search_ytdlp_sync(query: str):
                 thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
                 return {
                     "title": entry.get("title", query),
-                    "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else entry.get("url"),
+                    "video_id": vid_id,
                     "duration": int(entry.get("duration") or 0),
                     "thumbnail": thumb
                 }
@@ -38,10 +36,7 @@ def _search_ytdlp_sync(query: str):
 
 def _search_ytdlp_multi_sync(query: str, limit: int = 10):
     try:
-        ydl_opts = {
-            "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
-            "extractor_args": EXTRACTOR_ARGS
-        }
+        ydl_opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True, "extractor_args": EXTRACTOR_ARGS}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
             results = []
@@ -50,96 +45,76 @@ def _search_ytdlp_multi_sync(query: str, limit: int = 10):
                     if e:
                         vid_id = e.get("id")
                         thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else ""
-                        results.append({"title": e.get("title", "Unknown"), "url": f"https://www.youtube.com/watch?v={vid_id}" if vid_id else e.get("url"), "duration": int(e.get("duration") or 0), "thumbnail": thumb})
+                        results.append({"title": e.get("title", "Unknown"), "video_id": vid_id, "url": f"https://youtube.com/watch?v={vid_id}", "duration": int(e.get("duration") or 0), "thumbnail": thumb})
             return results
     except Exception as e:
         LOGGER.error(f"yt-dlp multi search error: {e}")
         return []
 
-async def _api_request(endpoint: str, params: dict) -> dict | None:
-    url = f"{config.ONEGRAB_API_URL.rstrip('/')}{endpoint}"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=API_HEADERS, params=params, timeout=15) as resp:
-                if resp.status != 200: return None
-                return await resp.json()
-    except Exception as e: 
-        LOGGER.error(f"API Request Error: {e}")
+# ✅ DOWNLOAD VIA SHRUTI API
+async def _download_shruti(video_id: str, is_video: bool) -> str | None:
+    if not video_id: return None
+    ext = ".mp4" if is_video else ".mp3"
+    file_path = f"{DOWNLOAD_DIR}/{video_id}{ext}"
+    
+    # Check if already downloaded
+    if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+        return file_path
+
+    if not config.SHRUTI_API_KEY:
+        LOGGER.error("❌ SHRUTI_API_KEY missing in config!")
         return None
 
-async def _download_telegram_cdn(cdnurl: str) -> str | None:
-    if not bot_module.assistant: return None
-    link = urlparse(cdnurl)
-    parts = link.path.strip("/").split("/")
-    if len(parts) != 2 or not parts[1].isdigit(): return None
-    channel, message_id = parts[0], int(parts[1])
-    try:
-        message = await bot_module.assistant.get_messages(channel, message_id)
-        if not message or not message.media: return None
-        return await bot_module.assistant.download_media(message, file_name=DOWNLOAD_DIR + "/")
-    except: return None
-
-async def _convert_media(input_path, is_video=False):
-    if not os.path.exists(input_path): return None
-    if not is_video: return input_path
-    if not input_path.endswith(".webm"): return input_path
+    url = f"{config.SHRUTI_API_URL.rstrip('/')}/download"
+    params = {
+        "url": video_id,
+        "type": "video" if is_video else "audio",
+        "api_key": config.SHRUTI_API_KEY
+    }
     
-    output_path = os.path.splitext(input_path)[0] + ".mp4"
-    if os.path.exists(output_path): return output_path
     try:
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-c:v", "copy", "-c:a", "aac", "-threads", "0", output_path]
-        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-        await process.communicate()
-        if os.path.exists(output_path):
-            os.remove(input_path)
-            return output_path
+        LOGGER.info(f"⬇️ Downloading {video_id} via ShrutiBots...")
+        async with aiohttp.ClientSession() as session:
+            # Timeout 300s for audio, 600s for video (as per docs)
+            timeout = aiohttp.ClientTimeout(total=600 if is_video else 300)
+            async with session.get(url, params=params, timeout=timeout) as resp:
+                if resp.status == 200:
+                    with open(file_path, "wb") as f:
+                        async for chunk in resp.content.iter_chunked(131072):
+                            f.write(chunk)
+                    if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                        return file_path
+                elif resp.status == 429:
+                    LOGGER.error("❌ ShrutiBots API Quota Exhausted!")
+                elif resp.status in (401, 403):
+                    LOGGER.error(f"❌ ShrutiBots API Key Error: {resp.status}")
+                else:
+                    LOGGER.error(f"❌ ShrutiBots Download Error: {resp.status}")
     except Exception as e:
-        LOGGER.error(f"FFmpeg error: {e}")
-    return input_path
+        LOGGER.error(f"ShrutiBots Exception: {e}")
+        if os.path.exists(file_path):
+            try: os.remove(file_path)
+            except: pass
+    return None
 
-# ✅ ULTRA FAST AUDIO DOWNLOAD (Converts to M4A instead of MP3)
-async def _convert_to_fast_audio(input_path):
-    if not os.path.exists(input_path): return None
-    if input_path.endswith((".mp3", ".m4a")): return input_path
-    
-    output_path = os.path.splitext(input_path)[0] + ".m4a"
-    if os.path.exists(output_path): return output_path
-    
-    try:
-        LOGGER.info(f"⚡ Fast converting to M4A (AAC)...")
-        # AAC is 10x faster than MP3
-        cmd = ["ffmpeg", "-y", "-i", input_path, "-vn", "-c:a", "aac", "-b:a", "192k", "-threads", "0", output_path]
-        process = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)
-        await process.communicate()
-        
-        if os.path.exists(output_path):
-            os.remove(input_path)
-            return output_path
-    except Exception as e:
-        LOGGER.error(f"Audio Conversion error: {e}")
-    return input_path
-
-async def _download_file(url: str, is_audio: bool) -> str | None:
-    ext = ".webm"
-    if url.endswith(".mp3"): ext = ".mp3"
-    elif url.endswith(".m4a"): ext = ".m4a"
-    elif url.endswith(".mp4"): ext = ".mp4"
-    
-    file_path = f"{DOWNLOAD_DIR}/{abs(hash(url))}{ext}"
-    if os.path.exists(file_path): return file_path
+# ✅ SHRUTI AUTOPLAY FEATURE
+async def get_autoplay(video_id: str, seed_id: str = None) -> list:
+    if not config.SHRUTI_API_KEY: return []
+    url = f"{config.SHRUTI_API_URL.rstrip('/')}/autoplay"
+    params = {"video_id": video_id, "api_key": config.SHRUTI_API_KEY}
+    if seed_id: params["seed_id"] = seed_id
     
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=60) as resp:
+            async with session.get(url, params=params, timeout=15) as resp:
                 if resp.status == 200:
-                    with open(file_path, "wb") as f: f.write(await resp.read())
-                    return file_path
+                    data = await resp.json()
+                    return data.get("tracks", [])
     except Exception as e:
-        LOGGER.error(f"Download error: {e}")
-    return None
+        LOGGER.error(f"Autoplay error: {e}")
+    return []
 
 async def extract_audio(query: str, video: bool = False) -> dict | None:
-    if not config.ONEGRAB_API_KEY: return None
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
         return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
 
@@ -147,88 +122,63 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     if cache_key in _SEARCH_CACHE:
         data, t = _SEARCH_CACHE[cache_key]
         if time.time() - t < _CACHE_TTL:
-            return data
+            if not data["url"].startswith("http") and not os.path.exists(data["url"]):
+                pass # File deleted, proceed to redownload
+            else:
+                return data
 
     webpage_url = query
     meta = {}
     loop = asyncio.get_running_loop()
 
+    # 1. Search via yt-dlp (Fastest & most accurate)
     if not query.startswith("http"):
         try: 
             ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
-        except: ytdlp_info = None
+        except: 
+            ytdlp_info = None
             
-        if ytdlp_info and ytdlp_info.get("url"):
-            webpage_url = ytdlp_info["url"]
+        if ytdlp_info and ytdlp_info.get("video_id"):
+            webpage_url = f"https://youtube.com/watch?v={ytdlp_info['video_id']}"
             meta = ytdlp_info
-        else:
-            search_data = await _api_request("/api/search", {"query": query, "platform": "youtube"})
-            if search_data and search_data.get("results"):
-                track = search_data["results"][0]
-                webpage_url = track.get("url")
-                vid_id = ""
-                if "v=" in webpage_url:
-                    vid_id = webpage_url.split("v=")[1].split("&")[0]
-                thumb = f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg" if vid_id else track.get("thumbnail", "")
-                meta = {"title": track.get("title", query), "duration": int(track.get("duration") or 0), "thumbnail": thumb}
-
-    if not webpage_url: return None
-
-    req_type = "video" if video else "audio"
-    track_data = await _api_request("/api/track", {"url": webpage_url, "type": req_type})
-    
-    if not track_data: return None
-
-    result = track_data
-    if "results" in track_data and isinstance(track_data["results"], list) and len(track_data["results"]) > 0:
-        result = track_data["results"][0]
-
-    cdnurl = result.get("cdnurl") or result.get("download_url") or result.get("audio_url") or result.get("video_url")
-    if not cdnurl: return None
-
-    final_thumb = meta.get("thumbnail") or result.get("thumbnail", "")
-    final_dur = meta.get("duration") or int(result.get("duration") or 0)
-    final_title = meta.get("title") or result.get("title", "Unknown")
-    
-    if "t.me" in cdnurl or "telegram.me" in cdnurl:
-        local_path = await _download_telegram_cdn(cdnurl)
-        if local_path: 
-            res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-            _SEARCH_CACHE[cache_key] = (res, time.time())
-            return res
     else:
-        local_path = await _download_file(cdnurl, not video)
-        if local_path:
-            if video:
-                local_path = await _convert_media(local_path, video=True)
-            # Audio is kept as .webm for fast VC play, we convert it in download_media_file
-            res = {"title": final_title, "url": local_path, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-            _SEARCH_CACHE[cache_key] = (res, time.time())
-            return res
-        else:
-            res = {"title": final_title, "url": cdnurl, "duration": final_dur, "thumbnail": final_thumb, "webpage_url": webpage_url}
-            _SEARCH_CACHE[cache_key] = (res, time.time())
-            return res
-    
-    return None
+        # If direct URL provided, extract ID
+        try:
+            def _get_info(url):
+                with yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True, "nocheckcertificate": True, "extractor_args": EXTRACTOR_ARGS}) as ydl:
+                    return ydl.extract_info(url, download=False)
+            info = await loop.run_in_executor(None, _get_info, query)
+            if info:
+                vid_id = info.get("id")
+                meta = {"title": info.get("title", "Unknown"), "video_id": vid_id, "duration": int(info.get("duration") or 0), "thumbnail": f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"}
+                webpage_url = info.get("webpage_url", query)
+        except: pass
+
+    if not meta.get("video_id"):
+        LOGGER.error("❌ Could not find video_id")
+        return None
+
+    # 2. Download via Shruti API
+    local_path = await _download_shruti(meta["video_id"], video)
+    if not local_path:
+        return None
+
+    res = {
+        "title": meta.get("title", "Unknown"), 
+        "url": local_path, 
+        "duration": meta.get("duration", 0), 
+        "thumbnail": meta.get("thumbnail", ""), 
+        "webpage_url": webpage_url,
+        "video_id": meta["video_id"]
+    }
+    _SEARCH_CACHE[cache_key] = (res, time.time())
+    return res
 
 async def download_media_file(query: str, video: bool = False, max_duration: int = 3600):
+    # /song command use karega
     res = await extract_audio(query, video)
     if res and res.get("url"):
-        if res["url"].startswith("http"):
-            path = await _download_file(res["url"], not video)
-            if path:
-                if video:
-                    path = await _convert_media(path, video=True)
-                else:
-                    path = await _convert_to_fast_audio(path) 
-                return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
-        else:
-            if not video and not res["url"].endswith((".mp3", ".m4a")):
-                path = await _convert_to_fast_audio(res["url"])
-            else:
-                path = res["url"]
-            return {"path": path, "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
+        return {"path": res["url"], "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}
     return None
 
 def cleanup_download(path: str):

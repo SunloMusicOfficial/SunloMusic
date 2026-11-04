@@ -10,11 +10,11 @@ class Config(BaseSettings):
     SESSION_STRING: str
     MONGO_URL: str
 
-    # Music APIs
-    ONEGRAB_API_KEY: str = "" 
-    ONEGRAB_API_URL: str = "https://api.onegrab.fun"
+    # ✅ ShrutiBots API (Replaced OneGrab)
+    SHRUTI_API_KEY: str = ""
+    SHRUTI_API_URL: str = "https://api.shrutibots.in"
     
-    # ✅ NEW: Groq AI API for Voice Commands
+    # Groq AI API for Voice Commands
     GROQ_API_KEY: str = ""
 
     # Owner & Admin Settings
