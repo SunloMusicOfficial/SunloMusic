@@ -2,28 +2,20 @@ from pyrogram import filters
 from pyrogram.types import Message
 from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors
-from richgram import rich_send, rich_heading, rich_esc
+from richgram import rich_send
 
-# Note: richgram ke exact block names library ke version par depend karte hain.
-# Agar error aaye toh fallback ke liye normal text use karein.
-
-@bot.on_message(filters.command("allcommand_rich"))
+@bot.on_message(filters.command("richhelp"))
 @catch_errors
-async def allcommand_rich_cmd(_, m: Message):
-    # Ye ek structured rich message bhejega jisme headings, lists, aur tables honge
+async def rich_help_cmd(_, m: Message):
     text = (
-        rich_heading("📜 SunloMusic Commands", level=2) +
-        rich_heading("🎵 Music", level=3) +
-        "<ul><li>/play</li><li>/vplay</li><li>/search</li><li>/trending</li></ul>" +
-        rich_heading("⏯ Controls", level=3) +
-        "<ul><li>/pause</li><li>/resume</li><li>/skip</li><li>/stop</li><li>/seek</li></ul>" +
-        rich_heading("🎛 Effects", level=3) +
-        "<ul><li>/bass</li><li>/8d</li><li>/nightcore</li><li>/reset</li></ul>" +
-        rich_heading("🛡 Admin", level=3) +
-        "<ul><li>/settings</li><li>/welcome</li><li>/tagall</li><li>/purge</li></ul>"
+        "<tg-thinking>User is asking for help, loading the best UI...</tg-thinking>\n"
+        "<h2>🎵 SunloMusic Help</h2>\n"
+        "<p>Here are the available commands:</p>\n"
+        "<tg-codeblock language='python'>\n# Play a song\nbot.play('Kesariya')\n</tg-codeblock>\n"
+        "<tg-math>E = mc^2</tg-math>\n"
+        "<b>Click the button below to see all commands!</b>"
     )
     try:
         await rich_send(bot, m.chat.id, text)
-    except:
-        # Fallback if rich blocks not supported
-        await m.reply_text("📜 <b>Use /allcommand for the full list.</b>")
+    except Exception as e:
+        await m.reply_text(f"Rich blocks error: {e}")
