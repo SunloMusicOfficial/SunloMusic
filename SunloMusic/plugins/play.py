@@ -17,6 +17,8 @@ from richgram import rich_send, rich_esc
 LOADING_EMOJIS = ["✨", "🌸", "🪄", "🌟", "🦋", "🎧", "🎶", "🍃", "🔥", "💫", "🪐", "🌈"]
 
 async def _check_admin(m):
+    # If sent by channel/anonymous, we can't check admin directly
+    if not m.from_user: return False
     if m.from_user.id == config.OWNER_ID or m.from_user.id in config.sudo_list: return True
     try:
         if await is_sudo(m.from_user.id): return True
@@ -29,6 +31,10 @@ async def _check_admin(m):
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @catch_errors
 async def play_cmd(_, m):
+    # ✅ FIXED: Handle Anonymous Admins/Channels
+    if not m.from_user:
+        return await m.reply_text("❌ <b>Anonymous admins/Channels cannot use this command.</b>\nPlease use your personal account.")
+
     if m.reply_to_message and m.reply_to_message.from_user and m.reply_to_message.from_user.is_bot:
         if m.reply_to_message.from_user.id != bot.me.id: return
     if m.text and m.text.startswith("/") and "@" in m.text.split()[0]:
@@ -63,7 +69,7 @@ async def play_cmd(_, m):
     
     if not is_admin: return await status.edit_text("🚫 <b>Only admins can use this.</b>")
     if not assist_ok: return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
-    if not info: return await status.edit_text("❌ <b>Failed to fetch media (API Quota or Link Error).</b>")
+    if not info: return await status.edit_text("❌ <b>Failed to fetch media.</b>")
 
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -79,7 +85,7 @@ async def play_cmd(_, m):
     if is_duplicate:
         return await status.edit_text("⚠️ <b>This song is already playing or in the queue!</b>")
     
-    # ✅ Added video_id
+    # ✅ Added video_id for Shruti API Autoplay
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video, video_id=info.get("video_id", ""))
     
     if q.now_playing:
