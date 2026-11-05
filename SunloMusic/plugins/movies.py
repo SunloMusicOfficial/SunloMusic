@@ -9,8 +9,9 @@ from SunloMusic.config import config
 WEB_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://sunlomusic.onrender.com").rstrip("/")
 
 async def get_movie_ddl_links(movie_name: str):
-    """Fetch real links from YTS for Hollywood, fallback to Google for others."""
-    # 1. Try YTS API (Hollywood Movies)
+    """Fetch real links from YTS, then PirateBay, then fallback to Google."""
+    
+    # 1. Try YTS API (Best for Hollywood, gives direct .torrent file)
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(f"https://yts.mx/api/v2/list_movies.json?query_term={movie_name}&limit=1") as resp:
@@ -26,6 +27,7 @@ async def get_movie_ddl_links(movie_name: str):
                             elif t["quality"] == "720p": links["720p"] = t["url"]
                         
                         if links:
+                            LOGGER.info(f"YTS links found for {movie_name}")
                             return {
                                 "4k": links.get("4k", links.get("1080p", "#")),
                                 "1080p": links.get("1080p", links.get("720p", "#")),
@@ -34,7 +36,38 @@ async def get_movie_ddl_links(movie_name: str):
     except Exception as e:
         LOGGER.error(f"YTS API Error: {e}")
     
-    # 2. Fallback: Google Search (For Bollywood, Unreleased, etc.)
+    # 2. Try PirateBay API (Best for Bollywood, Regional, and New Movies, gives Magnet link)
+    try:
+        async with aiohttp.ClientSession() as session:
+            query = movie_name.replace(' ', '%20')
+            # Category 200 = Video
+            async with session.get(f"https://apibay.org/q.php?q={query}&cat=200") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    # Check if results exist and are valid
+                    if data and len(data) > 0 and data[0].get("id") != "0":
+                        # Sort by seeders to get the best torrent
+                        results = sorted([r for r in data if int(r.get("seeders", 0)) > 0], key=lambda x: int(x["seeders"]), reverse=True)
+                        if results:
+                            best = results[0]
+                            info_hash = best["info_hash"]
+                            seeders = best["seeders"]
+                            # Create Magnet Link
+                            trackers = "&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451"
+                            magnet = f"magnet:?xt=urn:btih:{info_hash}{trackers}"
+                            
+                            LOGGER.info(f"PirateBay magnet found for {movie_name} (Seeders: {seeders})")
+                            # PirateBay doesn't separate 4K/1080p in basic API, so we give the best magnet for all
+                            return {
+                                "4k": magnet,
+                                "1080p": magnet,
+                                "720p": magnet
+                            }
+    except Exception as e:
+        LOGGER.error(f"PirateBay API Error: {e}")
+
+    # 3. Fallback: Google Search (If movie is too new and not even on PirateBay)
+    LOGGER.info(f"No torrent found for {movie_name}, using Google fallback.")
     query = movie_name.replace(' ', '+')
     return {
         "4k": f"https://www.google.com/search?q={query}+movie+download+4k",
