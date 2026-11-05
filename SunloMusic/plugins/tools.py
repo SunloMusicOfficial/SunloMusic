@@ -3,119 +3,46 @@ from pyrogram import filters
 from pyrogram.types import Message, CallbackQuery, LinkPreviewOptions
 from SunloMusic.bot import bot
 from SunloMusic.decorators import catch_errors, admin_only
-from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, get_queue
+from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, CROSSFADE_CHATS, get_queue
 from SunloMusic.lyrics import fetch_lyrics_text, start_live_karaoke
 from SunloMusic.keyboards import settings_keyboard
 from SunloMusic.database import get_group_setting, set_group_setting
 
-@bot.on_message(filters.command("karaoke") & filters.group)
+@bot.on_message(filters.command("crossfade") & filters.group)
 @catch_errors
 @admin_only
-async def karaoke_cmd(_, m):
-    try: await m.delete()
-    except: pass
-    if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/karaoke on</code>")
-    state = m.command[1].lower()
-    
-    if state == "on":
-        KARAOKE_CHATS.add(m.chat.id)
-        q = get_queue(m.chat.id)
-        if q.now_playing:
-            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>")
-            q.karaoke_task = asyncio.create_task(start_live_karaoke(bot, m.chat.id, q.now_playing.title, q.now_playing.duration, q))
-        else:
-            await m.reply_text("🎤 <b>Karaoke Mode ON!</b>")
-    elif state == "off":
-        KARAOKE_CHATS.discard(m.chat.id)
-        q = get_queue(m.chat.id)
-        if q.karaoke_task:
-            q.karaoke_task.cancel()
-            q.karaoke_task = None
-        await m.reply_text("🎤 <b>Karaoke Mode OFF.</b>")
-
-@bot.on_message(filters.command("autodj") & filters.group)
-@catch_errors
-@admin_only
-async def autodj_cmd(_, m):
-    try: await m.delete()
-    except: pass
-    if len(m.command) < 2:
-        return await m.reply_text("❌ <b>Usage:</b> <code>/autodj on</code> or <code>/autodj off</code>")
-    
+async def crossfade_cmd(_, m):
+    if len(m.command) < 2: return await m.reply_text("❌ Usage: <code>/crossfade on</code> or <code>off</code>")
     state = m.command[1].lower()
     if state == "on":
-        AUTO_DJ_CHATS.add(m.chat.id)
-        await m.reply_text("🎧 <b>Auto-DJ Enabled!</b>")
+        CROSSFADE_CHATS.add(m.chat.id)
+        await m.reply_text("✨ <b>Crossfade Enabled!</b>")
     elif state == "off":
-        AUTO_DJ_CHATS.discard(m.chat.id)
-        await m.reply_text("🛑 <b>Auto-DJ Disabled.</b>")
+        CROSSFADE_CHATS.discard(m.chat.id)
+        await m.reply_text("🔇 <b>Crossfade Disabled.</b>")
 
 @bot.on_message(filters.command("settings") & filters.group)
 @catch_errors
 @admin_only
 async def settings_cmd(_, m):
-    try: await m.delete()
-    except: pass
     tts_status = await get_group_setting(m.chat.id, "tts", False)
     vsearch_status = await get_group_setting(m.chat.id, "vsearch", False)
-    
-    text = (
-        "⚙️ <b>『 GROUP SETTINGS 』</b> ⚙️\n"
-        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-        "🎙️ <b>SunloMusic AI:</b> Bot will announce the song name in VC.\n"
-        "🎤 <b>Voice Search:</b> Users can send voice notes to play songs.\n"
-        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-        "👇 <i>Click buttons to toggle ON/OFF</i>"
-    )
+    text = "⚙️ <b>『 GROUP SETTINGS 』</b> ⚙️\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n🎙️ <b>AI Voice:</b> Announce song name.\n🎤 <b>Voice Search:</b> Play via voice notes.\n▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
     await m.reply_text(text, reply_markup=settings_keyboard(tts_status, vsearch_status), link_preview_options=LinkPreviewOptions(is_disabled=True))
 
-@bot.on_callback_query(filters.regex("^toggle_tts$"))
+@bot.on_callback_query(filters.regex("^toggle_(tts|vsearch)$"))
 @catch_errors
-async def toggle_tts_cb(_, cq: CallbackQuery):
-    chat_id = cq.message.chat.id
-    current = await get_group_setting(chat_id, "tts", False)
-    new_state = not current
-    await set_group_setting(chat_id, "tts", new_state)
-    
-    await cq.answer("🟢 SunloMusic AI Voice Enabled" if new_state else "🔴 SunloMusic AI Voice Disabled")
-        
-    tts_status = await get_group_setting(chat_id, "tts", False)
-    vsearch_status = await get_group_setting(chat_id, "vsearch", False)
-    try: await cq.message.edit_reply_markup(reply_markup=settings_keyboard(tts_status, vsearch_status))
-    except: pass
-
-@bot.on_callback_query(filters.regex("^toggle_vsearch$"))
-@catch_errors
-async def toggle_vsearch_cb(_, cq: CallbackQuery):
-    chat_id = cq.message.chat.id
-    current = await get_group_setting(chat_id, "vsearch", False)
-    new_state = not current
-    await set_group_setting(chat_id, "vsearch", new_state)
-    
-    await cq.answer("🟢 Voice Search Enabled" if new_state else "🔴 Voice Search Disabled")
-        
-    tts_status = await get_group_setting(chat_id, "tts", False)
-    vsearch_status = await get_group_setting(chat_id, "vsearch", False)
-    try: await cq.message.edit_reply_markup(reply_markup=settings_keyboard(tts_status, vsearch_status))
+async def toggle_cb(_, cq: CallbackQuery):
+    key = "tts" if "tts" in cq.data else "vsearch"
+    current = await get_group_setting(cq.message.chat.id, key, False)
+    await set_group_setting(cq.message.chat.id, key, not current)
+    await cq.answer(f"{'🟢 Enabled' if not current else '🔴 Disabled'}")
+    tts = await get_group_setting(cq.message.chat.id, "tts", False)
+    vs = await get_group_setting(cq.message.chat.id, "vsearch", False)
+    try: await cq.message.edit_reply_markup(reply_markup=settings_keyboard(tts, vs))
     except: pass
 
 @bot.on_callback_query(filters.regex("^close_settings$"))
 @catch_errors
 async def close_settings_cb(_, cq: CallbackQuery):
-    await cq.message.delete()
-    await cq.answer()
-
-@bot.on_message(filters.command("lyrics"))
-@catch_errors
-async def lyrics_cmd(_, m):
-    try: await m.delete()
-    except: pass
-    if len(m.command) < 2: return await m.reply_text("❌ <b>Usage:</b> <code>/lyrics song name</code>")
-    query = " ".join(m.command[1:])
-    status = await m.reply_text("🔎 <b>Searching lyrics...</b>")
-    
-    res = await fetch_lyrics_text(query)
-    if res: 
-        await status.edit_text(f"🎤 <b>{query}</b>\n━━━━━━━━━━━━━\n<blockquote>{res[:4000]}</blockquote>")
-    else: 
-        await status.edit_text("❌ <b>Lyrics not found in any database.</b>")
+    await cq.message.delete(); await cq.answer()

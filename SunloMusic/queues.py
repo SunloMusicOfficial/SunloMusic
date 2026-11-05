@@ -13,7 +13,7 @@ class Track:
     requester_id: int
     video: bool = False
     message_id: int = 0
-    video_id: str = "" # ✅ Added for Shruti Autoplay
+    video_id: str = ""
 
 @dataclass
 class ChatQueue:
@@ -38,6 +38,7 @@ KARAOKE_CHATS = set()
 AUTO_DJ_CHATS = set()
 TTS_CHATS = set()
 VOICE_CMD_CHATS = set()
+CROSSFADE_CHATS = set()
 
 def get_queue(chat_id: int) -> ChatQueue:
     if chat_id not in _queues: _queues[chat_id] = ChatQueue(chat_id=chat_id)
