@@ -99,6 +99,8 @@ async def update_live_timer(chat_id, msg_id):
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import Track, clear_queue
+    from SunloMusic.plugins.voice import speak_in_vc # ✅ FIXED: Moved import to top
+    
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
     if q.playing_message_id:
@@ -110,7 +112,6 @@ async def start_next_song(chat_id, q):
     last_video_id = getattr(q.now_playing, "video_id", None) if q.now_playing else None
     q.now_playing = None
     
-    # ✅ SHRUTI AUTOPLAY INTEGRATION
     if not q.queue and chat_id in AUTO_DJ_CHATS and last_video_id:
         try:
             LOGGER.info(f"🎵 Fetching Autoplay for {last_video_id}...")
@@ -131,7 +132,6 @@ async def start_next_song(chat_id, q):
             except: pass
             nxt.message_id = 0
 
-        from SunloMusic.plugins.voice import speak_in_vc
         if await get_group_setting(chat_id, "tts", False):
             await speak_in_vc(chat_id, f"Agla gaana, {nxt.title}")
 
@@ -210,7 +210,6 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
         LOGGER.error(f"❌ File not found before playing: {url}")
         return False
         
-    # Audio direct .mp3 hai, toh video=False handle ho jayega
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
         
