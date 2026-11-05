@@ -6,9 +6,9 @@ from SunloMusic.decorators import catch_errors
 from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
 
-WEB_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://sunlomusic.onrender.com")
+# ✅ Ensure URL is clean (No trailing slash)
+WEB_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://sunlomusic.onrender.com").rstrip("/")
 
-# ✅ Yahan Tu Apna Asli Scraper Daalega (VegaMovies, HDHub4u)
 async def get_movie_ddl_links(movie_name: str):
     # Demo Links (Inhe apne scraper se replace kar)
     return {
@@ -32,14 +32,14 @@ async def search_movie_tmdb(query: str):
 @bot.on_message(filters.command("movie") & filters.private)
 @catch_errors
 async def movie_search_cmd(_, m: Message):
-    if not config.TMDB_API_KEY: return await m.reply_text("❌ TMDB_API_KEY missing!")
+    if not config.TMDB_API_KEY: return await m.reply_text("❌ TMDB_API_KEY missing in Render Environment!")
     if len(m.command) < 2: return await m.reply_text("❌ Usage: <code>/movie Movie Name</code>")
     
     query = " ".join(m.command[1:])
     status = await m.reply_text(f"🍿 <b>Searching Database...</b>")
     
     movies = await search_movie_tmdb(query)
-    if not movies: return await status.edit_text("❌ <b>Movie nahi mili!</b>")
+    if not movies: return await status.edit_text("❌ <b>Movie nahi mili! Try different name.</b>")
     
     movie = movies[0]
     title = movie.get("title", "Unknown")
@@ -49,9 +49,16 @@ async def movie_search_cmd(_, m: Message):
     poster = f"https://image.tmdb.org/t/p/w500{movie.get('poster_path')}" if movie.get("poster_path") else ""
     
     caption = f"🎬 <b>{title} ({year})</b>\n━━━━━━━━━━━━━\n⭐ <b>Rating:</b> {rating}/10\n📝 <b>Plot:</b> <i>{overview}...</i>\n━━━━━━━━━━━━━\n👇 <b>Click below to download:</b>"
-    download_url = f"{WEB_URL}/movie?id={movie['id']}&title={title}"
+    
+    # ✅ FIXED: Removed '&title={title}' to prevent Invalid URL Error
+    download_url = f"{WEB_URL}/movie?id={movie['id']}"
     buttons = InlineKeyboardMarkup([[InlineKeyboardButton("⬇️ Download / Watch Now", url=download_url)]])
     
     await status.delete()
-    if poster: await m.reply_photo(poster, caption=caption, reply_markup=buttons)
-    else: await m.reply_text(caption, reply_markup=buttons)
+    if poster: 
+        try: 
+            await m.reply_photo(poster, caption=caption, reply_markup=buttons)
+        except:
+            await m.reply_text(caption, reply_markup=buttons)
+    else: 
+        await m.reply_text(caption, reply_markup=buttons)
