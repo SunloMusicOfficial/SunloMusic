@@ -69,8 +69,7 @@ async def _handle_movie_download(request):
         btn_html = """
         <div style="text-align: center; padding: 20px; background: rgba(255,0,0,0.1); border: 1px solid rgba(255,0,0,0.3); border-radius: 12px;">
             <h3 style="color: #ff4444; margin-bottom: 10px;">⚠️ Download Not Available</h3>
-            <p style="color: #ccc; font-size: 0.9rem;">This movie is either too new (in theatres) or has no active torrents available right now.</p>
-            <p style="color: #888; font-size: 0.8rem; margin-top: 10px;">Please check back later.</p>
+            <p style="color: #ccc; font-size: 0.9rem;">This movie has no active torrents available right now on Torrentio or PirateBay.</p>
         </div>
         """
     else:
