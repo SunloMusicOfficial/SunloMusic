@@ -40,10 +40,11 @@ async def _handle_dashboard(request):
         return web.Response(text=f"Error: {e}", status=500)
 
 async def _handle_movie_download(request):
-    # ✅ FIXED: Import moved inside function to prevent "bot is None" crash
     from SunloMusic.plugins.movies import get_movie_ddl_links
     
     movie_id = request.query.get("id")
+    imdb_id = request.query.get("imdb", "")
+    
     if not movie_id or not TMDB_API_KEY: return web.Response(text="Invalid Request.", status=400)
 
     try:
@@ -61,7 +62,26 @@ async def _handle_movie_download(request):
     genres = " • ".join([g["name"] for g in data.get("genres", [])])
     poster = f"{TMDB_IMG_BASE}{data.get('poster_path')}" if data.get("poster_path") else ""
     backdrop = f"{TMDB_IMG_BASE}{data.get('backdrop_path')}" if data.get("backdrop_path") else poster
-    links = await get_movie_ddl_links(title)
+    
+    # ✅ Fetch Links using Torrentio (Pass IMDB ID)
+    links = await get_movie_ddl_links(title, imdb_id)
+
+    if not links:
+        btn_html = """
+        <div style="text-align: center; padding: 20px; background: rgba(255,0,0,0.1); border: 1px solid rgba(255,0,0,0.3); border-radius: 12px;">
+            <h3 style="color: #ff4444; margin-bottom: 10px;">⚠️ Download Not Available</h3>
+            <p style="color: #ccc; font-size: 0.9rem;">This movie is either too new (in theatres) or has no active torrents available right now.</p>
+            <p style="color: #888; font-size: 0.8rem; margin-top: 10px;">Please check back later.</p>
+        </div>
+        """
+    else:
+        btn_html = f"""
+        <div class="btn-group">
+            <a href="{links['4k']}" class="btn btn-4k"><span class="quality">4K UHD</span></a>
+            <a href="{links['1080p']}" class="btn btn-1080p"><span class="quality">1080p FHD</span></a>
+            <a href="{links['720p']}" class="btn btn-720p"><span class="quality">720p HD</span></a>
+        </div>
+        """
 
     html = f"""
     <!DOCTYPE html>
@@ -109,11 +129,7 @@ async def _handle_movie_download(request):
                 <div class="meta" style="font-size:0.8rem; color:#888;">{genres}</div>
                 <div class="plot">{overview}</div>
                 <div class="download-title">⬇️ High-Speed Downloads</div>
-                <div class="btn-group">
-                    <a href="{links['4k']}" class="btn btn-4k"><span class="quality">4K UHD</span></a>
-                    <a href="{links['1080p']}" class="btn btn-1080p"><span class="quality">1080p FHD</span></a>
-                    <a href="{links['720p']}" class="btn btn-720p"><span class="quality">720p HD</span></a>
-                </div>
+                {btn_html}
             </div>
         </div>
     </body>
