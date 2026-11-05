@@ -9,9 +9,26 @@ from SunloMusic.config import config
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "")
 TMDB_SEARCH_URL = "https://api.themoviedb.org/3/search/multi"
 TMDB_IMG_BASE = "https://image.tmdb.org/t/p/w500"
-
-# Tera Render URL
 WEB_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://sunlomusic.onrender.com")
+
+# ✅ Yahan Tu Apna Scraper API ya Logic Daal Sakta Hai
+async def get_movie_ddl_links(movie_name: str):
+    """
+    Ye function internet se Direct Download Links (DDL) scrape karega.
+    Filhal maine demo ke liye kuch fake links daale hain.
+    Aap ise VegaMovies, HDHub4u ya 1337x ke scraper se replace kar sakte hain.
+    """
+    LOGGER.info(f"Scraping DDL for: {movie_name}")
+    
+    # Example: Agar aapke paas koi API hai jo links nikal kar deta hai, toh use call karein
+    # ya fir requests/BeautifulSoup se site scrape karein.
+    
+    # Demo Links (Jo website ke buttons me jayenge)
+    return {
+        "4k": f"https://vegamovies.download/4k/{movie_name.replace(' ', '-').lower()}",
+        "1080p": f"https://vegamovies.download/1080p/{movie_name.replace(' ', '-').lower()}",
+        "720p": f"https://vegamovies.download/720p/{movie_name.replace(' ', '-').lower()}"
+    }
 
 async def search_movie_tmdb(query: str):
     if not TMDB_API_KEY: return []
@@ -21,7 +38,7 @@ async def search_movie_tmdb(query: str):
             async with session.get(TMDB_SEARCH_URL, params=params, timeout=15) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    return [r for r in data.get("results", []) if r.get("media_type") == "movie"][:5]
+                    return [r for r in data.get("results", []) if r.get("media_type") == "movie"][:1]
     except Exception as e:
         LOGGER.error(f"TMDB Search Error: {e}")
     return []
@@ -45,7 +62,7 @@ async def movie_search_cmd(_, m: Message):
     title = movie.get("title", "Unknown")
     year = movie.get("release_date", "N/A")[:4]
     rating = movie.get("vote_average", "N/A")
-    overview = movie.get("overview", "No description available.")[:300]
+    overview = movie.get("overview", "No description.")[:300]
     poster = f"{TMDB_IMG_BASE}{movie.get('poster_path')}" if movie.get("poster_path") else ""
     
     caption = (
@@ -57,8 +74,8 @@ async def movie_search_cmd(_, m: Message):
         f"👇 <b>Click below to download:</b>"
     )
     
-    # ✅ Website ka Link Button
-    download_url = f"{WEB_URL}/movie?id={movie['id']}&title={title}&poster={poster}"
+    # Website ka Link
+    download_url = f"{WEB_URL}/movie?id={movie['id']}&title={title}"
     
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("⬇️ Download / Watch Now", url=download_url)]
