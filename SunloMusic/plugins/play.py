@@ -14,10 +14,7 @@ from SunloMusic.keyboards import player_buttons, queue_add_keyboard
 from SunloMusic.logger import LOGGER
 from richgram import rich_send, rich_esc
 
-LOADING_EMOJIS = ["✨", "🌸", "🪄", "🌟", "🦋", "🎧", "🎶", "🍃", "🔥", "💫", "🪐", "🌈"]
-
 async def _check_admin(m):
-    # If sent by channel/anonymous, we can't check admin directly
     if not m.from_user: return False
     if m.from_user.id == config.OWNER_ID or m.from_user.id in config.sudo_list: return True
     try:
@@ -31,10 +28,8 @@ async def _check_admin(m):
 @bot.on_message(filters.command(["play", "vplay"]) & filters.group)
 @catch_errors
 async def play_cmd(_, m):
-    # ✅ FIXED: Handle Anonymous Admins/Channels
     if not m.from_user:
-        return await m.reply_text("❌ <b>Anonymous admins/Channels cannot use this command.</b>\nPlease use your personal account.")
-
+        return await m.reply_text("❌ <b>Anonymous admins/Channels cannot use this command.</b>")
     if m.reply_to_message and m.reply_to_message.from_user and m.reply_to_message.from_user.is_bot:
         if m.reply_to_message.from_user.id != bot.me.id: return
     if m.text and m.text.startswith("/") and "@" in m.text.split()[0]:
@@ -57,7 +52,20 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    status = await m.reply_text(f"{random.choice(LOADING_EMOJIS)} <b>Fetching your music...</b>")
+    # ✅ PREMIUM LOADING UI (Blockquote + Native Action)
+    loading_text = (
+        "<blockquote>"
+        "🎵 <b>SUNLO PREMIUM ENGINE</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"🔍 <b>Searching:</b> <code>{query[:30]}</code>\n"
+        "⚡ <b>Status:</b> <i>Initializing audio stream...</i>"
+        "</blockquote>"
+    )
+    status = await m.reply_text(loading_text)
+    
+    # Telegram top bar me "Uploading audio..." dikhega
+    asyncio.create_task(bot.send_chat_action(m.chat.id, enums.ChatAction.UPLOAD_AUDIO))
+    
     video = "vplay" in m.command[0].lower()
     
     admin_task = _check_admin(m)
@@ -69,7 +77,17 @@ async def play_cmd(_, m):
     
     if not is_admin: return await status.edit_text("🚫 <b>Only admins can use this.</b>")
     if not assist_ok: return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
-    if not info: return await status.edit_text("❌ <b>Failed to fetch media.</b>")
+    if not info: return await status.edit_text("❌ <b>Failed to fetch media (API Error).</b>")
+
+    # ✅ Intermediate Update (Connecting step)
+    await status.edit_text(
+        "<blockquote>"
+        "🎵 <b>SUNLO PREMIUM ENGINE</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        f"🎶 <b>Found:</b> <code>{info['title'][:30]}</code>\n"
+        "⚡ <b>Status:</b> <i>Connecting to Voice Chat...</i>"
+        "</blockquote>"
+    )
 
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -85,7 +103,6 @@ async def play_cmd(_, m):
     if is_duplicate:
         return await status.edit_text("⚠️ <b>This song is already playing or in the queue!</b>")
     
-    # ✅ Added video_id for Shruti API Autoplay
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video, video_id=info.get("video_id", ""))
     
     if q.now_playing:
@@ -118,6 +135,7 @@ async def play_cmd(_, m):
     q.votes = set()
     await status.delete()
     
+    # ✅ PREMIUM PLAYER CARD (Rich Message)
     thumb_url = track.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
     b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
     title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
