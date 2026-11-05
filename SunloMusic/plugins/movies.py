@@ -1,4 +1,4 @@
-import asyncio, os, aiohttp
+import asyncio, os, aiohttp, re
 from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from SunloMusic.bot import bot
@@ -9,9 +9,9 @@ from SunloMusic.config import config
 WEB_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://sunlomusic.onrender.com").rstrip("/")
 
 async def get_movie_ddl_links(movie_name: str, imdb_id: str = None):
-    """Fetch real links using Torrentio API (Searches ALL torrent sites)."""
+    """Fetch real links using Torrentio API, then PirateBay, then DDL scrape."""
     
-    # 1. Try Torrentio API (Best for everything, requires IMDB ID)
+    # 1. Torrentio API (Best for everything, requires IMDB ID)
     if imdb_id:
         try:
             url = f"https://torrentio.strem.fun/stream/movie/{imdb_id}.json"
@@ -21,11 +21,9 @@ async def get_movie_ddl_links(movie_name: str, imdb_id: str = None):
                         data = await resp.json()
                         streams = data.get("streams", [])
                         if streams:
-                            # Find the best quality stream (just take the first one that has a magnet/url)
                             for s in streams:
                                 if "url" in s and s["url"].startswith("magnet:"):
                                     LOGGER.info(f"Torrentio found link for {movie_name} ({imdb_id})")
-                                    # Torrentio doesn't separate 4k/1080p easily in the basic JSON, so we give the same magnet for all
                                     magnet = s["url"]
                                     return {
                                         "4k": magnet,
@@ -35,12 +33,11 @@ async def get_movie_ddl_links(movie_name: str, imdb_id: str = None):
         except Exception as e:
             LOGGER.error(f"Torrentio API Error: {e}")
 
-    # 2. Try PirateBay API (Fallback if Torrentio fails or no IMDB ID)
+    # 2. PirateBay API (Fallback for Bollywood, Regional, etc.)
     try:
+        clean_name = movie_name.split(':')[0].split('-')[0].strip()
+        query = clean_name.replace(' ', '%20')
         async with aiohttp.ClientSession() as session:
-            clean_name = movie_name.split(':')[0].split('-')[0].strip()
-            query = clean_name.replace(' ', '%20')
-            
             async with session.get(f"https://apibay.org/q.php?q={query}&cat=200") as resp:
                 if resp.status == 200:
                     data = await resp.json()
@@ -61,6 +58,28 @@ async def get_movie_ddl_links(movie_name: str, imdb_id: str = None):
     except Exception as e:
         LOGGER.error(f"PirateBay API Error: {e}")
 
+    # 3. Direct DDL Scrape (VegaMovies / Movies4u) - Fallback for Skanda etc.
+    try:
+        # Example: Scrape a known DDL site for the movie page
+        search_url = f"https://vegamovies.download/?s={movie_name.replace(' ', '+')}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(search_url, timeout=15) as resp:
+                if resp.status == 200:
+                    html = await resp.text()
+                    # Simple regex to find 1080p/720p download links (adjust as needed)
+                    links = re.findall(r'https://[^"\']+\.(?:mkv|mp4)', html)
+                    if links:
+                        LOGGER.info(f"DDL scraped links found for {movie_name}")
+                        return {
+                            "4k": links[0],
+                            "1080p": links[0] if len(links) > 1 else links[0],
+                            "720p": links[1] if len(links) > 1 else links[0]
+                        }
+    except Exception as e:
+        LOGGER.error(f"DDL Scrape Error: {e}")
+
+    # 4. No links found
+    LOGGER.info(f"No torrent/DDL found for {movie_name}")
     return None
 
 async def search_movie_tmdb(query: str):
@@ -71,7 +90,6 @@ async def search_movie_tmdb(query: str):
             async with session.get("https://api.themoviedb.org/3/search/multi", params=params, timeout=15) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    # We need imdb_id for Torrentio, so we return the whole object
                     return [r for r in data.get("results", []) if r.get("media_type") == "movie"][:1]
     except: pass
     return []
@@ -95,7 +113,6 @@ async def movie_search_cmd(_, m: Message):
     overview = movie.get("overview", "No description.")[:300]
     poster = f"https://image.tmdb.org/t/p/w500{movie.get('poster_path')}" if movie.get("poster_path") else ""
     
-    # ✅ Pass IMDB ID to the website URL
     imdb_id = movie.get("imdb_id", "")
     download_url = f"{WEB_URL}/movie?id={movie['id']}&imdb={imdb_id}"
     

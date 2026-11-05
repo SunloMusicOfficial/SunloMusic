@@ -63,7 +63,6 @@ async def _handle_movie_download(request):
     poster = f"{TMDB_IMG_BASE}{data.get('poster_path')}" if data.get("poster_path") else ""
     backdrop = f"{TMDB_IMG_BASE}{data.get('backdrop_path')}" if data.get("backdrop_path") else poster
     
-    # ✅ Fetch Links using Torrentio (Pass IMDB ID)
     links = await get_movie_ddl_links(title, imdb_id)
 
     if not links:
