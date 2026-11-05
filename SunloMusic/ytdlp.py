@@ -1,4 +1,5 @@
-import aiohttp, asyncio, yt_dlp, os, time
+import aiohttp, asyncio, yt_dlp, os, time, re
+from urllib.parse import urlparse
 from SunloMusic.config import config
 from SunloMusic.logger import LOGGER
 import SunloMusic.bot as bot_module
@@ -16,7 +17,7 @@ def _search_ytdlp_sync(query: str):
         ydl_opts = {
             "quiet": True, "no_warnings": True, "noplaylist": True, "extract_flat": True, "nocheckcertificate": True,
             "extractor_args": EXTRACTOR_ARGS,
-            "match_filter": yt_dlp.utils.match_filter_func("duration < 1800") # Filter > 30 mins
+            "match_filter": yt_dlp.utils.match_filter_func("duration < 1800")
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"ytsearch1:{query} song audio", download=False)
@@ -51,13 +52,11 @@ def _search_ytdlp_multi_sync(query: str, limit: int = 10):
         LOGGER.error(f"yt-dlp multi search error: {e}")
         return []
 
-# ✅ DOWNLOAD VIA SHRUTI API
 async def _download_shruti(video_id: str, is_video: bool) -> str | None:
     if not video_id: return None
     ext = ".mp4" if is_video else ".mp3"
     file_path = f"{DOWNLOAD_DIR}/{video_id}{ext}"
     
-    # Check if already downloaded
     if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
         return file_path
 
@@ -75,7 +74,6 @@ async def _download_shruti(video_id: str, is_video: bool) -> str | None:
     try:
         LOGGER.info(f"⬇️ Downloading {video_id} via ShrutiBots...")
         async with aiohttp.ClientSession() as session:
-            # Timeout 300s for audio, 600s for video (as per docs)
             timeout = aiohttp.ClientTimeout(total=600 if is_video else 300)
             async with session.get(url, params=params, timeout=timeout) as resp:
                 if resp.status == 200:
@@ -97,7 +95,6 @@ async def _download_shruti(video_id: str, is_video: bool) -> str | None:
             except: pass
     return None
 
-# ✅ SHRUTI AUTOPLAY FEATURE
 async def get_autoplay(video_id: str, seed_id: str = None) -> list:
     if not config.SHRUTI_API_KEY: return []
     url = f"{config.SHRUTI_API_URL.rstrip('/')}/autoplay"
@@ -114,16 +111,36 @@ async def get_autoplay(video_id: str, seed_id: str = None) -> list:
         LOGGER.error(f"Autoplay error: {e}")
     return []
 
+# ✅ Spotify URL Handler
+def _get_spotify_title(url: str):
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if info:
+                return info.get("title", "")
+    except: pass
+    return ""
+
 async def extract_audio(query: str, video: bool = False) -> dict | None:
     if any(query.lower().endswith(ext) for ext in (".m4a", ".mp4", ".mp3", ".webm")):
         return {"title": "Direct Link", "url": query, "duration": 0, "thumbnail": "", "webpage_url": query}
+
+    # ✅ SPOTIFY SUPPORT
+    if "open.spotify.com" in query or "spotify.link" in query:
+        status_msg = await bot_module.bot.send_message(chat_id, "🔍 Extracting Spotify track...")
+        loop = asyncio.get_running_loop()
+        spotify_title = await loop.run_in_executor(None, _get_spotify_title, query)
+        await status_msg.delete()
+        if spotify_title:
+            query = spotify_title
+            LOGGER.info(f"Spotify extracted: {query}")
 
     cache_key = f"{query}_{video}"
     if cache_key in _SEARCH_CACHE:
         data, t = _SEARCH_CACHE[cache_key]
         if time.time() - t < _CACHE_TTL:
             if not data["url"].startswith("http") and not os.path.exists(data["url"]):
-                pass # File deleted, proceed to redownload
+                pass
             else:
                 return data
 
@@ -131,7 +148,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     meta = {}
     loop = asyncio.get_running_loop()
 
-    # 1. Search via yt-dlp (Fastest & most accurate)
     if not query.startswith("http"):
         try: 
             ytdlp_info = await asyncio.wait_for(loop.run_in_executor(None, _search_ytdlp_sync, query), timeout=10.0)
@@ -142,7 +158,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
             webpage_url = f"https://youtube.com/watch?v={ytdlp_info['video_id']}"
             meta = ytdlp_info
     else:
-        # If direct URL provided, extract ID
         try:
             def _get_info(url):
                 with yt_dlp.YoutubeDL({"quiet": True, "extract_flat": True, "nocheckcertificate": True, "extractor_args": EXTRACTOR_ARGS}) as ydl:
@@ -158,7 +173,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
         LOGGER.error("❌ Could not find video_id")
         return None
 
-    # 2. Download via Shruti API
     local_path = await _download_shruti(meta["video_id"], video)
     if not local_path:
         return None
@@ -175,7 +189,6 @@ async def extract_audio(query: str, video: bool = False) -> dict | None:
     return res
 
 async def download_media_file(query: str, video: bool = False, max_duration: int = 3600):
-    # /song command use karega
     res = await extract_audio(query, video)
     if res and res.get("url"):
         return {"path": res["url"], "title": res["title"], "duration": res["duration"], "thumbnail": res["thumbnail"]}

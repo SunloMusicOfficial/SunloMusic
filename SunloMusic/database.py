@@ -14,7 +14,6 @@ lb_col = db["leaderboard"]
 gplaylists_col = db["gplaylists"]
 afk_col = db["afk"]
 settings_col = db["settings"]
-# ✅ NEW COLLECTIONS
 favorites_col = db["favorites"]
 coins_col = db["coins"]
 daily_col = db["daily"]
@@ -22,6 +21,8 @@ recent_col = db["recent"]
 quiz_col = db["quiz"]
 voteplay_col = db["voteplay"]
 shop_col = db["shop_purchases"]
+gban_col = db["gban"]
+global_settings_col = db["global_settings"]
 
 SPAM_DICT = {}
 
@@ -108,15 +109,8 @@ async def get_afk(user_id: int):
 async def remove_afk(user_id: int):
     await afk_col.delete_one({"user_id": user_id})
 
-# ═══════════════════════════════════════════
-# ✅ NEW: FAVORITES
-# ═══════════════════════════════════════════
 async def add_favorite(user_id: int, song: dict):
-    await favorites_col.update_one(
-        {"user_id": user_id, "url": song["url"]},
-        {"$set": song},
-        upsert=True
-    )
+    await favorites_col.update_one({"user_id": user_id, "url": song["url"]}, {"$set": song}, upsert=True)
 
 async def remove_favorite(user_id: int, url: str):
     await favorites_col.delete_one({"user_id": user_id, "url": url})
@@ -127,15 +121,9 @@ async def get_favorites(user_id: int, limit: int = 50):
 async def is_favorite(user_id: int, url: str) -> bool:
     return await favorites_col.find_one({"user_id": user_id, "url": url}) is not None
 
-# ═══════════════════════════════════════════
-# ✅ NEW: COINS
-# ═══════════════════════════════════════════
 async def add_coins(user_id: int, amount: int):
     result = await coins_col.find_one_and_update(
-        {"user_id": user_id},
-        {"$inc": {"coins": amount}},
-        upsert=True,
-        return_document=True
+        {"user_id": user_id}, {"$inc": {"coins": amount}}, upsert=True, return_document=True
     )
     return result.get("coins", amount) if result else amount
 
@@ -150,9 +138,6 @@ async def spend_coins(user_id: int, amount: int) -> bool:
     await coins_col.update_one({"user_id": user_id}, {"$inc": {"coins": -amount}})
     return True
 
-# ═══════════════════════════════════════════
-# ✅ NEW: DAILY REWARD
-# ═══════════════════════════════════════════
 async def claim_daily(user_id: int):
     now = time.time()
     data = await daily_col.find_one({"user_id": user_id})
@@ -167,9 +152,6 @@ async def get_daily_cooldown(user_id: int) -> int:
     elapsed = time.time() - data.get("last_claim", 0)
     return max(0, int(86400 - elapsed))
 
-# ═══════════════════════════════════════════
-# ✅ NEW: RECENT
-# ═══════════════════════════════════════════
 async def add_recent(chat_id: int, track: dict):
     await recent_col.update_one(
         {"chat_id": chat_id},
@@ -181,22 +163,12 @@ async def get_recent(chat_id: int) -> list:
     data = await recent_col.find_one({"chat_id": chat_id})
     return data["tracks"] if data else []
 
-# ═══════════════════════════════════════════
-# ✅ NEW: QUIZ
-# ═══════════════════════════════════════════
 async def add_quiz_score(user_id: int, name: str):
-    await quiz_col.update_one(
-        {"user_id": user_id},
-        {"$inc": {"wins": 1}, "$set": {"name": name}},
-        upsert=True
-    )
+    await quiz_col.update_one({"user_id": user_id}, {"$inc": {"wins": 1}, "$set": {"name": name}}, upsert=True)
 
 async def get_quiz_leaderboard(limit: int = 10):
     return await quiz_col.find().sort("wins", -1).limit(limit).to_list(limit)
 
-# ═══════════════════════════════════════════
-# ✅ NEW: VOTEPLAY
-# ═══════════════════════════════════════════
 async def add_voteplay(chat_id: int, data: dict):
     await voteplay_col.update_one({"chat_id": chat_id}, {"$set": data}, upsert=True)
 
@@ -206,16 +178,42 @@ async def get_voteplay(chat_id: int):
 async def remove_voteplay(chat_id: int):
     await voteplay_col.delete_one({"chat_id": chat_id})
 
-# ═══════════════════════════════════════════
-# ✅ NEW: SHOP PURCHASES
-# ═══════════════════════════════════════════
 async def add_purchase(user_id: int, item: str):
-    await shop_col.update_one(
-        {"user_id": user_id},
-        {"$addToSet": {"items": item}},
-        upsert=True
-    )
+    await shop_col.update_one({"user_id": user_id}, {"$addToSet": {"items": item}}, upsert=True)
 
 async def get_purchases(user_id: int) -> list:
     data = await shop_col.find_one({"user_id": user_id})
     return data.get("items", []) if data else []
+
+async def gban_user(user_id: int, reason: str):
+    await gban_col.update_one({"user_id": user_id}, {"$set": {"reason": reason, "time": time.time()}}, upsert=True)
+
+async def ungban_user(user_id: int) -> bool:
+    res = await gban_col.delete_one({"user_id": user_id})
+    return res.deleted_count > 0
+
+async def is_gbanned(user_id: int):
+    return await gban_col.find_one({"user_id": user_id})
+
+async def get_gban_list() -> list:
+    return await gban_col.find().to_list(100)
+
+async def set_maintenance(status: bool):
+    await global_settings_col.update_one({"key": "maintenance"}, {"$set": {"value": status}}, upsert=True)
+
+async def get_maintenance() -> bool:
+    data = await global_settings_col.find_one({"key": "maintenance"})
+    return data.get("value", False) if data else False
+
+# ✅ NEW FUNCTIONS
+async def set_fsub(chat_id: int, channel: str):
+    await set_group_setting(chat_id, "fsub", channel)
+
+async def get_fsub(chat_id: int) -> str:
+    return await get_group_setting(chat_id, "fsub", None)
+
+async def set_prefix(chat_id: int, prefix: str):
+    await set_group_setting(chat_id, "prefix", prefix)
+
+async def get_prefix(chat_id: int) -> str:
+    return await get_group_setting(chat_id, "prefix", "/")

@@ -31,9 +31,13 @@ def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0)
     volume = ctrl.get("volume", 1.0)
     eq = ctrl.get("eq", "none")
     af_filters = []
+    
     if effect == "bass": af_filters.append("bass=g=10")
     elif effect == "8d": af_filters.append("apulsator=hz=0.1")
     elif effect == "nightcore": af_filters.append("atempo=1.25,asetrate=44100*1.25")
+    # ✅ NEW EFFECTS
+    elif effect == "chipmunk": af_filters.append("asetrate=44100*1.5,atempo=1/1.5")
+    elif effect == "monster": af_filters.append("asetrate=44100*0.7,atempo=1/0.7")
     else:
         if eq != "none":
             eq_map = {"bass": "bass=g=12", "pop": "equalizer=f=1000:width_type=h:width=200:g=5", "rock": "equalizer=f=100:width_type=h:width=200:g=3,equalizer=f=3000:width_type=h:width=200:g=4", "jazz": "equalizer=f=200:width_type=h:width=200:g=2", "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5"}
@@ -99,7 +103,7 @@ async def update_live_timer(chat_id, msg_id):
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import Track, clear_queue
-    from SunloMusic.plugins.voice import speak_in_vc # ✅ FIXED: Moved import to top
+    from SunloMusic.plugins.voice import speak_in_vc
     
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None

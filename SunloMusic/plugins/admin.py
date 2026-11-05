@@ -1,11 +1,11 @@
-import asyncio, time, platform, os, sys, subprocess
+import asyncio, time, platform, os, sys
 from pyrogram import filters
 from pyrogram.types import Message
 from SunloMusic.bot import bot
 from SunloMusic.config import config
-from SunloMusic.database import set_auth, get_all_chats, get_stats, add_sudo, remove_sudo, sudo_col, is_sudo
+from SunloMusic.database import set_auth, get_all_chats, get_stats, add_sudo, remove_sudo, sudo_col, is_sudo, set_fsub, set_prefix
 from SunloMusic.decorators import sudo_only, admin_only, catch_errors
-from SunloMusic.queues import active_chats, get_queue
+from SunloMusic.queues import active_chats
 
 @bot.on_message(filters.command("auth") & filters.group)
 @catch_errors
@@ -13,6 +13,37 @@ from SunloMusic.queues import active_chats, get_queue
 async def auth_cmd(_, m: Message):
     await set_auth(m.chat.id, True)
     await m.reply_text("✅ <b>Chat Authorized</b>")
+
+# ✅ NEW: Force Subscribe Command
+@bot.on_message(filters.command("fsub") & filters.group)
+@catch_errors
+@admin_only
+async def fsub_cmd(_, m: Message):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/fsub @YourChannel</code> or <code>/fsub off</code>")
+    
+    if m.command[1].lower() == "off":
+        await set_fsub(m.chat.id, None)
+        return await m.reply_text("✅ <b>Force Subscribe Disabled.</b>")
+    
+    channel = m.command[1]
+    await set_fsub(m.chat.id, channel)
+    await m.reply_text(f"✅ <b>Force Subscribe set to:</b> {channel}\n<i>Users must join this channel to use the bot.</i>")
+
+# ✅ NEW: Custom Prefix Command
+@bot.on_message(filters.command("setprefix") & filters.group)
+@catch_errors
+@admin_only
+async def setprefix_cmd(_, m: Message):
+    if len(m.command) < 2:
+        return await m.reply_text("❌ <b>Usage:</b> <code>/setprefix !</code> or <code>/setprefix .</code>")
+    
+    prefix = m.command[1]
+    if len(prefix) > 1:
+        return await m.reply_text("❌ Prefix must be a single character.")
+    
+    await set_prefix(m.chat.id, prefix)
+    await m.reply_text(f"✅ <b>Prefix changed to:</b> <code>{prefix}</code>")
 
 @bot.on_message(filters.command("stats"))
 @catch_errors
@@ -29,22 +60,6 @@ async def stats_cmd(_, m: Message):
         f"━━━━━━━━━━━━━"
     )
     await m.reply_text(text)
-
-# ✅ NEW: Set Bot Profile Photo (Bot API 9.4)
-@bot.on_message(filters.command("setprofilepic"))
-@catch_errors
-@sudo_only
-async def setprofilepic_cmd(_, m: Message):
-    if not m.reply_to_message or not m.reply_to_message.photo:
-        return await m.reply_text("❌ <b>Reply to a photo to set as bot profile pic.</b>")
-    
-    status = await m.reply_text("📸 <b>Setting profile picture...</b>")
-    try:
-        photo = await m.reply_to_message.download()
-        await bot.set_profile_photo(photo=photo)
-        await status.edit_text("✅ <b>Profile picture updated!</b>")
-    except Exception as e:
-        await status.edit_text(f"❌ <b>Error:</b> <code>{e}</code>")
 
 @bot.on_message(filters.command("broadcast"))
 @catch_errors
@@ -84,11 +99,9 @@ async def delsudo_cmd(_, m: Message):
 async def sudolist_cmd(_, m: Message):
     sudos = [u async for u in sudo_col.find({})]
     text = "<b>👑 Sudo Users List</b>\n━━━━━━━━━━━━━\n"
-    if not sudos:
-        text += "No sudo users found.\n"
+    if not sudos: text += "No sudo users found.\n"
     else:
-        for idx, u in enumerate(sudos, 1):
-            text += f"{idx}. <code>{u['user_id']}</code>\n"
+        for idx, u in enumerate(sudos, 1): text += f"{idx}. <code>{u['user_id']}</code>\n"
     text += "━━━━━━━━━━━━━\n"
     text += f"<b>Owner:</b> <code>{config.OWNER_ID}</code>"
     await m.reply_text(text)
