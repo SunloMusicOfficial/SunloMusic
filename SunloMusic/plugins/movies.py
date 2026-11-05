@@ -6,15 +6,40 @@ from SunloMusic.decorators import catch_errors
 from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
 
-# ✅ Ensure URL is clean (No trailing slash)
 WEB_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://sunlomusic.onrender.com").rstrip("/")
 
 async def get_movie_ddl_links(movie_name: str):
-    # Demo Links (Inhe apne scraper se replace kar)
+    """Fetch real links from YTS for Hollywood, fallback to Google for others."""
+    # 1. Try YTS API (Hollywood Movies)
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"https://yts.mx/api/v2/list_movies.json?query_term={movie_name}&limit=1") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    movies = data.get("data", {}).get("movies", [])
+                    if movies:
+                        torrents = movies[0].get("torrents", [])
+                        links = {}
+                        for t in torrents:
+                            if t["quality"] == "2160p": links["4k"] = t["url"]
+                            elif t["quality"] == "1080p": links["1080p"] = t["url"]
+                            elif t["quality"] == "720p": links["720p"] = t["url"]
+                        
+                        if links:
+                            return {
+                                "4k": links.get("4k", links.get("1080p", "#")),
+                                "1080p": links.get("1080p", links.get("720p", "#")),
+                                "720p": links.get("720p", links.get("1080p", "#"))
+                            }
+    except Exception as e:
+        LOGGER.error(f"YTS API Error: {e}")
+    
+    # 2. Fallback: Google Search (For Bollywood, Unreleased, etc.)
+    query = movie_name.replace(' ', '+')
     return {
-        "4k": f"https://vegamovies.download/4k/{movie_name.replace(' ', '-').lower()}",
-        "1080p": f"https://vegamovies.download/1080p/{movie_name.replace(' ', '-').lower()}",
-        "720p": f"https://vegamovies.download/720p/{movie_name.replace(' ', '-').lower()}"
+        "4k": f"https://www.google.com/search?q={query}+movie+download+4k",
+        "1080p": f"https://www.google.com/search?q={query}+movie+download+1080p",
+        "720p": f"https://www.google.com/search?q={query}+movie+download+720p"
     }
 
 async def search_movie_tmdb(query: str):
@@ -50,15 +75,12 @@ async def movie_search_cmd(_, m: Message):
     
     caption = f"🎬 <b>{title} ({year})</b>\n━━━━━━━━━━━━━\n⭐ <b>Rating:</b> {rating}/10\n📝 <b>Plot:</b> <i>{overview}...</i>\n━━━━━━━━━━━━━\n👇 <b>Click below to download:</b>"
     
-    # ✅ FIXED: Removed '&title={title}' to prevent Invalid URL Error
     download_url = f"{WEB_URL}/movie?id={movie['id']}"
     buttons = InlineKeyboardMarkup([[InlineKeyboardButton("⬇️ Download / Watch Now", url=download_url)]])
     
     await status.delete()
     if poster: 
-        try: 
-            await m.reply_photo(poster, caption=caption, reply_markup=buttons)
-        except:
-            await m.reply_text(caption, reply_markup=buttons)
+        try: await m.reply_photo(poster, caption=caption, reply_markup=buttons)
+        except: await m.reply_text(caption, reply_markup=buttons)
     else: 
         await m.reply_text(caption, reply_markup=buttons)
