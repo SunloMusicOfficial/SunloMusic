@@ -10,7 +10,7 @@ from SunloMusic.logger import LOGGER
 from SunloMusic.config import config
 from SunloMusic.formatters import format_duration
 from SunloMusic.ytdlp import extract_audio, get_autoplay, download_media_file
-from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS
+from SunloMusic.queues import KARAOKE_CHATS, AUTO_DJ_CHATS, CROSSFADE_CHATS
 from SunloMusic.database import add_recent, get_group_setting
 from SunloMusic.lyrics import start_live_karaoke
 from richgram import rich_send, rich_edit, rich_esc
@@ -25,25 +25,35 @@ def cleanup_file(url: str):
         try: os.remove(url)
         except: pass
 
-def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0) -> str | None:
+def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0, duration: int = 0) -> str | None:
     ctrl = AUDIO_CONTROLS.get(chat_id, {})
     speed = ctrl.get("speed", 1.0)
     volume = ctrl.get("volume", 1.0)
     eq = ctrl.get("eq", "none")
     af_filters = []
     
+    # ✅ CROSSFADE: Fade In (First 5 seconds)
+    if chat_id in CROSSFADE_CHATS and seek_time == 0:
+        af_filters.append("afade=t=in:st=0:d=5")
+        
+    # ✅ CROSSFADE: Fade Out (Last 5 seconds)
+    if chat_id in CROSSFADE_CHATS and duration > 10 and seek_time == 0:
+        fade_out_start = duration - 5
+        af_filters.append(f"afade=t=out:st={fade_out_start}:d=5")
+
     if effect == "bass": af_filters.append("bass=g=10")
     elif effect == "8d": af_filters.append("apulsator=hz=0.1")
     elif effect == "nightcore": af_filters.append("atempo=1.25,asetrate=44100*1.25")
-    # ✅ NEW EFFECTS
     elif effect == "chipmunk": af_filters.append("asetrate=44100*1.5,atempo=1/1.5")
     elif effect == "monster": af_filters.append("asetrate=44100*0.7,atempo=1/0.7")
     else:
         if eq != "none":
             eq_map = {"bass": "bass=g=12", "pop": "equalizer=f=1000:width_type=h:width=200:g=5", "rock": "equalizer=f=100:width_type=h:width=200:g=3,equalizer=f=3000:width_type=h:width=200:g=4", "jazz": "equalizer=f=200:width_type=h:width=200:g=2", "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5"}
             if eq in eq_map: af_filters.append(eq_map[eq])
+            
     if speed != 1.0: af_filters.append(f"atempo={speed}")
     if volume != 1.0: af_filters.append(f"volume={volume}")
+    
     params = []
     if seek_time > 0: params.append(f"-ss {seek_time}")
     if af_filters: params.append(f"-af \"{','.join(af_filters)}\"")
@@ -139,7 +149,7 @@ async def start_next_song(chat_id, q):
         if await get_group_setting(chat_id, "tts", False):
             await speak_in_vc(chat_id, f"Agla gaana, {nxt.title}")
 
-        await play_stream(chat_id, nxt.url, nxt.video)
+        await play_stream(chat_id, nxt.url, nxt.video, duration=nxt.duration)
         q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
         
         try:
@@ -193,7 +203,7 @@ async def stream_end_handler(client, update: StreamEnded):
         return
     if not q.now_playing: return
     if q.loop == 1 and q.now_playing:
-        await play_stream(chat_id, q.now_playing.url, q.now_playing.video)
+        await play_stream(chat_id, q.now_playing.url, q.now_playing.video, duration=q.now_playing.duration)
         q.start_time = time.time(); q.total_paused = 0; q.paused = False
         return
     if q.loop == 2 and q.now_playing: q.queue.append(q.now_playing)
@@ -208,7 +218,8 @@ def init_calls():
 async def start_call():
     if call: await call.start()
 
-async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none", seek_time: int = 0):
+# ✅ ADDED duration parameter here
+async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none", seek_time: int = 0, duration: int = 0):
     if not call: return False
     if not url.startswith("http") and not os.path.exists(url):
         LOGGER.error(f"❌ File not found before playing: {url}")
@@ -217,7 +228,7 @@ async def play_stream(chat_id: int, url: str, video: bool = False, effect: str =
     if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
         video = False
         
-    ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time)
+    ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time, duration)
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
     try:
