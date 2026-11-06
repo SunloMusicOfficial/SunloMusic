@@ -1,7 +1,6 @@
 import asyncio, time, base64, os, random
 import aiohttp
 from pyrogram import enums
-from pyrogram.types import LinkPreviewOptions
 from pyrogram.errors import FloodWait
 from pytgcalls import PyTgCalls, filters as fl
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality, StreamEnded, GroupCallConfig
@@ -31,12 +30,10 @@ def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0,
     volume = ctrl.get("volume", 1.0)
     eq = ctrl.get("eq", "none")
     af_filters = []
-    
     if chat_id in CROSSFADE_CHATS and seek_time == 0:
         af_filters.append("afade=t=in:st=0:d=5")
     if chat_id in CROSSFADE_CHATS and duration > 10 and seek_time == 0:
         af_filters.append(f"afade=t=out:st={duration-5}:d=5")
-
     if effect == "bass": af_filters.append("bass=g=10")
     elif effect == "8d": af_filters.append("apulsator=hz=0.1")
     elif effect == "nightcore": af_filters.append("atempo=1.25,asetrate=44100*1.25")
@@ -46,10 +43,8 @@ def _build_audio_filters(chat_id: int, effect: str = "none", seek_time: int = 0,
         if eq != "none":
             eq_map = {"bass": "bass=g=12", "pop": "equalizer=f=1000:width_type=h:width=200:g=5", "rock": "equalizer=f=100:width_type=h:width=200:g=3,equalizer=f=3000:width_type=h:width=200:g=4", "jazz": "equalizer=f=200:width_type=h:width=200:g=2", "vocal": "equalizer=f=2000:width_type=h:width=1000:g=5"}
             if eq in eq_map: af_filters.append(eq_map[eq])
-            
     if speed != 1.0: af_filters.append(f"atempo={speed}")
     if volume != 1.0: af_filters.append(f"volume={volume}")
-    
     params = []
     if seek_time > 0: params.append(f"-ss {seek_time}")
     if af_filters: params.append(f"-af \"{','.join(af_filters)}\"")
@@ -62,7 +57,7 @@ async def check_empty_vc(chat_id):
         if len(humans) == 0:
             if chat_id not in EMPTY_VC_TIMERS: EMPTY_VC_TIMERS[chat_id] = time.time()
             elif time.time() - EMPTY_VC_TIMERS[chat_id] > 180:
-                await bot_module.bot.send_message(chat_id, "💤 <b>No humans in VC for 3 minutes. Leaving...</b>")
+                await bot_module.bot.send_message(chat_id, "💤 <b>No humans in VC. Leaving...</b>")
                 await stop_stream(chat_id)
                 from SunloMusic.queues import clear_queue
                 clear_queue(chat_id)
@@ -81,10 +76,8 @@ async def update_live_timer(chat_id, msg_id):
         if not q.now_playing or q.playing_message_id != msg_id: break
         if q.paused: continue
         if await check_empty_vc(chat_id): break
-        
         elapsed = int(time.time() - q.start_time - q.total_paused)
         if q.now_playing.duration > 0 and elapsed >= q.now_playing.duration: break
-        
         try:
             thumb_url = q.now_playing.thumbnail or "https://i.ibb.co/68xK6Z4/sunlo-premium.jpg"
             b64_title = base64.urlsafe_b64encode(q.now_playing.title.encode()).decode().strip("=")
@@ -93,12 +86,11 @@ async def update_live_timer(chat_id, msg_id):
             buttons = player_buttons(q, elapsed)
             msg = await bot_module.bot.get_messages(chat_id, msg_id)
             await rich_edit(msg, card_text + buttons)
-        except Exception as e: pass
+        except: pass
 
 async def start_next_song(chat_id, q):
     from SunloMusic.queues import Track, clear_queue
     from SunloMusic.plugins.voice import speak_in_vc
-    
     if q.timer_task: q.timer_task.cancel(); q.timer_task = None
     if q.karaoke_task: q.karaoke_task.cancel(); q.karaoke_task = None
     if q.playing_message_id:
@@ -130,9 +122,11 @@ async def start_next_song(chat_id, q):
         if await get_group_setting(chat_id, "tts", False):
             await speak_in_vc(chat_id, f"Agla gaana, {nxt.title}")
 
-        await play_stream(chat_id, nxt.url, nxt.video, duration=nxt.duration)
+        success = await play_stream(chat_id, nxt.url, nxt.video, duration=nxt.duration)
+        if not success:
+            return await start_next_song(chat_id, q) # Skip to next if fail
+
         q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
-        
         try: await add_recent(chat_id, {"title": nxt.title, "url": nxt.url, "duration": nxt.duration, "thumbnail": nxt.thumbnail, "requester": nxt.requester, "requester_id": nxt.requester_id, "video": nxt.video})
         except: pass
         
@@ -140,7 +134,6 @@ async def start_next_song(chat_id, q):
         b64_title = base64.urlsafe_b64encode(nxt.title.encode()).decode().strip("=")
         title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
         card_text = f'<img src="{thumb_url}" style="width: 100%; border-radius: 10px; display: block; margin-bottom: 10px;" /><b>🎧🎶 Music Time 🎶🎧</b>\n━━━━━━━━━━━━━\n🎵 <a href="{title_link}">{rich_esc(nxt.title)}</a>\n━━━━━━━━━━━━━\n⏱ Duration: {format_duration(nxt.duration)}\n🙋‍♂️ Request: <a href="tg://user?id={nxt.requester_id}">{rich_esc(nxt.requester)}</a>'
-        
         try:
             sent_msg = await rich_send(bot_module.bot, chat_id, card_text + player_buttons(q, 0))
             q.playing_message_id = sent_msg.id
@@ -148,7 +141,6 @@ async def start_next_song(chat_id, q):
             except: pass
             q.timer_task = asyncio.create_task(update_live_timer(chat_id, sent_msg.id))
         except: pass
-
         if chat_id in KARAOKE_CHATS: q.karaoke_task = asyncio.create_task(start_live_karaoke(bot_module.bot, chat_id, nxt.title, nxt.duration, q))
     else:
         if await get_group_setting(chat_id, "tts", False):
@@ -187,28 +179,23 @@ async def start_call():
 async def play_stream(chat_id: int, url: str, video: bool = False, effect: str = "none", seek_time: int = 0, duration: int = 0):
     if not call: return False
     if not url.startswith("http") and not os.path.exists(url):
-        LOGGER.error(f"❌ File not found before playing: {url}")
+        LOGGER.error(f"❌ File not found: {url}")
         return False
-        
-    if video and (url.endswith('.m4a') or url.endswith('.mp3')): 
-        video = False
-        
+    if video and (url.endswith('.m4a') or url.endswith('.mp3')): video = False
     ffmpeg_args = _build_audio_filters(chat_id, effect, seek_time, duration)
     if video: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_parameters=VideoQuality.HD_720p, ffmpeg_parameters=ffmpeg_args)
     else: stream = MediaStream(media_path=url, audio_parameters=AudioQuality.HIGH, video_flags=MediaStream.Flags.IGNORE, ffmpeg_parameters=ffmpeg_args)
-    
     try:
-        # ✅ FIX: Force Assistant to fetch chat to prevent CHANNEL_INVALID
         try: await bot_module.assistant.get_chat(chat_id)
         except: pass
-        
-        LOGGER.info(f"🎵 Attempting to play URL directly: {url[:80]}")
         await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=120.0) 
         return True
     except Exception as e:
         err_str = str(e)
-        LOGGER.error(f"Direct Play error: {type(e).__name__} - {err_str}")
-        if "INTERDC_X_CALL_ERROR" in err_str or "INTERDC_X_CALL_RICH_ERROR" in err_str:
+        LOGGER.error(f"Play error: {err_str}")
+        if "CHANNEL_INVALID" in err_str or "USER_BANNED" in err_str or "CHAT_ADMIN_REQUIRED" in err_str:
+            return False # ✅ CRITICAL: Stop the card from being sent
+        if "INTERDC_X_CALL_ERROR" in err_str:
             await asyncio.sleep(5)
             try:
                 await asyncio.wait_for(call.play(chat_id, stream, config=GroupCallConfig(auto_start=True)), timeout=120.0)
@@ -220,12 +207,10 @@ async def pause_stream(chat_id: int):
     if call:
         try: await call.pause(chat_id)
         except: pass
-
 async def resume_stream(chat_id: int):
     if call:
         try: await call.resume(chat_id)
         except: pass
-
 async def stop_stream(chat_id: int):
     if call:
         try: await call.leave_call(chat_id)
