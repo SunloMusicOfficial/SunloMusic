@@ -1,7 +1,6 @@
 import asyncio, time, base64, random
 from pyrogram import filters, enums
-from pyrogram.types import LinkPreviewOptions
-from SunloMusic.bot import bot, ensure_assistant_in_chat
+from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import catch_errors
@@ -49,23 +48,29 @@ async def play_cmd(_, m):
     try: await m.delete()
     except: pass
 
-    status = await m.reply_text("<blockquote>🎵 <b>SUNLO ENGINE</b>\n🔍 Searching: <code>{}</code>\n⚡ Status: Initializing...</blockquote>".format(query[:30]))
-    asyncio.create_task(bot.send_chat_action(m.chat.id, enums.ChatAction.UPLOAD_AUDIO))
-    
+    status = await m.reply_text(f"🔍 <b>Checking Assistant...</b>")
     video = "vplay" in m.command[0].lower()
     
+    # ✅ Strict Check
+    assist_status = await ensure_assistant_in_chat(m.chat.id)
+    if assist_status == "banned":
+        return await status.edit_text(
+            f"🚫 <b>Assistant is Banned!</b>\n\n"
+            f"Please unban <code>@{assistant.me.username}</code> in this group to play music."
+        )
+    elif assist_status != "ok":
+        return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
+
+    await status.edit_text(f"⏳ <b>Fetching music...</b>")
+    
     admin_task = _check_admin(m)
-    assist_task = ensure_assistant_in_chat(m.chat.id)
     db_task = asyncio.gather(add_user(uid, m.from_user.first_name), add_lb_point(m.chat.id, uid, m.from_user.first_name))
     audio_task = extract_audio(query, video=video)
     
-    is_admin, assist_ok, _, info = await asyncio.gather(admin_task, assist_task, db_task, audio_task)
+    is_admin, _, info = await asyncio.gather(admin_task, db_task, audio_task)
     
-    if not is_admin: return await status.edit_text("🚫 Only admins can use this.")
-    if not assist_ok: return await status.edit_text("❌ Assistant could not join!")
-    if not info: return await status.edit_text("❌ Failed to fetch media.")
-
-    await status.edit_text("<blockquote>🎵 <b>SUNLO ENGINE</b>\n🎶 Found: <code>{}</code>\n⚡ Status: Connecting to VC...</blockquote>".format(info['title'][:30]))
+    if not is_admin: return await status.edit_text("🚫 <b>Only admins can use this.</b>")
+    if not info: return await status.edit_text("❌ <b>Failed to fetch media.</b>")
 
     raw_title = info["title"]
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
@@ -77,7 +82,7 @@ async def play_cmd(_, m):
         if t.url == info["url"] or t.title == safe_title:
             is_duplicate = True
             break
-    if is_duplicate: return await status.edit_text("⚠️ Song already in queue!")
+    if is_duplicate: return await status.edit_text("⚠️ <b>Song already in queue!</b>")
     
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video, video_id=info.get("video_id", ""))
     
@@ -86,7 +91,8 @@ async def play_cmd(_, m):
         await status.delete()
         thumb = await generate_thumbnail(m.chat.id, track.thumbnail, track.title, format_duration(track.duration), track.requester)
         b64_title = base64.urlsafe_b64encode(track.title.encode()).decode().strip("=")
-        caption = f"<b>📥 Added to Queue</b>\n━━━━━━━━━━━━━\n🎵 <a href='https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}'>{track.title}</a>\n⏱ {format_duration(track.duration)}\n🙋‍♂️ {track.requester}\n📌 Position: {len(q.queue)}"
+        title_link = f"https://t.me/{config.BOT_USERNAME.strip('@')}?start=dl_{b64_title}"
+        caption = f"<b>📥 Added to Queue</b>\n━━━━━━━━━━━━━\n🎵 <a href='{title_link}'>{track.title}</a>\n⏱ {format_duration(track.duration)}\n🙋‍♂️ {track.requester}\n📌 Position: {len(q.queue)}"
         sent_msg = await m.reply_photo(thumb, caption=caption, reply_markup=queue_add_keyboard(str(abs(hash(track.url))))) if thumb else await m.reply_text(caption)
         track.message_id = sent_msg.id
         return

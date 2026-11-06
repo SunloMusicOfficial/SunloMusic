@@ -1,12 +1,11 @@
 import asyncio
-from pyrogram import Client
-from pyrogram.errors import InviteHashExpired, UserAlreadyParticipant
+from pyrogram import Client, enums
+from pyrogram.errors import InviteHashExpired, UserAlreadyParticipant, UserBannedInChannel
 from SunloMusic.config import config
 from SunloMusic.logger import LOGGER, get_startup_card
 
 bot = None
 assistant = None
-ASSISTANT_CHATS = set()
 
 def init_clients():
     global bot, assistant
@@ -31,19 +30,18 @@ async def start_bot():
         except Exception as e:
             LOGGER.error(f"Failed to send startup card: {e}")
 
-async def ensure_assistant_in_chat(chat_id: int) -> bool:
-    global ASSISTANT_CHATS
-    if not assistant: return False
-        
-    if chat_id in ASSISTANT_CHATS: return True
+async def ensure_assistant_in_chat(chat_id: int) -> str:
+    """Returns 'ok', 'banned', or 'failed'"""
+    if not assistant: return "failed"
 
-    # 1. Check if already a member
+    # 1. Check current status (No Cache - Strict Check)
     try:
-        await assistant.get_chat_member(chat_id, "me")
-        ASSISTANT_CHATS.add(chat_id)
-        return True
+        member = await assistant.get_chat_member(chat_id, "me")
+        if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]:
+            return "banned"
+        return "ok"
     except Exception:
-        pass
+        pass # Not in chat, proceed to join
 
     LOGGER.info(f"🤖 Assistant is not in {chat_id}, attempting to join...")
     
@@ -53,46 +51,43 @@ async def ensure_assistant_in_chat(chat_id: int) -> bool:
         if chat.username:
             try:
                 await assistant.join_chat(chat.username)
-                ASSISTANT_CHATS.add(chat_id)
-                LOGGER.info(f"✅ Assistant joined public chat @{chat.username}")
-                return True
+                return "ok"
             except UserAlreadyParticipant:
-                ASSISTANT_CHATS.add(chat_id)
-                return True
-            except Exception:
-                pass
+                return "ok"
+            except UserBannedInChannel:
+                return "banned"
+            except Exception as e:
+                if "USER_BANNED_IN_CHAT" in str(e).upper() or "USER_BANNED_IN_CHANNEL" in str(e).upper():
+                    return "banned"
     except: pass
 
-    # 3. Try Invite Link + Auto-Approve (Fixes the manual approval issue)
+    # 3. Try Invite Link
     try:
         link = await bot.export_chat_invite_link(chat_id)
         await asyncio.sleep(1)
         try:
             await assistant.join_chat(link)
         except Exception as e:
-            # Sometimes join_chat throws error if request is pending
-            LOGGER.info(f"Join attempt: {e}")
+            if "USER_BANNED_IN_CHAT" in str(e).upper() or "USER_BANNED_IN_CHANNEL" in str(e).upper():
+                return "banned"
             
         await asyncio.sleep(2) # Wait for Telegram to process
         
-        # Check if joined
         try:
-            await assistant.get_chat_member(chat_id, "me")
-            ASSISTANT_CHATS.add(chat_id)
-            LOGGER.info(f"✅ Assistant joined via invite link")
-            return True
+            member = await assistant.get_chat_member(chat_id, "me")
+            if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]:
+                return "banned"
+            return "ok"
         except:
-            # ✅ If still not joined, Bot auto-approves the join request!
-            LOGGER.info("📝 Assistant join request pending. Bot auto-approving...")
+            # Auto-approve join request
             try:
                 me_ass = await assistant.get_me()
                 await bot.approve_chat_join_request(chat_id, me_ass.id)
-                LOGGER.info("✅ Bot auto-approved Assistant's request!")
-                ASSISTANT_CHATS.add(chat_id)
-                return True
-            except Exception as approve_err:
-                LOGGER.error(f"❌ Auto-approve failed: {approve_err}. Make sure Bot has 'Add Users' permission.")
+                return "ok"
+            except: pass
     except Exception as e:
-        LOGGER.error(f"❌ Could not create invite link: {e}")
+        LOGGER.error(f"❌ Could not join: {e}")
+        if "USER_BANNED_IN_CHAT" in str(e).upper() or "USER_BANNED_IN_CHANNEL" in str(e).upper():
+            return "banned"
 
-    return False
+    return "failed"
