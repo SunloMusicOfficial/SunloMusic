@@ -1,7 +1,7 @@
 import asyncio, time, base64
 from pyrogram import filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, LinkPreviewOptions
-from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat
+from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat, send_ban_alert
 from SunloMusic.config import config
 from SunloMusic.decorators import catch_errors
 from SunloMusic.database import add_voteplay, get_voteplay, remove_voteplay, is_sudo, add_recent
@@ -49,10 +49,13 @@ async def voteplay_cb(_, cq: CallbackQuery):
     await cq.answer("✅ Approved! Loading...")
     await cq.message.edit_text(f"🔍 <b>Checking Assistant...</b>")
     
-    # ✅ Strict Check
     assist_status = await ensure_assistant_in_chat(cq.message.chat.id)
     if assist_status == "banned":
-        return await cq.message.edit_text(f"🚫 <b>Assistant is Banned!</b>\n\nPlease unban <code>@{assistant.me.username}</code> in this group.")
+        await cq.message.delete()
+        await remove_voteplay(cq.message.chat.id)
+        return await send_ban_alert(cq.message.chat.id)
+    elif assist_status == "failed_no_admin":
+        return await cq.message.edit_text(f"❌ <b>Bot is not an Admin!</b>\n\nPlease promote Bot as Admin with 'Invite Users' permission.")
     elif assist_status != "ok":
         return await cq.message.edit_text("❌ <b>Assistant could not join the group!</b>")
         
@@ -68,7 +71,12 @@ async def voteplay_cb(_, cq: CallbackQuery):
         q.queue.append(track)
         await cq.message.edit_text(f"✅ <b>Approved & Queued!</b>\n\n🎵 {info['title']}\n📌 Position: {len(q.queue)}\n👮 By: {cq.from_user.mention}")
     else:
-        await play_stream(cq.message.chat.id, track.url, track.video, duration=track.duration)
+        success = await play_stream(cq.message.chat.id, track.url, track.video, duration=track.duration)
+        if not success:
+            await remove_voteplay(cq.message.chat.id)
+            await cq.message.delete()
+            return await send_ban_alert(cq.message.chat.id)
+            
         q.now_playing = track; q.start_time = time.time(); q.total_paused = 0; q.paused = False; q.votes = set()
         
         try:

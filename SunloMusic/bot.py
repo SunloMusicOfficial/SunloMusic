@@ -27,22 +27,18 @@ async def start_bot():
 async def ensure_assistant_in_chat(chat_id: int) -> str:
     if not assistant: return "failed"
 
-    # 1. Check status via Bot (Most accurate)
+    # 1. Check status via Bot
     try:
         member = await bot.get_chat_member(chat_id, assistant.me.id)
-        if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]:
-            return "banned"
-        if member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
-            return "ok"
-    except Exception: pass
+        if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]: return "banned"
+        if member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]: return "ok"
+    except: pass
 
-    # 2. Fallback to Assistant check
+    # 2. Check via Assistant
     try:
         member = await assistant.get_chat_member(chat_id, "me")
-        if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]:
-            return "banned"
-        if member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]:
-            return "ok"
+        if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]: return "banned"
+        if member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]: return "ok"
     except Exception as e:
         if "USER_BANNED" in str(e).upper(): return "banned"
 
@@ -86,3 +82,56 @@ async def ensure_assistant_in_chat(chat_id: int) -> str:
         if "USER_BANNED" in str(e).upper(): return "banned"
 
     return "failed"
+
+async def send_ban_alert(chat_id: int):
+    """Sends premium ban alert card to chat tagging all admins"""
+    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from richgram import rich_send
+    
+    if not assistant: return
+    
+    try:
+        ass_me = await assistant.get_me()
+        ass_username = ass_me.username
+        ass_id = ass_me.id
+    except:
+        ass_username = "Assistant"
+        ass_id = 0
+    
+    # Tag all admins
+    admins = []
+    try:
+        async for admin in bot.get_chat_members(chat_id, filter=enums.ChatMembersFilter.ADMINISTRATORS):
+            if not admin.user.is_bot and not admin.user.is_deleted:
+                admins.append(admin.user.mention)
+    except: pass
+    
+    admins_text = " ".join(admins[:10]) if admins else "Admins"
+    if len(admins) > 10:
+        admins_text += " and others..."
+    
+    # Premium Rich Card
+    card_text = (
+        f'<blockquote>'
+        f'🚫 <b>ASSISTANT BANNED</b> 🚫\n'
+        f'━━━━━━━━━━━━━━━━━━\n'
+        f'⚠️ The Voice Chat Assistant has been restricted in this group.\n'
+        f'</blockquote>\n\n'
+        f'🤖 <b>Assistant Info:</b>\n'
+        f'• Username: <code>@{ass_username}</code>\n'
+        f'• ID: <code>{ass_id}</code>\n\n'
+        f'🛠️ <b>How to fix:</b>\n'
+        f'1. Manually unban <b>@{ass_username}</b> from group settings\n'
+        f'2. Or click the button below to auto-unban\n\n'
+        f'<blockquote>{admins_text}\n\n<b>Please take action!</b></blockquote>'
+    )
+    
+    buttons = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔓 Unban Assistant Now", callback_data="unban_assistant")],
+        [InlineKeyboardButton("❌ Dismiss", callback_data="dismiss_ban")]
+    ])
+    
+    try:
+        await rich_send(bot, chat_id, card_text + buttons)
+    except Exception as e:
+        LOGGER.error(f"Ban alert error: {e}")

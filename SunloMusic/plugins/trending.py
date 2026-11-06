@@ -1,7 +1,7 @@
 import asyncio, time, base64, hashlib, os, random
 from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, LinkPreviewOptions
-from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat
+from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat, send_ban_alert
 from SunloMusic.config import config
 from SunloMusic.decorators import catch_errors
 from SunloMusic.ytdlp import _search_ytdlp_multi_sync, extract_audio, download_media_file, cleanup_download
@@ -13,6 +13,7 @@ from SunloMusic.thumbnails import generate_thumbnail, get_default_thumb
 from SunloMusic.keyboards import player_buttons
 from SunloMusic.database import add_recent
 from SunloMusic.lyrics import start_live_karaoke
+from richgram import rich_send, rich_esc
 
 CATEGORIES = {"hindi": "trending hindi songs 2024", "punjabi": "top punjabi hits 2024", "english": "top english hits 2024", "lofi": "lofi hindi songs", "arijit": "arijit singh best songs", "old": "old hindi classic songs"}
 TRENDING_CACHE = {}
@@ -90,10 +91,12 @@ async def tr_act_play(_, cq: CallbackQuery):
     await cq.answer("⚡ Loading into VC...")
     status = await cq.message.reply_text(f"🔍 <b>Checking Assistant...</b>")
     
-    # ✅ Strict Check
     assist_status = await ensure_assistant_in_chat(cq.message.chat.id)
     if assist_status == "banned":
-        return await status.edit_text(f"🚫 <b>Assistant is Banned!</b>\n\nPlease unban <code>@{assistant.me.username}</code> in this group to play music.")
+        await status.delete()
+        return await send_ban_alert(cq.message.chat.id)
+    elif assist_status == "failed_no_admin":
+        return await status.edit_text(f"❌ <b>Bot is not an Admin!</b>\n\nPlease promote Bot as Admin with 'Invite Users' permission.")
     elif assist_status != "ok":
         return await status.edit_text("❌ <b>Assistant could not join the group!</b>")
         
@@ -129,11 +132,21 @@ async def tr_act_play(_, cq: CallbackQuery):
     
     from SunloMusic.plugins.voice import speak_in_vc
     async def play_with_tts():
+        from SunloMusic.database import get_group_setting
         if await get_group_setting(cq.message.chat.id, "tts", False):
             await speak_in_vc(cq.message.chat.id, f"Ab play ho raha hai, {track.title}")
-        await play_stream(cq.message.chat.id, track.url, track.video, duration=track.duration)
+        return await play_stream(cq.message.chat.id, track.url, track.video, duration=track.duration)
         
-    sent_msg, _ = await asyncio.gather(rich_send(bot, cq.message.chat.id, caption + player_buttons(q, 0)), play_with_tts())
+    try:
+        sent_msg, play_success = await asyncio.gather(rich_send(bot, cq.message.chat.id, caption + player_buttons(q, 0)), play_with_tts())
+        if not play_success:
+            await sent_msg.delete()
+            q.now_playing = None
+            return await send_ban_alert(cq.message.chat.id)
+    except Exception as e:
+        LOGGER.error(f"Play error: {e}")
+        q.now_playing = None
+        return await cq.message.reply_text(f"❌ <b>Error:</b> {e}")
     
     q.playing_message_id = sent_msg.id
     try: await sent_msg.pin(disable_notification=True)

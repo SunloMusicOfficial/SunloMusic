@@ -1,7 +1,7 @@
 import asyncio, time, base64, random
 from pyrogram import filters, enums
 from pyrogram.types import LinkPreviewOptions
-from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat
+from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat, send_ban_alert
 from SunloMusic.config import config
 from SunloMusic.calls import play_stream, update_live_timer
 from SunloMusic.decorators import catch_errors
@@ -55,7 +55,8 @@ async def play_cmd(_, m):
     assist_status = await ensure_assistant_in_chat(m.chat.id)
     
     if assist_status == "banned":
-        return await status.edit_text(f"🚫 <b>Assistant is Banned!</b>\n\nPlease unban <code>@{assistant.me.username}</code> to play music.")
+        await status.delete()
+        return await send_ban_alert(m.chat.id)
     elif assist_status == "failed_no_admin":
         return await status.edit_text(f"❌ <b>Bot is not an Admin!</b>\n\nPlease promote Bot as Admin with 'Invite Users' permission.")
     elif assist_status != "ok":
@@ -119,7 +120,7 @@ async def play_cmd(_, m):
         if not play_success:
             await sent_msg.delete()
             q.now_playing = None
-            return await m.send_message(m.chat.id, "❌ <b>Assistant could not join VC.</b> It might be banned or kicked.")
+            return await send_ban_alert(m.chat.id)
     except Exception as e:
         LOGGER.error(f"Play error: {e}")
         q.now_playing = None
