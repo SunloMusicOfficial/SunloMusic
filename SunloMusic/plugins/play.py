@@ -3,7 +3,7 @@ from pyrogram import filters, enums
 from pyrogram.types import LinkPreviewOptions
 from SunloMusic.bot import bot, assistant, ensure_assistant_in_chat, send_ban_alert
 from SunloMusic.config import config
-from SunloMusic.calls import play_stream, update_live_timer
+from SunloMusic.calls import play_stream, update_live_timer, call
 from SunloMusic.decorators import catch_errors
 from SunloMusic.database import add_user, SPAM_DICT, add_lb_point, add_recent, is_sudo, get_group_setting
 from SunloMusic.queues import get_queue, Track, KARAOKE_CHATS
@@ -53,7 +53,6 @@ async def play_cmd(_, m):
     video = "vplay" in m.command[0].lower()
     
     assist_status = await ensure_assistant_in_chat(m.chat.id)
-    
     if assist_status == "banned":
         await status.delete()
         return await send_ban_alert(m.chat.id)
@@ -77,12 +76,24 @@ async def play_cmd(_, m):
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
     q = get_queue(m.chat.id)
     
+    # ✅ SMART CHECK: If VC is manually ended, clear the stuck queue
+    is_bot_in_vc = False
+    if call:
+        try: is_bot_in_vc = m.chat.id in call.calls
+        except: is_bot_in_vc = False
+    
+    if q.now_playing and not is_bot_in_vc:
+        LOGGER.info("⚠️ VC manually ended by user. Clearing stuck queue.")
+        q.now_playing = None
+        q.queue.clear()
+
     is_duplicate = False
     if q.now_playing and (q.now_playing.url == info["url"] or q.now_playing.title == safe_title): is_duplicate = True
     for t in q.queue:
         if t.url == info["url"] or t.title == safe_title:
             is_duplicate = True
             break
+            
     if is_duplicate: return await status.edit_text("⚠️ <b>Song already in queue!</b>")
     
     track = Track(safe_title, info["url"], info["duration"], info["thumbnail"], m.from_user.first_name, m.from_user.id, video, video_id=info.get("video_id", ""))
