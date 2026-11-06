@@ -27,14 +27,12 @@ async def start_bot():
 async def ensure_assistant_in_chat(chat_id: int) -> str:
     if not assistant: return "failed"
 
-    # 1. Check status via Bot
     try:
         member = await bot.get_chat_member(chat_id, assistant.me.id)
         if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]: return "banned"
         if member.status in [enums.ChatMemberStatus.MEMBER, enums.ChatMemberStatus.ADMINISTRATOR, enums.ChatMemberStatus.OWNER]: return "ok"
     except: pass
 
-    # 2. Check via Assistant
     try:
         member = await assistant.get_chat_member(chat_id, "me")
         if member.status in [enums.ChatMemberStatus.BANNED, enums.ChatMemberStatus.RESTRICTED]: return "banned"
@@ -42,7 +40,6 @@ async def ensure_assistant_in_chat(chat_id: int) -> str:
     except Exception as e:
         if "USER_BANNED" in str(e).upper(): return "banned"
 
-    # 3. Try joining
     try:
         chat = await bot.get_chat(chat_id)
         if chat.username:
@@ -85,8 +82,7 @@ async def ensure_assistant_in_chat(chat_id: int) -> str:
 
 async def send_ban_alert(chat_id: int):
     """Sends premium ban alert card to chat tagging all admins"""
-    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    from richgram import rich_send
+    from richgram import rich_send, rich_button, rich_button_row
     
     if not assistant: return
     
@@ -98,7 +94,6 @@ async def send_ban_alert(chat_id: int):
         ass_username = "Assistant"
         ass_id = 0
     
-    # Tag all admins
     admins = []
     try:
         async for admin in bot.get_chat_members(chat_id, filter=enums.ChatMembersFilter.ADMINISTRATORS):
@@ -110,7 +105,6 @@ async def send_ban_alert(chat_id: int):
     if len(admins) > 10:
         admins_text += " and others..."
     
-    # Premium Rich Card
     card_text = (
         f'<blockquote>'
         f'🚫 <b>ASSISTANT BANNED</b> 🚫\n'
@@ -126,10 +120,11 @@ async def send_ban_alert(chat_id: int):
         f'<blockquote>{admins_text}\n\n<b>Please take action!</b></blockquote>'
     )
     
-    buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔓 Unban Assistant Now", callback_data="unban_assistant")],
-        [InlineKeyboardButton("❌ Dismiss", callback_data="dismiss_ban")]
-    ])
+    # ✅ FIXED: Use rich_button instead of InlineKeyboardMarkup
+    buttons = (
+        rich_button_row(rich_button("🔓 Unban Assistant Now", callback_data="unban_assistant", style="success")) +
+        rich_button_row(rich_button("❌ Dismiss", callback_data="dismiss_ban", style="danger"))
+    )
     
     try:
         await rich_send(bot, chat_id, card_text + buttons)

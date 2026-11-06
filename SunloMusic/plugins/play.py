@@ -76,11 +76,17 @@ async def play_cmd(_, m):
     safe_title = raw_title[:40] + "..." if len(raw_title) > 40 else raw_title
     q = get_queue(m.chat.id)
     
-    # ✅ SMART CHECK: If VC is manually ended, clear the stuck queue
+    # ✅ FIXED: Added await for call.calls
     is_bot_in_vc = False
     if call:
-        try: is_bot_in_vc = m.chat.id in call.calls
-        except: is_bot_in_vc = False
+        try:
+            active_calls = await call.calls
+            if isinstance(active_calls, dict):
+                is_bot_in_vc = m.chat.id in active_calls
+            elif isinstance(active_calls, list):
+                is_bot_in_vc = m.chat.id in active_calls
+        except: 
+            is_bot_in_vc = False
     
     if q.now_playing and not is_bot_in_vc:
         LOGGER.info("⚠️ VC manually ended by user. Clearing stuck queue.")
