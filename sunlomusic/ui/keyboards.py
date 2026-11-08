@@ -417,7 +417,7 @@ class Keyboards:
             ],
             [
                 InlineKeyboardButton("Help", callback_data="help_menu", style=ButtonStyle.SUCCESS),
-                InlineKeyboardButton("Support", url="https://t.me/YO_UR_OFFICIAL_CRUSH/2008", style=ButtonStyle.DANGER),
+                InlineKeyboardButton("Support", url="https://t.me/YO_UR_OFFICIAL_CRUSH", style=ButtonStyle.DANGER),
             ],
         ]
         return InlineKeyboardMarkup(buttons)
