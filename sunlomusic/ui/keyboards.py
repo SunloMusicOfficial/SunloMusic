@@ -17,19 +17,14 @@ class Keyboards:
             return f"{minutes}:{secs:02d}"
 
     @staticmethod
-    def _create_progress_bar(current: int, total: int, length: int = 12) -> str:
+    def _create_progress_bar(current: int, total: int, length: int = 10) -> str:
         if total == 0 or total < 0:
-            return "─" * length
+            return "✧" * length
         if current > total:
             current = total
         filled = int((current / total) * length)
         filled = max(0, min(filled, length))
-        if filled == 0:
-            bar = "▸" + "─" * (length - 1)
-        elif filled == length:
-            bar = "─" * (length - 1) + "●"
-        else:
-            bar = "─" * (filled - 1) + "●" + "─" * (length - filled)
+        bar = "✦" * filled + "✧" * (length - filled)
         return bar
 
     @staticmethod
@@ -48,9 +43,9 @@ class Keyboards:
             current_formatted = Keyboards._format_time(current_time)
             total_formatted = Keyboards._format_time(total_time)
             progress_bar = Keyboards._create_progress_bar(current_time, total_time)
-            progress_text = f"{current_formatted} ▷ {progress_bar} {total_formatted}"
+            progress_text = f"{current_formatted} ▶ {progress_bar} {total_formatted}"
         else:
-            progress_text = "0:00 ▸ ────────────── 0:00"
+            progress_text = "0:00 ▶ ✧✧✧✧✧✧✧✧✧✧ 0:00"
 
         buttons.append([
             InlineKeyboardButton(progress_text, callback_data=f"progress_{chat_id}")
