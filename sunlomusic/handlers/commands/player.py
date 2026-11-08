@@ -101,10 +101,22 @@ async def play_command(client: Client, message: Message, player, tgcalls):
                 except Exception:
                     pass
                 old_np_id = player.get_now_playing_message(message.chat.id)
-                msg = await message.reply_text(
-                    messages.now_playing(current, current.get('requested_by', 'Unknown'), current_time, queue, playlist_unfetched),
-                    reply_markup=keyboards.player_controls(message.chat.id, is_paused, current_time, total_time, is_live, loop_mode, len(queue), settings.get('autoplay', False))
-                )
+                _thumb = current.get('thumbnail') if current else None
+                _caption = messages.now_playing(current, current.get('requested_by', 'Unknown'), current_time, queue, playlist_unfetched)
+                _kb = keyboards.player_controls(message.chat.id, is_paused, current_time, total_time, is_live, loop_mode, len(queue), settings.get('autoplay', False))
+                
+                if _thumb and _thumb.startswith("http"):
+                    try:
+                        msg = await message.reply_photo(
+                            photo=_thumb,
+                            caption=_caption,
+                            reply_markup=_kb
+                        )
+                    except Exception as e:
+                        logger.error(f"Thumbnail send failed: {e}")
+                        msg = await message.reply_text(_caption, reply_markup=_kb)
+                else:
+                    msg = await message.reply_text(_caption, reply_markup=_kb)
                 if old_np_id and old_np_id != msg.id:
                     try:
                         await client.delete_messages(message.chat.id, old_np_id)
