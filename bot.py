@@ -6,4 +6,5 @@ import asyncio
 from sunlomusic.bot import main
 
 if __name__ == "__main__":
+    keep_alive()
     asyncio.run(main())
