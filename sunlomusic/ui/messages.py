@@ -18,12 +18,8 @@ class Messages:
             dur_str = keyboards._format_time(duration)
             timer = f"{cur_str} ▶ {bar} {dur_str}"
 
-        message = f"![🎵](tg://emoji?id=5334665104677941170) **Music Playlist:**
-
-"
-        message += f"{timer}
-
-"
+        message = f"![🎵](tg://emoji?id=5334665104677941170) **Music Playlist:**\n\n"
+        message += f"{timer}\n\n"
 
         req_id = track.get('requested_by_id')
         if req_id:
@@ -31,11 +27,8 @@ class Messages:
         else:
             req_mention = requested_by
 
-        message += f"**1. ![🎸](tg://emoji?id=5222472119295684375) {title}**
-"
-        message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {req_mention}
-
-"
+        message += f"**1. ![🎸](tg://emoji?id=5222472119295684375) {title}**\n"
+        message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {req_mention}\n\n"
 
         if queue and len(queue) > 1:
             for i, next_track in enumerate(queue[1:4], start=2):
@@ -48,11 +41,8 @@ class Messages:
                     next_mention = f"[{next_name}](tg://user?id={next_id})"
                 else:
                     next_mention = next_name
-                message += f"**{i}. ![🎸](tg://emoji?id=5222472119295684375) {next_title}**
-"
-                message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {next_mention}
-
-"
+                message += f"**{i}. ![🎸](tg://emoji?id=5222472119295684375) {next_title}**\n"
+                message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {next_mention}\n\n"
 
             shown = min(len(queue), 4)
             remaining_in_queue = len(queue) - shown
