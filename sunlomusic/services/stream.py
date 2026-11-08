@@ -6,9 +6,9 @@ from typing import Dict, Optional, Callable, Set
 from pytgcalls import PyTgCalls
 from pytgcalls.types import MediaStream, AudioQuality, VideoQuality
 from pytgcalls.types.raw import VideoParameters
-from SunloMusic.core.logging import logger
-from SunloMusic.services.effects import build_ffmpeg_parameters
-from SunloMusic.core.errors import StreamOperationTimeout, FloodWaitError, TelegramServerError
+from sunlomusic.core.logging import logger
+from sunlomusic.services.effects import build_ffmpeg_parameters
+from sunlomusic.core.errors import StreamOperationTimeout, FloodWaitError, TelegramServerError
 
 AUDIO_QUALITY_MAP = {
     "studio": AudioQuality.STUDIO,

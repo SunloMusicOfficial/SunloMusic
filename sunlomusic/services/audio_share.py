@@ -8,10 +8,10 @@ from pyrogram import Client
 from pyrogram.enums import ChatAction, ParseMode
 from pyrogram.errors import FloodWait, RPCError
 
-from SunloMusic.core.config import Config
-from SunloMusic.core.logging import logger
-from SunloMusic.db import db
-from SunloMusic.services.downloader import downloader
+from sunlomusic.core.config import Config
+from sunlomusic.core.logging import logger
+from sunlomusic.db import db
+from sunlomusic.services.downloader import downloader
 
 MAX_UPLOAD_BYTES = 2000 * 1024 * 1024  # MTProto allows up to 2 GB (the 50 MB limit is Bot API HTTP only)
 DIRECT_AUDIO_EXTS = (".mp3", ".m4a")

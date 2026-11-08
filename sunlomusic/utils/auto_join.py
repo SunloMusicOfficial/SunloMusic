@@ -8,7 +8,7 @@ from pyrogram.errors import (
     UserAlreadyParticipant, InviteHashExpired, UsersTooMuch,
     FloodWait, ChatAdminRequired, UserBannedInChannel
 )
-from SunloMusic.core.logging import logger
+from sunlomusic.core.logging import logger
 
 Result = Tuple[bool, Optional[str]]
 
@@ -117,7 +117,7 @@ class AutoJoinHandler:
             f"3. Send the **play** command again.\n\n"
             f"💡 **Tip:** Make the bot Admin with **Invite Users** permission to auto-approve requests."
         )
-        from SunloMusic.ui.keyboards import keyboards
+        from sunlomusic.ui.keyboards import keyboards
         return JoinNotice(text, rich, keyboards.close_only(chat_id))
 
     @staticmethod

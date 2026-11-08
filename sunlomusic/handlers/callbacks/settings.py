@@ -1,10 +1,10 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
-from SunloMusic.db import db
-from SunloMusic.utils.permissions import permission_checker
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
-from SunloMusic.utils.rich import show_settings
+from sunlomusic.db import db
+from sunlomusic.utils.permissions import permission_checker
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
+from sunlomusic.utils.rich import show_settings
 
 
 async def handle(client, callback_query, player, user_client, settings):

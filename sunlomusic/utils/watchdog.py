@@ -4,7 +4,7 @@ import asyncio
 import threading
 import time
 
-from SunloMusic.core.logging import logger
+from sunlomusic.core.logging import logger
 
 
 class LoopWatchdog:

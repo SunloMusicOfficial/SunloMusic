@@ -6,9 +6,9 @@ from typing import Optional
 from pyrogram.errors import FloodWait
 from pyrogram.raw import functions, types
 
-from SunloMusic.db import db
-from SunloMusic.core.logging import logger
-from SunloMusic.ui.messages import messages
+from sunlomusic.db import db
+from sunlomusic.core.logging import logger
+from sunlomusic.ui.messages import messages
 
 
 class VCMessenger:

@@ -1,8 +1,8 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
 from typing import List, Dict, Optional
-from SunloMusic.db import db
-from SunloMusic.core.logging import logger
+from sunlomusic.db import db
+from sunlomusic.core.logging import logger
 
 class PlaylistManager:
     async def save_playlist(self, chat_id: int, name: str, tracks: List[Dict]) -> bool:

@@ -6,12 +6,12 @@ import sys
 from pyrogram import Client
 from pyrogram.types import Message
 
-from SunloMusic.db import db
-from SunloMusic.core.config import Config
-from SunloMusic.core.logging import logger
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
-from SunloMusic.utils.rich import reply_welcome, reply_help
+from sunlomusic.db import db
+from sunlomusic.core.config import Config
+from sunlomusic.core.logging import logger
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
+from sunlomusic.utils.rich import reply_welcome, reply_help
 
 
 async def start_command(client: Client, message: Message):

@@ -2,7 +2,7 @@
 
 import asyncio
 
-from SunloMusic.bot import main
+from sunlomusic.bot import main
 
 if __name__ == "__main__":
     asyncio.run(main())

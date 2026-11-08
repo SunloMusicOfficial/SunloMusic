@@ -7,9 +7,9 @@ import time
 import yt_dlp
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
-from SunloMusic.core.config import Config
-from SunloMusic.core.logging import logger
-from SunloMusic.services.yt_search import youtube_search
+from sunlomusic.core.config import Config
+from sunlomusic.core.logging import logger
+from sunlomusic.services.yt_search import youtube_search
 
 _executor = ThreadPoolExecutor(max_workers=4)
 

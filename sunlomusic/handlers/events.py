@@ -2,9 +2,9 @@
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from SunloMusic.db import db
-from SunloMusic.core.logging import logger
-from SunloMusic.utils.monitor import monitor_logger
+from sunlomusic.db import db
+from sunlomusic.core.logging import logger
+from sunlomusic.utils.monitor import monitor_logger
 
 async def on_bot_added_to_group(client: Client, message: Message):
     if not message.new_chat_members:

@@ -8,9 +8,9 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from SunloMusic.core.logging import logger
+from sunlomusic.core.logging import logger
 
-from SunloMusic.ui.rankings.renderer import PALETTE, render_banner
+from sunlomusic.ui.rankings.renderer import PALETTE, render_banner
 
 _ACCENT_SONGS = (167, 116, 255)
 _ACCENT_PEOPLE = (56, 189, 248)

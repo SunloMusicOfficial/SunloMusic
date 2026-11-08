@@ -41,7 +41,7 @@ Stream YouTube tracks (or your own audio/video files) straight into a group voic
 - 🏆 **Rankings** — daily, weekly and global top-listeners, rendered as banner images.
 - 📎 **Telegram files** — reply to an audio/video file to queue it directly.
 - 🔴 **Live streams** — plays YouTube live streams.
-- 🔍 **Inline search** — type `@YourBot song name` in any chat to search YouTube.
+- 🔍 **Inline search** — type `@SunloMusicBot song name` in any chat to search YouTube.
 - 🎯 **Live call title** — updates the group call title to the currently playing track.
 - 👋 **Voice-chat welcome** — greets listeners inside the voice chat when they join.
 - 👥 **Multi-chat** — serves many groups at once.
@@ -369,4 +369,4 @@ Built with [Pyrogram](https://github.com/pyrogram/pyrogram) (via the *kurigram* 
 
 ## SunloMusicOfficial 🔔
 
-> **Ethics Reminder:** Simply modifying a few lines of code does not constitute original authorship. When forking a project, always fork responsibly and give proper credit to the original creators.
+> **

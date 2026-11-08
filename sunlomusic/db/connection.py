@@ -2,8 +2,8 @@
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from SunloMusic.core.config import Config
-from SunloMusic.core.logging import logger
+from sunlomusic.core.config import Config
+from sunlomusic.core.logging import logger
 
 
 class MongoDB:

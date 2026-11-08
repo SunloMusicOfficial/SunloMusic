@@ -4,16 +4,16 @@ from pyrogram import Client
 from pyrogram.enums import ParseMode
 from pyrogram.types import Message
 
-from SunloMusic.db import db
-from SunloMusic.services.queue import queue_manager
-from SunloMusic.services.downloader import downloader
-from SunloMusic.utils.rich import edit_to_playlist_ready
-from SunloMusic.utils.permissions import permission_checker
-from SunloMusic.utils.validators import validators
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
-from SunloMusic.core.logging import logger
-from SunloMusic.core.config import Config
+from sunlomusic.db import db
+from sunlomusic.services.queue import queue_manager
+from sunlomusic.services.downloader import downloader
+from sunlomusic.utils.rich import edit_to_playlist_ready
+from sunlomusic.utils.permissions import permission_checker
+from sunlomusic.utils.validators import validators
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
+from sunlomusic.core.logging import logger
+from sunlomusic.core.config import Config
 
 
 async def play_command(client: Client, message: Message, player, tgcalls):
@@ -33,7 +33,7 @@ async def play_command(client: Client, message: Message, player, tgcalls):
     query = message.text.split(maxsplit=1)[1] if len(message.text.split()) > 1 else None
 
     if message.reply_to_message:
-        from SunloMusic.services.processor import processor
+        from sunlomusic.services.processor import processor
         status_msg = await message.reply_text("📥 **Processing Telegram file...**")
         file_info = await processor.download_telegram_file(client, message.reply_to_message)
 
@@ -111,7 +111,7 @@ async def play_command(client: Client, message: Message, player, tgcalls):
                     except Exception:
                         pass
                 player.set_now_playing_message(message.chat.id, msg.id)
-                import SunloMusic.ui.progress as ui_progress_updater
+                import sunlomusic.ui.progress as ui_progress_updater
                 if ui_progress_updater.progress_updater:
                     ui_progress_updater.progress_updater.start_updates(message.chat.id, msg.id)
         else:
@@ -282,7 +282,7 @@ async def play_command(client: Client, message: Message, player, tgcalls):
                 except Exception:
                     pass
             player.set_now_playing_message(message.chat.id, msg.id)
-            import SunloMusic.ui.progress as ui_progress_updater
+            import sunlomusic.ui.progress as ui_progress_updater
             if ui_progress_updater.progress_updater:
                 ui_progress_updater.progress_updater.start_updates(message.chat.id, msg.id)
 

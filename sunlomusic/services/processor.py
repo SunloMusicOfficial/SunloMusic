@@ -3,8 +3,8 @@
 import asyncio
 import os
 from typing import Optional
-from SunloMusic.core.config import Config
-from SunloMusic.core.logging import logger
+from sunlomusic.core.config import Config
+from sunlomusic.core.logging import logger
 
 class MediaProcessor:
     @staticmethod

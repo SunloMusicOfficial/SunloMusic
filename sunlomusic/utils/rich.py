@@ -2,8 +2,8 @@
 
 from pyrogram.types import InlineKeyboardMarkup, Message
 
-from SunloMusic.core.logging import logger
-from SunloMusic.ui.messages import messages
+from sunlomusic.core.logging import logger
+from sunlomusic.ui.messages import messages
 
 
 async def _reply(message: Message, variants, reply_markup: InlineKeyboardMarkup, label: str) -> bool:

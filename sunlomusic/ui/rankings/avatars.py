@@ -6,7 +6,7 @@ from typing import Dict, Optional, Tuple
 
 import aiohttp
 
-from SunloMusic.core.logging import logger
+from sunlomusic.core.logging import logger
 
 Key = Tuple[str, object]
 

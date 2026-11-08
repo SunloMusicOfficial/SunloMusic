@@ -9,8 +9,8 @@ from pyrogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton
 )
-from SunloMusic.services.downloader import downloader
-from SunloMusic.core.logging import logger
+from sunlomusic.services.downloader import downloader
+from sunlomusic.core.logging import logger
 
 def format_views(count):
     if count >= 1_000_000_000:

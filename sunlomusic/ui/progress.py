@@ -4,8 +4,8 @@ import asyncio
 from typing import Dict, Optional
 from pyrogram import Client
 from pyrogram.errors import MessageIdInvalid, MessageNotModified, FloodWait
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.core.logging import logger
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.core.logging import logger
 
 class ProgressUpdater:
     def __init__(self, client: Client, player):
@@ -77,8 +77,8 @@ class ProgressUpdater:
                     current_position = await self.player.get_current_time(chat_id)
                     duration = int(current_track.get('duration', 0))
 
-                    from SunloMusic.services.queue import queue_manager
-                    from SunloMusic.db import db
+                    from sunlomusic.services.queue import queue_manager
+                    from sunlomusic.db import db
                     queue = await queue_manager.get_queue(chat_id)
                     playlist_state = queue_manager.get_playlist_state(chat_id)
                     playlist_unfetched = (playlist_state['total'] - playlist_state['fetched']) if playlist_state else 0

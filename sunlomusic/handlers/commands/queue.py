@@ -3,11 +3,11 @@
 from pyrogram import Client
 from pyrogram.types import Message
 
-from SunloMusic.db import db
-from SunloMusic.services.queue import queue_manager
-from SunloMusic.utils.permissions import permission_checker
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
+from sunlomusic.db import db
+from sunlomusic.services.queue import queue_manager
+from sunlomusic.utils.permissions import permission_checker
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
 
 
 async def clearplaylist_command(client: Client, message: Message):
@@ -76,7 +76,7 @@ async def playlist_command(client: Client, message: Message, player):
             reply_markup=keyboards.player_controls(message.chat.id, is_paused, current_time, total_time, current.get('is_live', False), loop_mode, len(queue), settings.get('autoplay', False))
         )
         player.set_now_playing_message(message.chat.id, msg.id)
-        import SunloMusic.ui.progress as ui_progress_updater
+        import sunlomusic.ui.progress as ui_progress_updater
         if ui_progress_updater.progress_updater:
             ui_progress_updater.progress_updater.start_updates(message.chat.id, msg.id)
     else:

@@ -1,8 +1,8 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
-from SunloMusic.db import db
-from SunloMusic.services.effects import normalize_effect, EFFECT_LABELS, clamp_speed
-from SunloMusic.ui.keyboards import keyboards
+from sunlomusic.db import db
+from sunlomusic.services.effects import normalize_effect, EFFECT_LABELS, clamp_speed
+from sunlomusic.ui.keyboards import keyboards
 
 
 async def handle(client, callback_query, player, user_client, settings):

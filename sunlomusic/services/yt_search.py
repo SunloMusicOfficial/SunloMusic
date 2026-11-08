@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 
-from SunloMusic.core.logging import logger
+from sunlomusic.core.logging import logger
 
 _API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
 _CLIENT_VERSION = "2.20250101.01.00"

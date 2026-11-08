@@ -2,9 +2,9 @@
 
 import asyncio
 
-from SunloMusic.core.logging import logger
-from SunloMusic.services.downloader import downloader
-from SunloMusic.services.audio_share import (
+from sunlomusic.core.logging import logger
+from sunlomusic.services.downloader import downloader
+from sunlomusic.services.audio_share import (
     audio_share, log_download, SENT, CACHED, NOT_STARTED, TOO_LARGE,
 )
 

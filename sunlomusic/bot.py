@@ -6,21 +6,21 @@ import signal
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 
-from SunloMusic.core.config import Config
-from SunloMusic.core.logging import logger
-from SunloMusic.db import db
-from SunloMusic.services.stream import TGCallsManager
-from SunloMusic.services.player import PlayerController
-from SunloMusic.ui.title import TitleUpdater
-from SunloMusic.ui.progress import ProgressUpdater
-from SunloMusic.ui.vc_messages import VCMessenger
-from SunloMusic.handlers.commands import register_commands
-from SunloMusic.handlers.callbacks import register_callbacks
-from SunloMusic.handlers.broadcast import register_broadcast_handlers
-from SunloMusic.handlers.events import register_event_handlers
-from SunloMusic.handlers.inline import register_inline_handlers
-from SunloMusic.utils.monitor import monitor_logger
-from SunloMusic.utils.watchdog import LoopWatchdog
+from sunlomusic.core.config import Config
+from sunlomusic.core.logging import logger
+from sunlomusic.db import db
+from sunlomusic.services.stream import TGCallsManager
+from sunlomusic.services.player import PlayerController
+from sunlomusic.ui.title import TitleUpdater
+from sunlomusic.ui.progress import ProgressUpdater
+from sunlomusic.ui.vc_messages import VCMessenger
+from sunlomusic.handlers.commands import register_commands
+from sunlomusic.handlers.callbacks import register_callbacks
+from sunlomusic.handlers.broadcast import register_broadcast_handlers
+from sunlomusic.handlers.events import register_event_handlers
+from sunlomusic.handlers.inline import register_inline_handlers
+from sunlomusic.utils.monitor import monitor_logger
+from sunlomusic.utils.watchdog import LoopWatchdog
 
 
 class VCMusicBot:
@@ -70,13 +70,13 @@ class VCMusicBot:
         self.vc_messenger = VCMessenger(self.user_client)
         self.tgcalls_manager.set_vc_join_callback(self.vc_messenger.welcome)
 
-        import SunloMusic.services.player as player_module
+        import sunlomusic.services.player as player_module
         player_module.player_controller = self.player_controller
 
-        import SunloMusic.ui.title as title_module
+        import sunlomusic.ui.title as title_module
         title_module.title_updater = self.title_updater
 
-        import SunloMusic.ui.progress as progress_module
+        import sunlomusic.ui.progress as progress_module
         progress_module.progress_updater = self.progress_updater
 
         register_commands(self.bot, self.player_controller)

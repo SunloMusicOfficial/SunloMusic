@@ -6,15 +6,15 @@ from pyrogram import Client
 from pyrogram.enums import ParseMode
 from pyrogram.types import CallbackQuery
 
-from SunloMusic.db import db
-from SunloMusic.core.config import Config
-from SunloMusic.utils.permissions import permission_checker
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
-from SunloMusic.utils.rich import edit_to_welcome, edit_to_help, edit_or_resend_text
-from SunloMusic.core.logging import logger
-from SunloMusic.handlers.commands import show_rankings
-from SunloMusic.handlers.commands.admin import read_log_tail
+from sunlomusic.db import db
+from sunlomusic.core.config import Config
+from sunlomusic.utils.permissions import permission_checker
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
+from sunlomusic.utils.rich import edit_to_welcome, edit_to_help, edit_or_resend_text
+from sunlomusic.core.logging import logger
+from sunlomusic.handlers.commands import show_rankings
+from sunlomusic.handlers.commands.admin import read_log_tail
 
 HELP_SECTIONS = {"help_basic": "basic", "help_music": "music", "help_settings": "settings"}
 

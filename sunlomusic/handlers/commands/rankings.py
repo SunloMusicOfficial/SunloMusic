@@ -5,12 +5,12 @@ import os
 from pyrogram import Client
 from pyrogram.types import Message, InputMediaPhoto
 
-from SunloMusic.db import db
-from SunloMusic.core.logging import logger
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
-from SunloMusic.ui.rankings import adapter as rankings_banner
-from SunloMusic.ui.rankings.avatars import collect_avatars
+from sunlomusic.db import db
+from sunlomusic.core.logging import logger
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
+from sunlomusic.ui.rankings import adapter as rankings_banner
+from sunlomusic.ui.rankings.avatars import collect_avatars
 
 _RANK_PERIODS = {"daily": "Daily", "weekly": "Weekly", "global": "Global"}
 

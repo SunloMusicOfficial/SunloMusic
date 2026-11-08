@@ -1,9 +1,9 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
-from SunloMusic.services.queue import queue_manager
-from SunloMusic.services.playlist import playlist_manager
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
+from sunlomusic.services.queue import queue_manager
+from sunlomusic.services.playlist import playlist_manager
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
 
 
 async def handle(client, callback_query, player, user_client, settings):

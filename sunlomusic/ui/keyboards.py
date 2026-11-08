@@ -139,7 +139,7 @@ class Keyboards:
 
     @staticmethod
     def effects_menu(chat_id: int, current: str = "none", speed: float = 1.0):
-        from SunloMusic.services.effects import AUDIO_EFFECTS, EFFECT_LABELS
+        from sunlomusic.services.effects import AUDIO_EFFECTS, EFFECT_LABELS
 
         current = (current or "none").lower()
         order = ["none", "bassboost", "nightcore", "slowed", "lofi", "8d"]
@@ -175,7 +175,7 @@ class Keyboards:
 
     @staticmethod
     def speed_menu(chat_id: int, speed: float = 1.0):
-        from SunloMusic.services.effects import SPEED_PRESETS
+        from sunlomusic.services.effects import SPEED_PRESETS
 
         try:
             current = round(float(speed), 2)

@@ -3,9 +3,9 @@
 import asyncio
 from pyrogram.errors import FloodWait, ChatAdminRequired
 from pyrogram.raw import functions, types
-from SunloMusic.db import db
-from SunloMusic.core.config import Config
-from SunloMusic.core.logging import logger
+from sunlomusic.db import db
+from sunlomusic.core.config import Config
+from sunlomusic.core.logging import logger
 
 class TitleUpdater:
     def __init__(self, client):

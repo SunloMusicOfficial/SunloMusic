@@ -4,8 +4,8 @@ from pyrogram import Client
 from pyrogram.types import Message
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.raw import functions, types
-from SunloMusic.core.logging import logger
-from SunloMusic.db import db
+from sunlomusic.core.logging import logger
+from sunlomusic.db import db
 
 class PermissionChecker:
     @staticmethod

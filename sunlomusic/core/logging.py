@@ -3,7 +3,7 @@
 import logging
 import sys
 import os
-from SunloMusic.core.config import Config
+from sunlomusic.core.config import Config
 
 class FilteredStderr:
     def __init__(self, original_stderr):

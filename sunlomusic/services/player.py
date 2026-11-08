@@ -5,19 +5,19 @@ import html
 import os
 from typing import Optional, Dict
 from pyrogram.enums import ParseMode
-from SunloMusic.core.config import Config
-from SunloMusic.db import db
-from SunloMusic.services.queue import queue_manager
-from SunloMusic.services.downloader import downloader
-from SunloMusic.services.processor import processor
-from SunloMusic.utils.auto_join import auto_join_handler
-from SunloMusic.core.errors import FloodWaitError, TelegramServerError, StreamOperationTimeout
-from SunloMusic.core.logging import logger
-from SunloMusic.utils.monitor import monitor_logger
-from SunloMusic.ui.keyboards import keyboards
-from SunloMusic.ui.messages import messages
-import SunloMusic.ui.title as ui_title_updater
-import SunloMusic.ui.progress as ui_progress_updater
+from sunlomusic.core.config import Config
+from sunlomusic.db import db
+from sunlomusic.services.queue import queue_manager
+from sunlomusic.services.downloader import downloader
+from sunlomusic.services.processor import processor
+from sunlomusic.utils.auto_join import auto_join_handler
+from sunlomusic.core.errors import FloodWaitError, TelegramServerError, StreamOperationTimeout
+from sunlomusic.core.logging import logger
+from sunlomusic.utils.monitor import monitor_logger
+from sunlomusic.ui.keyboards import keyboards
+from sunlomusic.ui.messages import messages
+import sunlomusic.ui.title as ui_title_updater
+import sunlomusic.ui.progress as ui_progress_updater
 
 class PlayerController:
     def __init__(self, tgcalls_manager, bot_client=None):
@@ -287,8 +287,8 @@ class PlayerController:
 
             if ui_progress_updater.progress_updater:
                 try:
-                    from SunloMusic.ui.messages import messages
-                    from SunloMusic.ui.keyboards import keyboards
+                    from sunlomusic.ui.messages import messages
+                    from sunlomusic.ui.keyboards import keyboards
                     bot_client = ui_progress_updater.progress_updater.client
 
                     old_msg_id = self.now_playing_messages.get(chat_id)
@@ -597,8 +597,8 @@ class PlayerController:
         await self.play_next(chat_id)
 
     async def _maybe_fetch_more_playlist_tracks(self, chat_id: int):
-        from SunloMusic.services.queue import queue_manager as qm
-        from SunloMusic.services.downloader import downloader
+        from sunlomusic.services.queue import queue_manager as qm
+        from sunlomusic.services.downloader import downloader
 
         state = qm.get_playlist_state(chat_id)
         if not state:
@@ -610,7 +610,7 @@ class PlayerController:
         if remaining > 2:
             return
 
-        from SunloMusic.core.config import Config
+        from sunlomusic.core.config import Config
 
         total = state['total']
         fetched = state['fetched']
@@ -747,7 +747,7 @@ class PlayerController:
             logger.error(f"Failed to seek in {chat_id}: {e}")
 
     async def change_audio_effect(self, chat_id: int, effect: str = None, speed=None) -> bool:
-        from SunloMusic.services.effects import normalize_effect, clamp_speed
+        from sunlomusic.services.effects import normalize_effect, clamp_speed
         updates = {}
         if effect is not None:
             updates['audio_effect'] = normalize_effect(effect)

@@ -2,8 +2,8 @@
 
 from typing import List, Dict, Optional
 import random
-from SunloMusic.db import db
-from SunloMusic.core.logging import logger
+from sunlomusic.db import db
+from sunlomusic.core.logging import logger
 
 class QueueManager:
     def __init__(self):

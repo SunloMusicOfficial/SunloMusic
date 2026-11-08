@@ -3,9 +3,9 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.enums import ChatType
-from SunloMusic.core.config import Config
-from SunloMusic.db import db
-from SunloMusic.core.logging import logger
+from sunlomusic.core.config import Config
+from sunlomusic.db import db
+from sunlomusic.core.logging import logger
 import asyncio
 
 async def broadcast_command(client: Client, message: Message):

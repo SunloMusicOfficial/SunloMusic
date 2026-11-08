@@ -1,6 +1,6 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
-from SunloMusic.core.logging import logger
+from sunlomusic.core.logging import logger
 
 
 class HistoryMixin:
