@@ -42,7 +42,7 @@ class Keyboards:
             current_formatted = Keyboards._format_time(current_time)
             total_formatted = Keyboards._format_time(total_time)
             progress_bar = Keyboards._create_progress_bar(current_time, total_time)
-            progress_text = f"{current_formatted} ▶ {progress_bar} {total_formatted}"
+            progress_text = f"{current_formatted} {progress_bar} {total_formatted}"
         else:
             progress_text = "0:00 ▶ ✧✧✧✧✧✧✧✧✧✧ 0:00"
 

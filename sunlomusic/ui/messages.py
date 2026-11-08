@@ -6,20 +6,7 @@ class Messages:
     @staticmethod
     def now_playing(track: Dict, requested_by: str = "Unknown", current_time: int = 0, queue: List[Dict] = None, playlist_unfetched: int = 0) -> str:
         title = track.get('title', 'Unknown')
-        duration = int(track.get('duration', 0))
-        is_live = track.get('is_live', False)
-
-        if is_live:
-            timer = "🔴 **LIVE STREAM**"
-        else:
-            from sunlomusic.ui.keyboards import keyboards
-            bar = keyboards._create_progress_bar(current_time, duration, length=10)
-            cur_str = keyboards._format_time(current_time)
-            dur_str = keyboards._format_time(duration)
-            timer = f"{cur_str} ▶ {bar} {dur_str}"
-
         message = f"![🎵](tg://emoji?id=5334665104677941170) **Music Playlist:**\n\n"
-        message += f"{timer}\n\n"
 
         req_id = track.get('requested_by_id')
         if req_id:
