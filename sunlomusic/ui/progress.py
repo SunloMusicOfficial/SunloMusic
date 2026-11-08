@@ -102,6 +102,15 @@ class ProgressUpdater:
                     )
 
                     try:
+                        # Try editing photo caption first (since we send photo now)
+                        await self.client.edit_message_caption(
+                            chat_id=chat_id,
+                            message_id=message_id,
+                            caption=new_message,
+                            reply_markup=reply_markup
+                        )
+                    except Exception:
+                        # Fallback to text edit if it's not a photo
                         await self.client.edit_message_text(
                             chat_id=chat_id,
                             message_id=message_id,

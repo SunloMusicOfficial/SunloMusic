@@ -7,7 +7,17 @@ class Messages:
     def now_playing(track: Dict, requested_by: str = "Unknown", current_time: int = 0, queue: List[Dict] = None, playlist_unfetched: int = 0) -> str:
         title = track.get('title', 'Unknown')
 
+        duration = int(track.get('duration', 0))
+        if duration > 0:
+            bar = Messages._create_progress_bar(current_time, duration, length=10)
+            current_str = Messages._format_duration(current_time)
+            duration_str = Messages._format_duration(duration)
+            timer = f"`{current_str}` {bar} `{duration_str}`"
+        else:
+            timer = "🔴 Live Stream"
+
         message = f"![🎵](tg://emoji?id=5334665104677941170) **Music Playlist:**\n\n"
+        message += f"{timer}\n\n"
 
         req_id = track.get('requested_by_id')
         if req_id:
@@ -179,7 +189,17 @@ class Messages:
         if not queue:
             return "📄 **Queue is empty**"
 
+        duration = int(track.get('duration', 0))
+        if duration > 0:
+            bar = Messages._create_progress_bar(current_time, duration, length=10)
+            current_str = Messages._format_duration(current_time)
+            duration_str = Messages._format_duration(duration)
+            timer = f"`{current_str}` {bar} `{duration_str}`"
+        else:
+            timer = "🔴 Live Stream"
+
         message = f"![🎵](tg://emoji?id=5334665104677941170) **Music Playlist:**\n\n"
+        message += f"{timer}\n\n"
 
         for i, track in enumerate(queue[:5], start=1):
             track_title = track.get('title', 'Unknown')
