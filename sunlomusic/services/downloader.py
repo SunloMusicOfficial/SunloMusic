@@ -140,7 +140,7 @@ class MediaDownloader:
         metadata = {
             'title': title,
             'duration': duration,
-            'thumbnail': info.get('thumbnail', ''),
+            'thumbnail': info.get('thumbnail') or f"https://img.youtube.com/vi/{info.get('id')}/hqdefault.jpg",
             'uploader': info.get('uploader', 'Unknown'),
             'url': info.get('webpage_url', info.get('url', url)),
             'is_live': info.get('is_live', False),
@@ -279,7 +279,7 @@ class MediaDownloader:
                     'title': entry.get('title', 'Unknown'),
                     'duration': int(entry.get('duration', 0) or 0),
                     'uploader': entry.get('uploader', 'Unknown'),
-                    'thumbnail': entry.get('thumbnail', ''),
+                    'thumbnail': entry.get('thumbnail') or f"https://img.youtube.com/vi/{entry.get('id')}/hqdefault.jpg",
                     'is_live': entry.get('is_live', False),
                     '_raw_info': None,
                 })
@@ -334,7 +334,7 @@ class MediaDownloader:
         metadata = {
             'title': entry.get('title', 'Unknown'),
             'duration': int(entry.get('duration') or 0),
-            'thumbnail': entry.get('thumbnail', ''),
+            'thumbnail': entry.get('thumbnail') or f"https://img.youtube.com/vi/{entry.get('id')}/hqdefault.jpg",
             'uploader': entry.get('uploader') or entry.get('channel', 'Unknown'),
             'url': url,
             'is_live': entry.get('is_live', False),
@@ -381,7 +381,7 @@ class MediaDownloader:
                     'title': entry.get('title', 'Unknown'),
                     'url': f"https://www.youtube.com/watch?v={entry.get('id', '')}",
                     'duration': int(entry.get('duration', 0) or 0),
-                    'thumbnail': entry.get('thumbnail', ''),
+                    'thumbnail': entry.get('thumbnail') or f"https://img.youtube.com/vi/{entry.get('id')}/hqdefault.jpg",
                     'uploader': entry.get('uploader', 'Unknown'),
                     'view_count': entry.get('view_count', 0),
                     'id': entry.get('id', '')
@@ -412,7 +412,7 @@ class MediaDownloader:
                 'title': entry.get('title', 'Unknown'),
                 'duration': entry.get('duration', 0),
                 'uploader': entry.get('uploader', 'Unknown'),
-                'thumbnail': entry.get('thumbnail', ''),
+                'thumbnail': entry.get('thumbnail') or f"https://img.youtube.com/vi/{entry.get('id')}/hqdefault.jpg",
                 'is_live': False,
                 '_raw_info': {'id': entry.get('id')},
             })
