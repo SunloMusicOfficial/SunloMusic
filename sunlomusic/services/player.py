@@ -308,11 +308,24 @@ class PlayerController:
                     new_markup = keyboards.player_controls(chat_id, False, initial_position, initial_duration, track.get('is_live', False), loop_mode, len(queue), settings.get('autoplay', False))
 
                     _thumb = track.get('thumbnail')
+                    _temp_thumb = None
                     if _thumb and str(_thumb).startswith("http"):
+                        try:
+                            import requests, tempfile
+                            resp = requests.get(_thumb, timeout=5)
+                            if resp.status_code == 200:
+                                _tf = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+                                _tf.write(resp.content)
+                                _tf.close()
+                                _temp_thumb = _tf.name
+                        except Exception as dl_err:
+                            logger.error(f"Thumbnail download error: {dl_err}")
+
+                    if _temp_thumb and os.path.exists(_temp_thumb):
                         try:
                             new_msg = await bot_client.send_photo(
                                 chat_id=chat_id,
-                                photo=_thumb,
+                                photo=_temp_thumb,
                                 caption=new_text,
                                 reply_markup=new_markup
                             )
@@ -323,6 +336,11 @@ class PlayerController:
                                 text=new_text,
                                 reply_markup=new_markup
                             )
+                        finally:
+                            try:
+                                os.remove(_temp_thumb)
+                            except:
+                                pass
                     else:
                         new_msg = await bot_client.send_message(
                             chat_id=chat_id,
