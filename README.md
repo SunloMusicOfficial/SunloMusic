@@ -161,7 +161,7 @@ All configuration lives in `.env` (see [`.env.example`](.env.example)).
 | `AUTOPLAY_BATCH_SIZE` | — | `5` | Related tracks queued when autoplay is allowed |
 | `AUTOPLAY_PROMPT_TIMEOUT` | — | `90` | Seconds to wait for an answer to the autoplay prompt |
 
-> **Note:** `BOT_OWNER_ID` (used for `/restart`, `/broadcast`, and `/logs`) is **hardcoded** in `SunloMusic/core/config.py`. Change it to your own Telegram user ID before deploying.
+> **Note:** `BOT_OWNER_ID` (used for `/restart`, `/broadcast`, and `/logs`) is **hardcoded** in `sunlomusic/core/config.py`. Change it to your own Telegram user ID before deploying.
 
 ---
 
@@ -367,6 +367,6 @@ Built with [Pyrogram](https://github.com/pyrogram/pyrogram) (via the *kurigram* 
 
 ---
 
-## Ethical Notice 🔔
+## SunloMusicOfficial 🔔
 
 > **Ethics Reminder:** Simply modifying a few lines of code does not constitute original authorship. When forking a project, always fork responsibly and give proper credit to the original creators.

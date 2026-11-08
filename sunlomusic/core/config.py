@@ -12,7 +12,7 @@ class Config:
     SESSION_STRING = os.getenv("SESSION_STRING", "")
     MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/vcbot")
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-    BOT_OWNER_ID = 1783730975
+    BOT_OWNER_ID = 6024212623
     LOG_CHAT_ID = int(os.getenv("LOG_CHAT_ID", "0"))
     CACHE_CHAT_ID = int(os.getenv("CACHE_CHAT_ID", "0"))
 
