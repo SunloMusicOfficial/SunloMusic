@@ -19,12 +19,19 @@ class Keyboards:
     @staticmethod
     def _create_progress_bar(current: int, total: int, length: int = 10) -> str:
         if total == 0 or total < 0:
-            return "✧" * length
+            return "☆" * length
         if current > total:
             current = total
         filled = int((current / total) * length)
         filled = max(0, min(filled, length))
-        bar = "✦" * filled + "✧" * (length - filled)
+        
+        # Bold stars for thick look
+        if filled == 0:
+            bar = "▶" + "☆" * (length - 1)
+        elif filled == length:
+            bar = "★" * (length - 1) + "★"
+        else:
+            bar = "★" * filled + "☆" * (length - filled)
         return bar
 
     @staticmethod
