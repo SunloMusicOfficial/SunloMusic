@@ -118,9 +118,9 @@ The bot uses **two** accounts:
 - `SunloMusic` — your bot (runs on `BOT_TOKEN`).
 - `user_client` — a **user** account (runs on `SESSION_STRING`). This is the account that actually joins the voice chat and streams, because Telegram requires a *user* (not a bot) to stream audio in a voice chat.
 
-Generate the session string using [@TgDevToolBot](https://t.me/TgDevToolBot):
+Generate the session string using [@SunloMusicBot](https://t.me/SunloMusicBot):
 
-1. Open Telegram and start **[@TgDevToolBot](https://t.me/TgDevToolBot)**.
+1. Open Telegram and start **[@SunloMusicBot](https://t.me/SunloMusicBot)**.
 2. Select **🔐 Pyrogram Session** from the menu.
 3. Enter your `API_ID` and `API_HASH` when prompted.
 4. Log in with the **user account's** phone number and the OTP code.
