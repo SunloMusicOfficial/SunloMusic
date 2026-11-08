@@ -9,5 +9,6 @@ fonttools
 aiohttp
 aiofiles
 python-dotenv
-numpyflask
+numpy
+flask
 requests
