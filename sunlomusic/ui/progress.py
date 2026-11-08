@@ -55,7 +55,7 @@ class ProgressUpdater:
 
             while True:
                 try:
-                    await asyncio.sleep(30)
+                    await asyncio.sleep(10)
 
                     if self.current_message_ids.get(chat_id) != message_id:
                         logger.info(f"Progress updater for message {message_id} superseded in {chat_id}, stopping")

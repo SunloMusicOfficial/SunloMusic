@@ -6,18 +6,24 @@ class Messages:
     @staticmethod
     def now_playing(track: Dict, requested_by: str = "Unknown", current_time: int = 0, queue: List[Dict] = None, playlist_unfetched: int = 0) -> str:
         title = track.get('title', 'Unknown')
-
         duration = int(track.get('duration', 0))
-        if duration > 0:
-            bar = Messages._create_progress_bar(current_time, duration, length=10)
-            current_str = Messages._format_duration(current_time)
-            duration_str = Messages._format_duration(duration)
-            timer = f"`{current_str}` {bar} `{duration_str}`"
-        else:
-            timer = "🔴 Live Stream"
+        is_live = track.get('is_live', False)
 
-        message = f"![🎵](tg://emoji?id=5334665104677941170) **Music Playlist:**\n\n"
-        message += f"{timer}\n\n"
+        if is_live:
+            timer = "🔴 **LIVE STREAM**"
+        else:
+            from sunlomusic.ui.keyboards import keyboards
+            bar = keyboards._create_progress_bar(current_time, duration, length=10)
+            cur_str = keyboards._format_time(current_time)
+            dur_str = keyboards._format_time(duration)
+            timer = f"{cur_str} ▶ {bar} {dur_str}"
+
+        message = f"![🎵](tg://emoji?id=5334665104677941170) **Music Playlist:**
+
+"
+        message += f"{timer}
+
+"
 
         req_id = track.get('requested_by_id')
         if req_id:
@@ -25,8 +31,11 @@ class Messages:
         else:
             req_mention = requested_by
 
-        message += f"**1. ![🎸](tg://emoji?id=5222472119295684375) {title}**\n"
-        message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {req_mention}\n\n"
+        message += f"**1. ![🎸](tg://emoji?id=5222472119295684375) {title}**
+"
+        message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {req_mention}
+
+"
 
         if queue and len(queue) > 1:
             for i, next_track in enumerate(queue[1:4], start=2):
@@ -39,8 +48,11 @@ class Messages:
                     next_mention = f"[{next_name}](tg://user?id={next_id})"
                 else:
                     next_mention = next_name
-                message += f"**{i}. ![🎸](tg://emoji?id=5222472119295684375) {next_title}**\n"
-                message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {next_mention}\n\n"
+                message += f"**{i}. ![🎸](tg://emoji?id=5222472119295684375) {next_title}**
+"
+                message += f"![🏆](tg://emoji?id=5944970130554359187) **Requested by:** {next_mention}
+
+"
 
             shown = min(len(queue), 4)
             remaining_in_queue = len(queue) - shown

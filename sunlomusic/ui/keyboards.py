@@ -24,15 +24,7 @@ class Keyboards:
             current = total
         filled = int((current / total) * length)
         filled = max(0, min(filled, length))
-        
-        # Bold stars for thick look
-        if filled == 0:
-            bar = "▶" + "☆" * (length - 1)
-        elif filled == length:
-            bar = "★" * (length - 1) + "★"
-        else:
-            bar = "★" * filled + "☆" * (length - filled)
-        return bar
+        return "★" * filled + "☆" * (length - filled)
 
     @staticmethod
     def player_controls(chat_id: int, is_paused: bool = False, current_time: int = 0, total_time: int = 0, is_live: bool = False, loop_mode: str = 'off', queue_length: int = None, autoplay: bool = False):
