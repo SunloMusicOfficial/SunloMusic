@@ -46,7 +46,7 @@ class Messages:
             return "━" * length
 
         filled = int((current / total) * length)
-        bar = "━" * filled + "🔘" + "━" * (length - filled - 1)
+        bar = "✦" * filled + "✧" * (length - filled)
         return bar
 
     @staticmethod
