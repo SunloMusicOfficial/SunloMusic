@@ -1,3 +1,4 @@
+from keep_alive import keep_alive
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
 import asyncio
