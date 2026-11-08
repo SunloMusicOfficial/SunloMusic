@@ -307,11 +307,28 @@ class PlayerController:
                     new_text = messages.now_playing(track, track.get('requested_by', 'Unknown'), initial_position, queue, playlist_unfetched)
                     new_markup = keyboards.player_controls(chat_id, False, initial_position, initial_duration, track.get('is_live', False), loop_mode, len(queue), settings.get('autoplay', False))
 
-                    new_msg = await bot_client.send_message(
-                        chat_id=chat_id,
-                        text=new_text,
-                        reply_markup=new_markup
-                    )
+                    _thumb = track.get('thumbnail')
+                    if _thumb and str(_thumb).startswith("http"):
+                        try:
+                            new_msg = await bot_client.send_photo(
+                                chat_id=chat_id,
+                                photo=_thumb,
+                                caption=new_text,
+                                reply_markup=new_markup
+                            )
+                        except Exception as photo_err:
+                            logger.error(f"Thumbnail send failed: {photo_err}, falling back to text")
+                            new_msg = await bot_client.send_message(
+                                chat_id=chat_id,
+                                text=new_text,
+                                reply_markup=new_markup
+                            )
+                    else:
+                        new_msg = await bot_client.send_message(
+                            chat_id=chat_id,
+                            text=new_text,
+                            reply_markup=new_markup
+                        )
                     self.now_playing_messages[chat_id] = new_msg.id
                     logger.info(f"Sent new now playing message in {chat_id}")
                 except Exception as e:
