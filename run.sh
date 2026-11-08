@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Copyright (C) @itsSmartDev
+# Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
-# Run the Telecast bot: install/upgrade Python deps + yt-dlp + ffmpeg, then launch.
+# Run the SunloMusic bot: install/upgrade Python deps + yt-dlp + ffmpeg, then launch.
 set -euo pipefail
 
 cd "$(dirname "$0")"

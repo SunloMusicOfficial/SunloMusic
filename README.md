@@ -350,8 +350,8 @@ Don't commit secrets — `.env`, `*.session*`, and `cookies/yt.txt` are gitignor
 
 ## 💬 Support
 
-- **Update channel:** [@itsSmartDev](https://t.me/itsSmartDev)
-- **Discussion chat:** [@DevChatZone](https://t.me/DevChatZone)
+- **Update channel:** [@YO_UR_OFFICIAL_CRUSH](https://t.me/YO_UR_OFFICIAL_CRUSH)
+- **Discussion chat:** [@Vip_Sakil_Bio](https://t.me/Vip_Sakil_Bio)
 
 ---
 
@@ -361,7 +361,7 @@ Don't commit secrets — `.env`, `*.session*`, and `cookies/yt.txt` are gitignor
 
 This project is licensed under the **[MIT License](LICENSE)**. You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell the software, provided the copyright notice above is included in all copies or substantial portions.
 
-© [@itsSmartDev](https://github.com/itsSmartDev) — copyright holder.
+© [@YO_UR_OFFICIAL_CRUSH](https://github.com/YO_UR_OFFICIAL_CRUSH) — copyright holder.
 
 Built with [Pyrogram](https://github.com/pyrogram/pyrogram) (via the *kurigram* fork), [py-tgcalls](https://github.com/pytgcalls/pytgcalls), [ntgcalls](https://github.com/pytgcalls/ntgcalls), [yt-dlp](https://github.com/yt-dlp/yt-dlp), [MongoDB/motor](https://www.mongodb.com/docs/drivers/motor/), [Pillow](https://python-pillow.org/) and [numpy](https://numpy.org/).
 
