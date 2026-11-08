@@ -250,6 +250,26 @@ async def play_command(client: Client, message: Message, player, tgcalls):
                 )
                 return
 
+        # Check if song is already in queue
+        queue_list = await queue_manager.get_queue(message.chat.id)
+        current_playing_track = await player.get_current_track(message.chat.id)
+        if current_playing_track:
+            queue_list.insert(0, current_playing_track)
+            
+        is_duplicate = False
+        for item in queue_list:
+            if downloader.track_video_id(item) == downloader.track_video_id(track):
+                is_duplicate = True
+                break
+                
+        if is_duplicate:
+            await status_msg.edit_text(
+                f"🔁 **Already in Queue**\n\n"
+                f"![🎸](tg://emoji?id=5222472119295684375) {track['title']}\n\n"
+                f"⚠️ **This music is already in the playlist/queue.**"
+            )
+            return
+
         await queue_manager.add_track(message.chat.id, track)
 
         if not await player.is_playing(message.chat.id):
