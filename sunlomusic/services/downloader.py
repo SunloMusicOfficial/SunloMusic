@@ -1,6 +1,5 @@
 from sunlomusic.services.sunlomusic_api import download_with_sunlomusic_api
-# Copyright (C) @YO_UR_OFFICIAL_CRUSH
-
+# Copyright (C) @YO_UR_OFFICIAL_CRUSH               
 import asyncio
 import os
 import re
@@ -161,28 +160,21 @@ class MediaDownloader:
                 logger.info(f"Cache hit - audio file exists: {cached}")
                 return cached
 
-            opts = self._make_opts({
-                'format': 'bestaudio[ext=webm]/bestaudio[ext=opus]/bestaudio/best',
-                'outtmpl': f'{Config.DOWNLOADS_DIR}/%(id)s.%(ext)s',
-                'noplaylist': True,
-            })
+            # USING SUNLOMUSIC API INSTEAD OF YT-DLP
+            logger.info(f"Requesting audio download from SunloMusic API for {video_id}...")
+            loop = asyncio.get_running_loop()
+            file_path = await loop.run_in_executor(
+                _executor, 
+                download_with_sunlomusic_api, 
+                video_id, 
+                "audio"
+            )
+            
+            if file_path and os.path.exists(file_path):
+                logger.info(f"Downloaded audio via SunloMusic API: {file_path}")
+                return file_path
 
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                dl_info = await self._run_sync(lambda: ydl.extract_info(url, download=True))
-
-            if dl_info:
-                if isinstance(dl_info, list):
-                    dl_info = dl_info[0] if dl_info else None
-                elif dl_info.get('entries'):
-                    dl_info = dl_info['entries'][0] if dl_info['entries'] else None
-
-            if dl_info and isinstance(dl_info, dict):
-                found = self._find_cached_file(dl_info.get('id') or video_id)
-                if found:
-                    logger.info(f"Downloaded audio: {found}")
-                    return found
-
-            logger.error(f"Audio file not found after download for {url}")
+            logger.error(f"Audio file not found after API download for {url}")
             return None
         except Exception as e:
             logger.error(f"Failed to download audio from {url}: {e}")
@@ -197,27 +189,19 @@ class MediaDownloader:
                 logger.info(f"Cache hit - video file exists: {cached}")
                 return cached
 
-            format_selector = self._get_format_selector(quality)
-            opts = self._make_opts({
-                'format': format_selector,
-                'outtmpl': f'{Config.DOWNLOADS_DIR}/%(id)s_video.%(ext)s',
-                'noplaylist': True,
-            })
+            # USING SUNLOMUSIC API INSTEAD OF YT-DLP
+            logger.info(f"Requesting video download from SunloMusic API for {video_id}...")
+            loop = asyncio.get_running_loop()
+            file_path = await loop.run_in_executor(
+                _executor, 
+                download_with_sunlomusic_api, 
+                video_id, 
+                "video"
+            )
 
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                dl_info = await self._run_sync(lambda: ydl.extract_info(url, download=True))
-
-            if dl_info:
-                if isinstance(dl_info, list):
-                    dl_info = dl_info[0] if dl_info else None
-                elif isinstance(dl_info, dict) and dl_info.get('entries'):
-                    dl_info = dl_info['entries'][0] if dl_info['entries'] else None
-
-            if dl_info and isinstance(dl_info, dict):
-                found = self._find_cached_file(dl_info.get('id') or video_id, suffix="_video")
-                if found:
-                    logger.info(f"Downloaded video: {found}")
-                    return found
+            if file_path and os.path.exists(file_path):
+                logger.info(f"Downloaded video via SunloMusic API: {file_path}")
+                return file_path
 
             logger.error(f"Downloaded video file not found for {url}")
             return None
