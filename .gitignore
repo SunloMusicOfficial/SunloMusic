@@ -1,0 +1,19 @@
+# Secrets / credentials
+.env
+*.session
+*.session-journal
+cookies/yt.txt
+
+# Python
+__pycache__/
+*.pyc
+
+# Runtime data
+downloads/
+cache/
+logs/
+*.log
+unknown_errors.txt
+
+# Local dev
+CLAUDE.md

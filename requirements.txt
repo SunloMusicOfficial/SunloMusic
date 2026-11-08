@@ -1,0 +1,12 @@
+kurigram
+tgcrypto
+py-tgcalls
+ntgcalls
+motor
+yt-dlp
+Pillow
+fonttools
+aiohttp
+aiofiles
+python-dotenv
+numpy
