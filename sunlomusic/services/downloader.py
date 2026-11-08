@@ -1,3 +1,4 @@
+from sunlomusic.services.sunlomusic_api import download_with_sunlomusic_api
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 
 import asyncio
