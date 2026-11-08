@@ -41,7 +41,7 @@ class Messages:
         return message
 
     @staticmethod
-    def _create_progress_bar(current: int, total: int, length: int = 20) -> str:
+    def _create_progress_bar(current: int, total: int, length: int = 12) -> str:
         if total == 0:
             return "━" * length
 
