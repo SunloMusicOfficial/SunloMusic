@@ -1,5 +1,30 @@
 <div align="center">
 
+## 🔑 Required Environment Variables
+
+Agar aap yeh bot deploy kar rahe hain, toh aapko Render (ya kisi bhi host) par yeh Environment Variables add karne honge:
+
+| Variable | Description | Where to get it? |
+|----------|-------------|------------------|
+| `API_ID` | Telegram API ID | [my.telegram.org](https://my.telegram.org) |
+| `API_HASH` | Telegram API Hash | [my.telegram.org](https://my.telegram.org) |
+| `BOT_TOKEN` | Main Bot Token | [@BotFather](https://t.me/BotFather) |
+| `SESSION_STRING` | Assistant Account Session | [@SunloMusicBot](https://t.me/SunloMusicBot) (Session generator) |
+| `MONGO_DB_URI` | MongoDB Database URI | [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) |
+| `BOT_OWNER_ID` | Owner's Telegram ID | [@userinfobot](https://t.me/userinfobot) |
+| `LOG_CHAT_ID` | Channel ID for logs | Create a private channel |
+| `SUNLOMUSIC_API_KEY` | Music Download API Key | [ShrutiAPI](https://dash.shrutibots.in) |
+| `GEMINI_API_KEY` | Google Gemini AI API Key | [Google AI Studio](https://aistudio.google.com/) |
+
+### 🛠️ Deployment on Render
+
+1. Fork this repository.
+2. Create a new **Web Service** on Render.
+3. Select **Docker** as the environment.
+4. Add all the Environment Variables listed above.
+5. Deploy!
+
+
 # 🎧 SunloMusic
 
 **A Telegram voice-chat music & video bot.**
