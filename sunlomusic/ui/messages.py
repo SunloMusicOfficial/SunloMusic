@@ -313,6 +313,8 @@ class Messages:
         ("/rank or /ranking", "View group rankings"),
         ("/tmail", "Generate a temporary email"),
         ("/cmail <token>", "Check temporary email inbox"),
+        ("/gem <prompt>", "Ask Gemini AI anything"),
+        ("/imgai <prompt>", "Reply to a photo for AI analysis"),
     ]
     HELP_MUSIC = [
         ("/play <query>", "Play a song from YouTube"),

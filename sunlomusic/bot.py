@@ -18,7 +18,7 @@ from sunlomusic.handlers.commands import register_commands
 from sunlomusic.handlers.callbacks import register_callbacks
 from sunlomusic.handlers.broadcast import register_broadcast_handlers
 from sunlomusic.handlers.events import register_event_handlers
-from sunlomusic.handlers.inline import register_inline_handlers
+from sunlomusic.handlers.inline import register_inline_handlers\nfrom sunlomusic.handlers.gemini import register_gemini_handlers
 from sunlomusic.handlers.tempmail import register_tempmail_handlers
 from sunlomusic.handlers.whisper import register_whisper_handlers
 from sunlomusic.utils.monitor import monitor_logger
