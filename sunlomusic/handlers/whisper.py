@@ -10,8 +10,8 @@ from pyrogram.enums import ButtonStyle, ParseMode
 from sunlomusic.core.logging import logger
 from sunlomusic.db import db
 
-# Collections
-messages_col = db.db["whisper_messages"]
+def get_messages_col():
+    return db.db["whisper_messages"]
 
 def register_whisper_handlers(app: Client):
     @app.on_inline_query()
@@ -81,6 +81,7 @@ def register_whisper_handlers(app: Client):
                 )])
                 return
 
+        messages_col = get_messages_col()
         await messages_col.insert_one({
             "_id": message_id,
             "content": message_content,
@@ -113,6 +114,7 @@ def register_whisper_handlers(app: Client):
         message_id = callback_query.data
         user_id = callback_query.from_user.id
 
+        messages_col = get_messages_col()
         message_data = await messages_col.find_one({"_id": message_id})
         if not message_data:
             await callback_query.answer("Message not found or expired.", show_alert=True)
