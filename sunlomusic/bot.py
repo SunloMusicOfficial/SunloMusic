@@ -38,8 +38,6 @@ class VCMusicBot:
         self.is_running = False
 
     async def initialize(self):
-        register_whisper_handlers(self.bot)
-        register_tempmail_handlers(self.bot)
         Config.validate()
         logger.info("Starting VC Music Bot...")
 
@@ -88,6 +86,8 @@ class VCMusicBot:
         register_broadcast_handlers(self.bot)
         register_event_handlers(self.bot)
         register_inline_handlers(self.bot)
+        register_whisper_handlers(self.bot)
+        register_tempmail_handlers(self.bot)
 
         logger.info("Bot initialized successfully")
 
