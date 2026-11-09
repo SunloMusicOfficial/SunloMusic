@@ -311,6 +311,8 @@ class Messages:
         ("/help", "Show this help message"),
         ("/status", "Show bot statistics"),
         ("/rank or /ranking", "View group rankings"),
+        ("/tmail", "Generate a temporary email"),
+        ("/cmail <token>", "Check temporary email inbox"),
     ]
     HELP_MUSIC = [
         ("/play <query>", "Play a song from YouTube"),
