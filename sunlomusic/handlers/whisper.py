@@ -11,7 +11,7 @@ from sunlomusic.core.logging import logger
 from sunlomusic.db import db
 
 # Collections
-messages_col = db["whisper_messages"]
+messages_col = db.db["whisper_messages"]
 
 def register_whisper_handlers(app: Client):
     @app.on_inline_query()
