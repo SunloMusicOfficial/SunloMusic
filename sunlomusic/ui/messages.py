@@ -315,6 +315,7 @@ class Messages:
         ("/cmail <token>", "Check temporary email inbox"),
         ("/gem <prompt>", "Ask Gemini AI anything"),
         ("/imgai <prompt>", "Reply to a photo for AI analysis"),
+        ("/dl <link>", "Download private/restricted content"),
     ]
     HELP_MUSIC = [
         ("/play <query>", "Play a song from YouTube"),
