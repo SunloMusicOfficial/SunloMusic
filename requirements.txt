@@ -13,4 +13,4 @@ numpy
 flask
 requests
 beautifulsoup4
-\ngoogle-generativeai
+google-generativeai
