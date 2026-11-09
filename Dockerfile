@@ -38,4 +38,4 @@ RUN mkdir -p downloads cookies logs assets
 EXPOSE 8080
 
 # Start the bot
-CMD ["python", "bot.py"]
+CMD ["python", "SunloMusic.py"]
