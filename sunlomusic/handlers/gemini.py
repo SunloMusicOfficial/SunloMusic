@@ -1,3 +1,4 @@
+import asyncio
 import os
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 import io
@@ -35,7 +36,7 @@ def register_gemini_handlers(app: Client):
                 return
             
             prompt = message.text.split(maxsplit=1)[1]
-            response = model.generate_content(prompt)
+            response = await asyncio.to_thread(model.generate_content, prompt)
             response_text = response.text
             
             if len(response_text) > 4000:
@@ -66,7 +67,7 @@ def register_gemini_handlers(app: Client):
         try:
             img_data = await client.download_media(message.reply_to_message, in_memory=True)
             img = PIL.Image.open(io.BytesIO(img_data.getbuffer()))
-            response = model.generate_content([prompt, img])
+            response = await asyncio.to_thread(model.generate_content, [prompt, img])
             response_text = response.text
             await message.reply_text(response_text, parse_mode=None)
         except Exception as e:

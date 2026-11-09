@@ -1,3 +1,4 @@
+import asyncio
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 import re
 import time
@@ -105,7 +106,7 @@ def register_tempmail_handlers(app: Client):
         
         loading_msg = await message.reply("**Generating your temporary email...**")
         
-        domain = get_domain()
+        domain = await asyncio.to_thread(get_domain)
         if not domain:
             await loading_msg.edit_text("**Failed to connect to TempMail API (Domain error). Try again later.**")
             return
@@ -114,12 +115,12 @@ def register_tempmail_handlers(app: Client):
         password = generate_random_password()
         email = f"{username}@{domain}"
         
-        account = create_account(email, password)
+        account = await asyncio.to_thread(create_account, email, password)
         if not account:
             await loading_msg.edit_text("**Failed to create account. Username might be taken.**")
             return
         
-        token = get_token(email, password)
+        token = await asyncio.to_thread(get_token, email, password)
         if not token:
             await loading_msg.edit_text("**Failed to retrieve token.**")
             return
@@ -148,7 +149,7 @@ def register_tempmail_handlers(app: Client):
             return
         
         user_tokens[callback_query.from_user.id] = token
-        messages = list_messages(token)
+        messages = await asyncio.to_thread(list_messages, token)
         
         if not messages:
             await callback_query.answer("Inbox is empty ❌", show_alert=True)
@@ -205,7 +206,7 @@ def register_tempmail_handlers(app: Client):
         
         loading_msg = await message.reply("**⏳ Checking...**")
         user_tokens[message.from_user.id] = token
-        messages = list_messages(token)
+        messages = await asyncio.to_thread(list_messages, token)
         
         if not messages:
             await loading_msg.edit_text("**❌ Inbox is empty or invalid token.**")
