@@ -12,3 +12,4 @@ python-dotenv
 numpy
 flask
 requests
+beautifulsoup4
