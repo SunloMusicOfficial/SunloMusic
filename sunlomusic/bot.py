@@ -38,6 +38,7 @@ class VCMusicBot:
         self.is_running = False
 
     async def initialize(self):
+        register_tempmail_handlers(self.client)
         Config.validate()
         logger.info("Starting VC Music Bot...")
 
