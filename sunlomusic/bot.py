@@ -90,6 +90,8 @@ class VCMusicBot:
         register_inline_handlers(self.bot)
         register_whisper_handlers(self.bot)
         register_tempmail_handlers(self.bot)
+        register_gemini_handlers(self.bot)
+        register_restricted_handlers(self.bot, self.user_client)
 
         logger.info("Bot initialized successfully")
 
