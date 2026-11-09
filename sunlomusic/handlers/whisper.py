@@ -7,13 +7,10 @@ from pyrogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton
 )
 from pyrogram.enums import ButtonStyle, ParseMode
-from motor.motor_asyncio import AsyncIOMotorClient
 from sunlomusic.core.logging import logger
-from sunlomusic.core.config import Config
+from sunlomusic.db import db
 
-# Setup DB specifically for whisper
-mongo_client = AsyncIOMotorClient(Config.MONGO_DB_URI)
-db = mongo_client.get_default_database()
+# Collections
 messages_col = db["whisper_messages"]
 
 def register_whisper_handlers(app: Client):
