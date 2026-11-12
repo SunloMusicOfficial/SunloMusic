@@ -57,7 +57,10 @@ class VCMusicBot:
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 "🎶 *System initialized. Ready for playback.*"
             )
-            await self.bot.send_message(Config.LOG_CHAT_ID, text)
+            
+            target_chat = Config.LOG_CHAT_ID if Config.LOG_CHAT_ID and Config.LOG_CHAT_ID != 0 else Config.BOT_OWNER_ID
+            await self.bot.send_message(target_chat, text)
+            logger.info("✅ Startup message sent successfully!")
         except Exception as e:
             logger.error(f"Failed to send startup message: {e}")
 
@@ -141,7 +144,9 @@ class VCMusicBot:
             bot_info = await self.bot.get_me()
             user_info = await self.user_client.get_me()
             logger.info(f"Bot @{bot_info.username} is now running")
-            logger.info(f"User client: {user_info.first_name} (ID: {user_info.id})")
+            import asyncio
+        asyncio.create_task(self.send_startup_message())
+        logger.info(f"User client: {user_info.first_name} (ID: {user_info.id})")
 
             await self._check_restart_message()
 
