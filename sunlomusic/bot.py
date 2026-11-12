@@ -39,6 +39,28 @@ class VCMusicBot:
         self.watchdog = None
         self.is_running = False
 
+
+    async def send_startup_message(self):
+        import datetime
+        try:
+            me = await self.bot.get_me()
+            assistant = await self.user_client.get_me() if getattr(self, 'user_client', None) else None
+            assistant_name = assistant.first_name if assistant else "Not Connected"
+            
+            text = (
+                "✨ **SunloMusic Deployment Successful!** ✨\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🤖 **Bot:** @{me.username}\n"
+                f"🎧 **Assistant:** {assistant_name}\n"
+                f"⚡ **Status:** Active & Ready\n"
+                f"🕒 **Time:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🎶 *System initialized. Ready for playback.*"
+            )
+            await self.bot.send_message(Config.LOG_CHAT_ID, text)
+        except Exception as e:
+            logger.error(f"Failed to send startup message: {e}")
+
     async def initialize(self):
         Config.validate()
         logger.info("Starting VC Music Bot...")
@@ -103,6 +125,7 @@ class VCMusicBot:
             logger.info("Bot client started")
 
             await self.user_client.start()
+        await self.send_startup_message()
             logger.info("User client started successfully")
 
             await self.tgcalls_manager.initialize()

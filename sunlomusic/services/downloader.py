@@ -62,7 +62,7 @@ class MediaDownloader:
             self._base_opts['cookiefile'] = self.cookies_path
             logger.info(f"YouTube cookies loaded from: {self.cookies_path}")
         else:
-            logger.warning(f"YouTube cookies file not found at: {self.cookies_path}")
+            logger.info(f"YouTube cookies not used. Using SunloMusic API instead.")
 
     def _make_opts(self, extra: dict = None) -> dict:
         opts = self._base_opts.copy()
