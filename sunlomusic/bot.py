@@ -281,4 +281,4 @@ async def main():
     bot = VCMusicBot()
     await bot.start()
         import asyncio
-        asyncio.create_task(bot.send_startup_message())
+        asyncio.create_task(bot.send_startup_message()))
