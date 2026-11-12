@@ -1,5 +1,6 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 import signal
+import asyncio
 
 from pyrogram import Client
 from pyrogram.enums import ParseMode
@@ -140,7 +141,9 @@ class VCMusicBot:
             bot_info = await self.bot.get_me()
             user_info = await self.user_client.get_me()
             logger.info(f"Bot @{bot_info.username} is now running")
-        logger.info(f"User client: {user_info.first_name} (ID: {user_info.id})")
+            logger.info(f"User client: {user_info.first_name} (ID: {user_info.id})")
+
+            await self.send_startup_message()
 
             await self._check_restart_message()
 
@@ -280,5 +283,3 @@ class VCMusicBot:
 async def main():
     bot = VCMusicBot()
     await bot.start()
-        import asyncio
-        asyncio.create_task(bot.send_startup_message())
