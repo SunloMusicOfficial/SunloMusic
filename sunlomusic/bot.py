@@ -125,7 +125,6 @@ class VCMusicBot:
             logger.info("Bot client started")
 
             await self.user_client.start()
-        await self.send_startup_message()
             logger.info("User client started successfully")
 
             await self.tgcalls_manager.initialize()
