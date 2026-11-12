@@ -25,12 +25,30 @@ async def start_command(client: Client, message: Message):
 
     me = await client.get_me()
     markup = keyboards.start_menu(me.username)
+    
+    img_url = os.getenv("START_IMG_URL")
+    if img_url:
+        try:
+            await message.reply_photo(photo=img_url, caption=messages.start_welcome(), reply_markup=markup)
+            return
+        except Exception as e:
+            logger.error(f"Failed to send start image: {e}")
+            
     if not await reply_welcome(message, markup):
         await message.reply_text(messages.start_welcome(), reply_markup=markup)
 
 
 async def help_command(client: Client, message: Message):
     markup = keyboards.help_menu()
+    
+    img_url = os.getenv("START_IMG_URL")
+    if img_url:
+        try:
+            await message.reply_photo(photo=img_url, caption=messages.help_message(), reply_markup=markup)
+            return
+        except Exception as e:
+            logger.error(f"Failed to send help image: {e}")
+            
     if not await reply_help(message, markup):
         await message.reply_text(messages.help_message(), reply_markup=markup)
 
