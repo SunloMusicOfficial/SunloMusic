@@ -1,6 +1,4 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
-
-import asyncio
 import signal
 
 from pyrogram import Client
@@ -26,7 +24,6 @@ from sunlomusic.handlers.whisper import register_whisper_handlers
 from sunlomusic.utils.monitor import monitor_logger
 from sunlomusic.utils.watchdog import LoopWatchdog
 
-
 class VCMusicBot:
     def __init__(self):
         self.bot = None
@@ -38,7 +35,6 @@ class VCMusicBot:
         self.vc_messenger = None
         self.watchdog = None
         self.is_running = False
-
 
     async def send_startup_message(self):
         import datetime
@@ -144,8 +140,6 @@ class VCMusicBot:
             bot_info = await self.bot.get_me()
             user_info = await self.user_client.get_me()
             logger.info(f"Bot @{bot_info.username} is now running")
-            import asyncio
-        asyncio.create_task(self.send_startup_message())
         logger.info(f"User client: {user_info.first_name} (ID: {user_info.id})")
 
             await self._check_restart_message()
@@ -283,7 +277,8 @@ class VCMusicBot:
         while self.is_running:
             await asyncio.sleep(1)
 
-
 async def main():
     bot = VCMusicBot()
     await bot.start()
+        import asyncio
+        asyncio.create_task(bot.send_startup_message())
