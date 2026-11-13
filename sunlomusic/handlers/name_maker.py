@@ -1,7 +1,11 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 from pyrogram import Client, filters
-from pyrogram.types import Message
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 import asyncio
+import math
+
+# Cache to store generated names temporarily (user_id -> list of designs)
+RESULTS_CACHE = {}
 
 # 1. Premium Fonts Dictionary
 FONTS = {
@@ -15,77 +19,44 @@ FONTS = {
     "fullwidth": str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ")
 }
 
-# 2. User's Exact 66 Borders
+# 2. User's Exact Borders
 USER_BORDERS = [
-    "❤️‍🔥 ⃪꯭⃝꯭꯭꯭꯭꯭꯭꯭{n}👻𝆺꯭𝅥⎯꯭̽⎯꯭",
-    "🦋⃤✺꯭⤹⌯꯭🫥꯭꯭꯭꯭꯭꯭꯭꯭𝆬{n}🌙꯭🐬᪵᪳𝄟",
-    "꧁𓊈𒆜꯭꯭꯭꯭꯭꯭꯭{n}𒆜𓊉꧂",
-    "🍹𝆺𝅥⃝🤍⃪⃪꯭꯭㉿ ꯭꯭꯭꯭꯭꯭꯭꯭͓{n}◡̈⃝🤍͕᪳𝆺꯭𝅥⎯꯭̽⎯꯭",
-    "➳↡↡↡↡↡☬꯭꯭꯭꯭꯭꯭꯭{n}☬↡↡↡↡↡➳",
-    "✧⊹⊱⍣⊹⊱꯭꯭꯭꯭꯭꯭꯭{n}⊹⊱⍣⊹⊰✧",
-    "◄⏤͟͟͞ ⃪ͥ͢𐏓⃝⃪⭕ғͥғ𓆩꯭꯭꯭꯭꯭꯭꯭{n}𓆪••➤‌‌",
-    "𝄟͢ᶦ―ᷟ⃞꯭꯭꯭꯭꯭꯭꯭᪵{n}𝄟⃝🤫᭄",
-    "̶̶ ̶꯭͓̽♥️ ⃪꯭꯭꯭꯭꯭꯭꯭꯭⃜{n}᭡፝֟፝֟͢🍃اا̽ـ꯭ــ꯭ـ⃛و꯭",
-    "˟ ̶꯭⃖ ̶꯭꯭🪂⃪꯭⃝꯭꯭꯭꯭꯭꯭꯭{n}𓆩🥵꯭𓆪",
+    "❤️‍🔥 ⃪꯭⃝꯭꯭꯭꯭꯭꯭꯭{n}👻𝆺꯭𝅥⎯꯭̽⎯꯭", "🦋⃤✺꯭⤹⌯꯭🫥꯭꯭꯭꯭꯭꯭꯭꯭𝆬{n}🌙꯭🐬᪵᪳𝄟",
+    "꧁𓊈𒆜꯭꯭꯭꯭꯭꯭꯭{n}𒆜𓊉꧂", "🍹𝆺𝅥⃝🤍⃪⃪꯭꯭㉿ ꯭꯭꯭꯭꯭꯭꯭꯭͓{n}◡̈⃝🤍͕᪳𝆺꯭𝅥⎯꯭̽⎯꯭",
+    "➳↡↡↡↡↡☬꯭꯭꯭꯭꯭꯭꯭{n}☬↡↡↡↡↡➳", "✧⊹⊱⍣⊹⊱꯭꯭꯭꯭꯭꯭꯭{n}⊹⊱⍣⊹⊰✧",
+    "◄⏤͟͟͞ ⃪ͥ͢𐏓⃝⃪⭕ғͥғ𓆩꯭꯭꯭꯭꯭꯭꯭{n}𓆪••➤‌‌", "𝄟͢ᶦ―ᷟ⃞꯭꯭꯭꯭꯭꯭꯭᪵{n}𝄟⃝🤫᭄",
+    "̶̶ ̶꯭͓̽♥️ ⃪꯭꯭꯭꯭꯭꯭꯭꯭⃜{n}᭡፝֟፝֟͢🍃اا̽ـ꯭ــ꯭ـ⃛و꯭", "˟ ̶꯭⃖ ̶꯭꯭🪂⃪꯭⃝꯭꯭꯭꯭꯭꯭꯭{n}𓆩🥵꯭𓆪",
     ".⎯꯭᪵᪳🦋⃝‌꯭𝅦𝅥𝅥ٖٖ͟͟͟͟𝄀𝄄𝄀꯭꯭꯭꯭꯭꯭꯭꯭͟͟{n}🦋⃝‌ٖٖٖٖ ‌ٖٖٖٖٖ❤️‍🔥",
-    "◦•●◉✿ ꯭꯭꯭꯭꯭꯭꯭{n} ✿◉●•◦",
-    "╰•★★ ꯭꯭꯭꯭꯭꯭꯭{n} ★★•╯",
-    "❁⭒☆꯭꯭꯭꯭꯭꯭꯭{n}☆⭒❁",
-    "𓃭⃞꯭꯭꯭꯭꯭꯭꯭⃔͢{n}➼ ᭄꯭꯭❥𝄄⃟꯭𝅥ͦ𝆬🥂",
-    "𓆩𓆪𓆩𓆪❖꯭꯭꯭꯭꯭꯭꯭{n}❖𓆩𓆪𓆩𓆪",
-    "✪♕☬꯭꯭꯭꯭꯭꯭꯭{n}☬♕✪",
-    "⎯꯭̽ᬃ꯭꯭꯭꯭꯭꯭꯭꯭{n}🧸⎯",
-    "⏤⃝⃪꯭⃮͙͙⃕⃔🌺⃪꯭꯭꯭꯭꯭꯭꯭꯭͙͙𝆭{n}🤍⃪꯭͙͙⏤",
-    "ミ★ ꯭꯭꯭꯭꯭꯭꯭{n} ★彡",
-    "⫸⫷⫸⫷⫸✪꯭꯭꯭꯭꯭꯭꯭{n}✪⫸⫷⫸⫷⫸",
-    "──⃜͢͢៎꯭꯭꯭🐼⃪꯭͓͢°⃪꯭𝆺꯭꯭꯭꯭꯭꯭꯭꯭𝅥{n} ꯭͢⃟͢🍒⛦⃕͜🍃",
-    "꧁༒☬꯭꯭꯭꯭꯭꯭꯭{n}☬༒꧂",
-    "𝁘꯭ ꯭ྭ꯭꯭꯭꯭꯭꯭꯭{n}➛🕸",
-    "꧁✿✿✿ ꯭꯭꯭꯭꯭꯭꯭{n} ✿✿✿꧂",
-    "༺༒❁꯭꯭꯭꯭꯭꯭꯭{n}❁༒༻",
-    "𓄂≛⃝꯭꯭꯭꯭꯭꯭꯭꯭{n} ꯭𝅥ͦ𝆬🚭",
-    "❘☞ͥ͟⋆ͣ͟⋆ͫ⍣꯭꯭꯭꯭꯭꯭꯭꯭{n}⍣❘꯭𝄄꯭",
-    "꧁•⊹٭꯭꯭꯭꯭꯭꯭꯭{n}٭⊹•꧂",
-    "个『꯭꯭꯭꯭꯭꯭꯭{n}』个",
-    ".⎯᪵᪵፝֟፝֟⎯꯭𝄀𝄄𝄀🌸꯭꯭꯭꯭꯭꯭꯭꯭꯭͟{n}🦋",
-    "⎯͢ꠋ ᶦϻͣ། ⃪ͥ͢ 🌺꯭꯭꯭꯭꯭꯭꯭͜͟{n}🫧",
-    "𒆜꯭•☬•꯭꯭꯭꯭꯭꯭꯭{n}•☬•꯭𒆜",
-    "✤𖠌𓂀✤ ꯭꯭꯭꯭꯭꯭꯭{n} ✤𓂀𖠌✤",
-    "˚₊·𐏓꯭ᶜᵘᵗᵉ ꯭꯭꯭꯭꯭꯭꯭{n}°‌🥀",
-    "ıllıllı⭐🌟 ꯭꯭꯭꯭꯭꯭꯭{n} 🌟⭐ıllıllı",
-    "◄🕊️⃪꯭꯭꯭꯭꯭꯭꯭꯭̽͟{n}🦋⃝‌ٖٖٖٖ ‌ٖٖٖٖٖ❤️‍🔥",
-    "ᯓ🩺̶̶᪵˟̶ 𝆺𝅥⃝🫀꯭꯭꯭꯭꯭꯭꯭꯭{n}ﮩ᪵٨ـﮩ➛♥️",
-    "⋆⋆⋆❀꯭꯭꯭꯭꯭꯭꯭{n}❀⋆⋆⋆",
-    "•─┼ᶦϻ‌།͢ ⃪꯭꯭꯭꯭꯭꯭꯭{n}🍓꯭᪳᪼᪳",
-    "亗『꯭꯭꯭꯭꯭꯭꯭{n}』亗",
-    "◄⏤͟͟͞🤍⃝⃪🦋⃪꯭ᵛ̲ᵎ̲ᵖ̲𒉜꯭꯭꯭꯭꯭꯭꯭{n}🌸︭︫┼⁰⁰⁷─⦁••",
-    "°†° «[꯭꯭꯭꯭꯭꯭꯭{n}]» °†°",
-    "☆☬꯭꯭꯭꯭꯭꯭꯭{n}☬☆",
-    "⎯⃛㬓𓆩⃗㬓͟🍃̶̌͟🅼ɨֆֆ𝆺𝅥⃝꯭꯭꯭꯭꯭꯭꯭{n}˶֟፝͟͝⎯꯭̽ 🖤",
-    "🥀 ⃪ͥ͢ ᷟ𝆺꯭꯭𝅥᪳‌꯭꯭꯭꯭꯭꯭꯭꯭{n} ⎯꯭꯭᪵᪵፝֟፝❤️‍🔥",
-    "➶➶➶➶➶⫷꯭꯭꯭꯭꯭꯭꯭{n}⫸➶➶➶➶➶",
-    "★¸.•☆•.¸★ ꯭꯭꯭꯭꯭꯭꯭{n} ★⡀.•☆•.★",
-    "➤⇌⇌⇌꯭꯭꯭꯭꯭꯭꯭{n}⇌⇌⇌➤",
-    "❖꯭𓂀⃝꯭꯭꯭꯭꯭꯭꯭{n}𓂀⃝꯭❖",
-    "【★】➳✮꯭꯭꯭꯭꯭꯭꯭{n}✮➳【★】",
-    "❥⃝⍣꯭꯭꯭꯭꯭꯭꯭{n}❥⃝⍣",
-    "⛥꯭ᴳᴼᴰ⛥꯭꯭꯭꯭꯭꯭꯭꯭{n}⛥꯭",
-    "🝐꯭𓆩꯭꯭⍣⃪꯭꯭꯭꯭꯭꯭꯭{n}⃪⍣꯭꯭𓆪꯭🝐",
-    "◄❥ ⃝⃪⃕♥️̶⍣⃪͜🌿𝄄᭄꯭꯭꯭꯭꯭꯭꯭{n}🍃⃝🎸",
-    "◄⏤͟͞ꭙ𝆺𝅥⃝🔥 ⃪꯭꯭꯭꯭꯭꯭꯭ͥ͢{n}༎ࠫ⛧‌ٖٖٖٖٖٖٜٖٖٖٖ𝆺꯭𝅥🤍",
-    "☔️⃟⃚⃐⎯⃚꯭፝֟֗. ⃝꯭꯭꯭꯭꯭꯭꯭{n}✿⃟☔️✾",
-    "★彡[꯭꯭꯭꯭꯭꯭꯭{n}]彡★",
-    "𓄂꯭꯭‌≛⃝꯭꯭꯭‌꯭꯭꯭꯭꯭꯭꯭꯭{n}𐎭❥┼🕊️",
-    "✿્᭄͜͡⃝❥꯭꯭꯭꯭꯭꯭꯭{n}༏༏𝆺꯭𝅥𝆺꯭𝅥༎ࠫ✿͜͡࿐",
-    "•⏤‌𝄞⃝🍧 ‌⃪‌꯭꯭꯭꯭꯭꯭꯭{n}♥️꯭꯭꯭꯭ ꯭꯭᪳𝆺𝅥",
-    "⎯ᷝ⎯ⷨ͢ ꯭꯭꯭꯭꯭꯭꯭{n}𝆺꯭𝅥❤️‍🔥⎯꯭ͯ⟶⋆",
-    "──⃜͢͢🥤⃘⃝⃟⃪꯭꯭꯭꯭꯭꯭꯭⃜{n}༎͢🦋",
-    "⤹ ⃪꯭꯭꯭꯭꯭꯭꯭꯭{n} ⃪🤭꯭͎᪳᪳𝆺꯭𝅥⎯꯭̽⎯꯭",
-    "⋆⎯꯭̽𝅃꯭꯭꯭꯭꯭꯭꯭꯭᳚{n}𝅃꯭꯭᳚ ⃪꯭⃝𐏓꯭",
+    "◦•●◉✿ ꯭꯭꯭꯭꯭꯭꯭{n} ✿◉●•◦", "╰•★★ ꯭꯭꯭꯭꯭꯭꯭{n} ★★•╯",
+    "❁⭒☆꯭꯭꯭꯭꯭꯭꯭{n}☆⭒❁", "𓃭⃞꯭꯭꯭꯭꯭꯭꯭⃔͢{n}➼ ᭄꯭꯭❥𝄄⃟꯭𝅥ͦ𝆬🥂",
+    "𓆩𓆪𓆩𓆪❖꯭꯭꯭꯭꯭꯭꯭{n}❖𓆩𓆪𓆩𓆪", "✪♕☬꯭꯭꯭꯭꯭꯭꯭{n}☬♕✪",
+    "⎯꯭̽ᬃ꯭꯭꯭꯭꯭꯭꯭꯭{n}🧸⎯", "⏤⃝⃪꯭⃮͙͙⃕⃔🌺⃪꯭꯭꯭꯭꯭꯭꯭꯭͙͙𝆭{n}🤍⃪꯭͙͙⏤",
+    "ミ★ ꯭꯭꯭꯭꯭꯭꯭{n} ★彡", "⫸⫷⫸⫷⫸✪꯭꯭꯭꯭꯭꯭꯭{n}✪⫸⫷⫸⫷⫸",
+    "──⃜͢͢៎꯭꯭꯭🐼⃪꯭͓͢°⃪꯭𝆺꯭꯭꯭꯭꯭꯭꯭꯭𝅥{n} ꯭͢⃟͢🍒⛦⃕͜🍃", "꧁༒☬꯭꯭꯭꯭꯭꯭꯭{n}☬༒꧂",
+    "𝁘꯭ ꯭ྭ꯭꯭꯭꯭꯭꯭꯭{n}➛🕸", "꧁✿✿✿ ꯭꯭꯭꯭꯭꯭꯭{n} ✿✿✿꧂",
+    "༺༒❁꯭꯭꯭꯭꯭꯭꯭{n}❁༒༻", "𓄂≛⃝꯭꯭꯭꯭꯭꯭꯭꯭{n} ꯭𝅥ͦ𝆬🚭",
+    "❘☞ͥ͟⋆ͣ͟⋆ͫ⍣꯭꯭꯭꯭꯭꯭꯭꯭{n}⍣❘꯭𝄄꯭", "꧁•⊹٭꯭꯭꯭꯭꯭꯭꯭{n}٭⊹•꧂",
+    "个『꯭꯭꯭꯭꯭꯭꯭{n}』个", ".⎯᪵᪵፝֟፝֟⎯꯭𝄀𝄄𝄀🌸꯭꯭꯭꯭꯭꯭꯭꯭꯭͟{n}🦋",
+    "⎯͢ꠋ ᶦϻͣ། ⃪ͥ͢ 🌺꯭꯭꯭꯭꯭꯭꯭͜͟{n}🫧", "𒆜꯭•☬•꯭꯭꯭꯭꯭꯭꯭{n}•☬•꯭𒆜",
+    "✤𖠌𓂀✤ ꯭꯭꯭꯭꯭꯭꯭{n} ✤𓂀𖠌✤", "˚₊·𐏓꯭ᶜᵘᵗᵉ ꯭꯭꯭꯭꯭꯭꯭{n}°‌🥀",
+    "ıllıllı⭐🌟 ꯭꯭꯭꯭꯭꯭꯭{n} 🌟⭐ıllıllı", "◄🕊️⃪꯭꯭꯭꯭꯭꯭꯭꯭̽͟{n}🦋⃝‌ٖٖٖٖ ‌ٖٖٖٖٖ❤️‍🔥",
+    "ᯓ🩺̶̶᪵˟̶ 𝆺𝅥⃝🫀꯭꯭꯭꯭꯭꯭꯭꯭{n}ﮩ᪵٨ـﮩ➛♥️", "⋆⋆⋆❀꯭꯭꯭꯭꯭꯭꯭{n}❀⋆⋆⋆",
+    "•─┼ᶦϻ‌།͢ ⃪꯭꯭꯭꯭꯭꯭꯭{n}🍓꯭᪳᪼᪳", "亗『꯭꯭꯭꯭꯭꯭꯭{n}』亗",
+    "◄⏤͟͟͞🤍⃝⃪🦋⃪꯭ᵛ̲ᵎ̲ᵖ̲𒉜꯭꯭꯭꯭꯭꯭꯭{n}🌸︭︫┼⁰⁰⁷─⦁••", "°†° «[꯭꯭꯭꯭꯭꯭꯭{n}]» °†°",
+    "☆☬꯭꯭꯭꯭꯭꯭꯭{n}☬☆", "⎯⃛㬓𓆩⃗㬓͟🍃̶̌͟🅼ɨֆֆ𝆺𝅥⃝꯭꯭꯭꯭꯭꯭꯭{n}˶֟፝͟͝⎯꯭̽ 🖤",
+    "🥀 ⃪ͥ͢ ᷟ𝆺꯭꯭𝅥᪳‌꯭꯭꯭꯭꯭꯭꯭꯭{n} ⎯꯭꯭᪵᪵፝֟፝❤️‍🔥", "➶➶➶➶➶⫷꯭꯭꯭꯭꯭꯭꯭{n}⫸➶➶➶➶➶",
+    "★¸.•☆•.¸★ ꯭꯭꯭꯭꯭꯭꯭{n} ★⡀.•☆•.★", "➤⇌⇌⇌꯭꯭꯭꯭꯭꯭꯭{n}⇌⇌⇌➤",
+    "❖꯭𓂀⃝꯭꯭꯭꯭꯭꯭꯭{n}𓂀⃝꯭❖", "【★】➳✮꯭꯭꯭꯭꯭꯭꯭{n}✮➳【★】",
+    "❥⃝⍣꯭꯭꯭꯭꯭꯭꯭{n}❥⃝⍣", "⛥꯭ᴳᴼᴰ⛥꯭꯭꯭꯭꯭꯭꯭꯭{n}⛥꯭",
+    "🝐꯭𓆩꯭꯭⍣⃪꯭꯭꯭꯭꯭꯭꯭{n}⃪⍣꯭꯭𓆪꯭🝐", "◄❥ ⃝⃪⃕♥️̶⍣⃪͜🌿𝄄᭄꯭꯭꯭꯭꯭꯭꯭{n}🍃⃝🎸",
+    "◄⏤͟͞ꭙ𝆺𝅥⃝🔥 ⃪꯭꯭꯭꯭꯭꯭꯭ͥ͢{n}༎ࠫ⛧‌ٖٖٖٖٖٖٜٖٖٖٖ𝆺꯭𝅥🤍", "☔️⃟⃚⃐⎯⃚꯭፝֟֗. ⃝꯭꯭꯭꯭꯭꯭꯭{n}✿⃟☔️✾",
+    "★彡[꯭꯭꯭꯭꯭꯭꯭{n}]彡★", "𓄂꯭꯭‌≛⃝꯭꯭꯭‌꯭꯭꯭꯭꯭꯭꯭꯭{n}𐎭❥┼🕊️",
+    "✿્᭄͜͡⃝❥꯭꯭꯭꯭꯭꯭꯭{n}༏༏𝆺꯭𝅥𝆺꯭𝅥༎ࠫ✿͜͡࿐", "•⏤‌𝄞⃝🍧 ‌⃪‌꯭꯭꯭꯭꯭꯭꯭{n}♥️꯭꯭꯭꯭ ꯭꯭᪳𝆺𝅥",
+    "⎯ᷝ⎯ⷨ͢ ꯭꯭꯭꯭꯭꯭꯭{n}𝆺꯭𝅥❤️‍🔥⎯꯭ͯ⟶⋆", "──⃜͢͢🥤⃘⃝⃟⃪꯭꯭꯭꯭꯭꯭꯭⃜{n}༎͢🦋",
+    "⤹ ⃪꯭꯭꯭꯭꯭꯭꯭꯭{n} ⃪🤭꯭͎᪳᪳𝆺꯭𝅥⎯꯭̽⎯꯭", "⋆⎯꯭̽𝅃꯭꯭꯭꯭꯭꯭꯭꯭᳚{n}𝅃꯭꯭᳚ ⃪꯭⃝𐏓꯭",
     "𓂀 ꯭꯭꯭꯭꯭꯭꯭{n} 𓂀"
 ]
 
-# 3. Extra Auto-Generated Borders
 AUTO_BORDERS = [
     "『 {n} 』", "▰▰ {n} ▰▰", "✧･ﾟ: * {n} *:･ﾟ✧", "ღ꧁ღ⊱ {n} ⊱ღ꧂ღ", 
     "★彡 {n} 彡★", "▄︻デ {n} ══━一", "乂✿꧁ {n} ꧂✿乂", "☬༒⋆ {n} ⋆༒☬",
@@ -94,42 +65,47 @@ AUTO_BORDERS = [
 ]
 
 def generate_designs(name):
-    designs = set()
-    
-    # Generate Name variations
+    designs = []
+    def add(d):
+        if d not in designs:
+            designs.append(d)
+            
     names = {
-        "bold": name.translate(FONTS["bold"]),
-        "cursive": name.translate(FONTS["cursive"]),
-        "gothic": name.translate(FONTS["gothic"]),
-        "double": name.translate(FONTS["double"]),
-        "smallcaps": name.translate(FONTS["smallcaps"]),
-        "circle": name.translate(FONTS["circle"]),
-        "square": name.upper().translate(FONTS["square"]),
-        "fullwidth": name.translate(FONTS["fullwidth"])
+        "bold": name.translate(FONTS["bold"]), "cursive": name.translate(FONTS["cursive"]),
+        "gothic": name.translate(FONTS["gothic"]), "double": name.translate(FONTS["double"]),
+        "smallcaps": name.translate(FONTS["smallcaps"]), "circle": name.translate(FONTS["circle"]),
+        "square": name.upper().translate(FONTS["square"]), "fullwidth": name.translate(FONTS["fullwidth"])
     }
 
-    # 1. Pure Fonts (Bina border ke)
-    for font_name in names.values():
-        designs.add(font_name)
-
-    # 2. User's Exact Borders + Bold Font
+    for font_name in names.values(): add(font_name)
     for border in USER_BORDERS:
-        designs.add(border.format(n=names["bold"]))
-        
-    # 3. User's Exact Borders + SmallCaps Font
-    for border in USER_BORDERS:
-        designs.add(border.format(n=names["smallcaps"]))
-        
-    # 4. Auto Borders + Various Fonts
+        add(border.format(n=names["bold"]))
+        add(border.format(n=names["smallcaps"]))
     for border in AUTO_BORDERS:
-        designs.add(border.format(n=names["bold"]))
-        designs.add(border.format(n=names["cursive"]))
-        designs.add(border.format(n=names["gothic"]))
-        designs.add(border.format(n=names["double"]))
-        designs.add(border.format(n=names["smallcaps"]))
-        designs.add(border.format(n=names["circle"]))
+        add(border.format(n=names["bold"]))
+        add(border.format(n=names["cursive"]))
+        add(border.format(n=names["gothic"]))
+        add(border.format(n=names["double"]))
+        add(border.format(n=names["smallcaps"]))
+        add(border.format(n=names["circle"]))
         
-    return list(designs)
+    return designs
+
+def get_page_markup(user_id, page, total_pages):
+    buttons = []
+    if page > 0:
+        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"nm_{user_id}_{page-1}"))
+    else:
+        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="nm_ignore"))
+        
+    buttons.append(InlineKeyboardButton(f"Page {page+1}/{total_pages}", callback_data="nm_ignore"))
+    
+    if page < total_pages - 1:
+        buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"nm_{user_id}_{page+1}"))
+    else:
+        buttons.append(InlineKeyboardButton("Next ➡️", callback_data="nm_ignore"))
+        
+    return InlineKeyboardMarkup([buttons])
 
 def register_name_maker(app: Client):
     @app.on_message(filters.command("name"))
@@ -148,21 +124,59 @@ def register_name_maker(app: Client):
             await message.reply_text("**Name is too long! Please provide a shorter name (max 15 chars).**")
             return
 
-        status = await message.reply_text("✨ **Generating 400+ Premium Designs... Wait!**")
+        status = await message.reply_text("✨ **Generating Premium Designs...**")
         
-        results = generate_designs(text)
+        designs = generate_designs(text)
         
-        # Send in chunks to prevent Telegram limits
-        chunk = ""
-        count = 1
-        for res in results:
-            if len(chunk) + len(res) > 3500:
-                await message.reply_text(chunk)
-                chunk = ""
-                await asyncio.sleep(1)
-            chunk += res + "\n\n"
+        # Save to cache
+        user_id = message.from_user.id
+        RESULTS_CACHE[user_id] = designs
+        
+        items_per_page = 8
+        total_pages = math.ceil(len(designs) / items_per_page)
+        
+        # Get first page
+        first_page_items = designs[0:items_per_page]
+        page_text = "✨ **Premium Name Styles for** `" + text + "` ✨\n\n" + "\n\n".join(first_page_items)
+        
+        markup = get_page_markup(user_id, 0, total_pages)
+        
+        await status.edit_text(page_text, reply_markup=markup)
+
+    @app.on_callback_query(filters.regex(r"^nm_"))
+    async def name_callback(client, callback_query):
+        data = callback_query.data.split("_")
+        
+        if data[1] == "ignore":
+            await callback_query.answer("This is just a page indicator.")
+            return
             
-        if chunk:
-            await message.reply_text(chunk)
+        user_id = int(data[1])
+        page = int(data[2])
+        
+        if callback_query.from_user.id != user_id:
+            await callback_query.answer("❌ Yeh buttons aapke liye nahi hain. Please apna khud ka /name command use karein.", show_alert=True)
+            return
             
-        await status.delete()
+        designs = RESULTS_CACHE.get(user_id)
+        if not designs:
+            await callback_query.answer("Session expired. Please use /name again.", show_alert=True)
+            return
+            
+        items_per_page = 8
+        total_pages = math.ceil(len(designs) / items_per_page)
+        
+        start_idx = page * items_per_page
+        end_idx = start_idx + items_per_page
+        
+        page_items = designs[start_idx:end_idx]
+        
+        # Extract name from first design if possible or just use generic
+        page_text = "✨ **Premium Name Styles** ✨\n\n" + "\n\n".join(page_items)
+        markup = get_page_markup(user_id, page, total_pages)
+        
+        try:
+            await callback_query.message.edit_text(page_text, reply_markup=markup)
+        except Exception:
+            pass
+        await callback_query.answer()
