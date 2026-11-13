@@ -157,12 +157,12 @@ def register_name_maker(app: Client):
         count = 1
         for res in results:
             if len(chunk) + len(res) > 3500:
-                await message.reply_text(chunk, disable_web_page_preview=True)
+                await message.reply_text(chunk)
                 chunk = ""
                 await asyncio.sleep(1)
             chunk += res + "\n\n"
             
         if chunk:
-            await message.reply_text(chunk, disable_web_page_preview=True)
+            await message.reply_text(chunk)
             
         await status.delete()
