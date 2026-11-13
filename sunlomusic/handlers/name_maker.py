@@ -104,7 +104,7 @@ def register_name_maker(app: Client):
         
         RESULTS_CACHE[user_id] = (text, designs)
         
-        items_per_page = 8
+        items_per_page = 20
         total_pages = math.ceil(len(designs) / items_per_page)
         
         first_page_items = designs[0:items_per_page]
@@ -138,7 +138,7 @@ def register_name_maker(app: Client):
             return
             
         text, designs = cached_data
-        items_per_page = 8
+        items_per_page = 20
         total_pages = math.ceil(len(designs) / items_per_page)
         
         start_idx = page * items_per_page
