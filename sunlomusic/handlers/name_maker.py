@@ -51,20 +51,24 @@ USER_BORDERS = [
 ]
 
 def generate_designs(name):
+    import random
     designs = []
     
-    # Generate combinations of Fonts and Borders
+    # 1. Pure Fonts (No Border)
     for font_name, trans_map in FONTS.items():
-        styled_name = name.translate(trans_map)
+        designs.append(name.translate(trans_map))
         
-        # Pure Font (No Border)
-        designs.append(styled_name)
-        
-        # Font + All Borders
-        for border in USER_BORDERS:
+    # 2. Font + Border Combinations (Mixed)
+    for border in USER_BORDERS:
+        for font_name, trans_map in FONTS.items():
+            styled_name = name.translate(trans_map)
             designs.append(border.format(n=styled_name))
             
-    return designs
+    # 3. Shuffle to mix different fonts on the same page
+    random.shuffle(designs)
+    
+    # 4. Remove duplicates if any
+    return list(dict.fromkeys(designs))
 
 def get_page_markup(user_id, page, total_pages):
     buttons = []
@@ -99,7 +103,7 @@ def register_name_maker(app: Client):
         user_id = message.from_user.id
         RESULTS_CACHE[user_id] = (text, designs)
         
-        items_per_page = 20
+        items_per_page = 50
         total_pages = math.ceil(len(designs) / items_per_page)
         
         first_page_items = designs[0:items_per_page]
@@ -131,7 +135,7 @@ def register_name_maker(app: Client):
             return
             
         text, designs = cached_data
-        items_per_page = 20
+        items_per_page = 50
         total_pages = math.ceil(len(designs) / items_per_page)
         
         start_idx = page * items_per_page
