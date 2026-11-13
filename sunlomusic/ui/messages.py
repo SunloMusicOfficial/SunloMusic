@@ -306,7 +306,8 @@ class Messages:
             types.InputRichBlockParagraph(types.RichTextBold(first_track)),
         ])
 
-    HELP_BASIC = [
+    HELP_BASIC = [        ("/name <text>", "Generate stylish names"),
+
         ("/start", "Show welcome message"),
         ("/help", "Show this help message"),
         ("/status", "Show bot statistics"),
