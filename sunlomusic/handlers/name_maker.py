@@ -1,6 +1,7 @@
 # Copyright (C) @YO_UR_OFFICIAL_CRUSH
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.enums import ButtonStyle, ParseMode
 from pyrogram.errors import MessageNotModified
 import math
 
@@ -62,26 +63,21 @@ USER_BORDERS = [
 def generate_designs(name):
     designs = []
     zalgo_name = make_zalgo(name)
-    
     for border in USER_BORDERS:
         designs.append(border.format(n=zalgo_name))
-        
     return designs
 
 def get_page_markup(user_id, page, total_pages):
     buttons = []
-    if page > 0:
-        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"nm_{user_id}_{page-1}"))
-    else:
-        buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="nm_ignore"))
-        
-    buttons.append(InlineKeyboardButton(f"Page {page+1}/{total_pages}", callback_data="nm_ignore"))
     
-    if page < total_pages - 1:
-        buttons.append(InlineKeyboardButton("Next ➡️", callback_data=f"nm_{user_id}_{page+1}"))
-    else:
-        buttons.append(InlineKeyboardButton("Next ➡️", callback_data="nm_ignore"))
-        
+    prev_btn = InlineKeyboardButton("⬅️ Prev", callback_data=f"nm_{user_id}_{page-1}" if page > 0 else "nm_ignore", style=ButtonStyle.PRIMARY)
+    page_btn = InlineKeyboardButton(f"Page {page+1}/{total_pages}", callback_data="nm_ignore", style=ButtonStyle.DANGER)
+    next_btn = InlineKeyboardButton("Next ➡️", callback_data=f"nm_{user_id}_{page+1}" if page < total_pages - 1 else "nm_ignore", style=ButtonStyle.SUCCESS)
+    
+    buttons.append(prev_btn)
+    buttons.append(page_btn)
+    buttons.append(next_btn)
+    
     return InlineKeyboardMarkup([buttons])
 
 def register_name_maker(app: Client):
@@ -101,29 +97,32 @@ def register_name_maker(app: Client):
             await message.reply_text("**Name is too long! Please provide a shorter name (max 15 chars).**")
             return
 
-        status = await message.reply_text("✨ **Generating Premium Zalgo Designs...**")
+        status = await message.reply_text("✨ **Generating Premium Designs...**")
         
         designs = generate_designs(text)
         user_id = message.from_user.id
         
-        # Cache save: storing tuple of (name, designs)
         RESULTS_CACHE[user_id] = (text, designs)
         
         items_per_page = 8
         total_pages = math.ceil(len(designs) / items_per_page)
         
         first_page_items = designs[0:items_per_page]
-        page_text = "✨ **Premium Name Styles for** `" + text + "` ✨\n\n" + "\n\n".join(first_page_items)
+        
+        page_text = f"✨ **Premium Name Styles for** `{text}` ✨\n\n👇 **Tap on any style to copy:**\n\n"
+        for item in first_page_items:
+            page_text += f"`{item}`\n\n"
+            
         markup = get_page_markup(user_id, 0, total_pages)
         
         await status.edit_text(page_text, reply_markup=markup)
 
     @app.on_callback_query(filters.regex(r"^nm_"))
     async def name_callback(client, callback_query):
-        data = callback_query.data.split("_")
+        await callback_query.answer()
         
+        data = callback_query.data.split("_")
         if data[1] == "ignore":
-            await callback_query.answer("Yeh sirf page number hai.")
             return
             
         user_id = int(data[1])
@@ -146,13 +145,14 @@ def register_name_maker(app: Client):
         end_idx = start_idx + items_per_page
         
         page_items = designs[start_idx:end_idx]
-        page_text = "✨ **Premium Name Styles for** `" + text + "` ✨\n\n" + "\n\n".join(page_items)
+        
+        page_text = f"✨ **Premium Name Styles for** `{text}` ✨\n\n👇 **Tap on any style to copy:**\n\n"
+        for item in page_items:
+            page_text += f"`{item}`\n\n"
+            
         markup = get_page_markup(user_id, page, total_pages)
         
         try:
             await callback_query.message.edit_text(page_text, reply_markup=markup)
-            await callback_query.answer()
         except MessageNotModified:
-            await callback_query.answer()
-        except Exception as e:
-            await callback_query.answer(f"Error: {e}", show_alert=True)
+            pass
