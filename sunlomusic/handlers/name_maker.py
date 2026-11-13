@@ -84,10 +84,12 @@ def register_name_maker(app: Client):
     @app.on_message(filters.command("name"))
     async def name_command(client, message: Message):
         text = ""
-        if message.reply_to_message and message.reply_to_message.text:
-            text = message.reply_to_message.text.strip()
-        elif len(message.text.split()) > 1:
+        # Pehle check karein ki command ke aage kuch type kiya gaya hai ya nahi (Jaise /name Sakil)
+        if len(message.text.split()) > 1:
             text = message.text.split(maxsplit=1)[1].strip()
+        # Agar sirf /name likha hai, tabhi reply check karein
+        elif message.reply_to_message and message.reply_to_message.text:
+            text = message.reply_to_message.text.strip()
             
         if not text:
             await message.reply_text("**Usage:**\n`/name Sakil` \nYa kisi ke message par reply karke `/name` likhein.")
@@ -119,6 +121,9 @@ def register_name_maker(app: Client):
 
     @app.on_callback_query(filters.regex(r"^nm_"), group=-1)
     async def name_callback(client, callback_query):
+        # Loading animation rokne ke liye turant answer karein
+        await callback_query.answer()
+        
         data = callback_query.data.split("_")
         
         if data[1] == "ignore":
