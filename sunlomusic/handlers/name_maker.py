@@ -117,12 +117,12 @@ def register_name_maker(app: Client):
         
         await status.edit_text(page_text, reply_markup=markup)
 
-    @app.on_callback_query(filters.regex(r"^nm_"))
+    @app.on_callback_query(filters.regex(r"^nm_"), group=-1)
     async def name_callback(client, callback_query):
-        await callback_query.answer()
-        
         data = callback_query.data.split("_")
+        
         if data[1] == "ignore":
+            await callback_query.answer("Yeh sirf page number hai.")
             return
             
         user_id = int(data[1])
@@ -134,7 +134,7 @@ def register_name_maker(app: Client):
             
         cached_data = RESULTS_CACHE.get(user_id)
         if not cached_data:
-            await callback_query.answer("Session expired. Please use /name again.", show_alert=True)
+            await callback_query.answer("⏳ Session expired ya bot restart ho gaya. Please /name dobara likhein.", show_alert=True)
             return
             
         text, designs = cached_data
@@ -154,5 +154,8 @@ def register_name_maker(app: Client):
         
         try:
             await callback_query.message.edit_text(page_text, reply_markup=markup)
+            await callback_query.answer()
         except MessageNotModified:
-            pass
+            await callback_query.answer("Aap isi page par hain.")
+        except Exception as e:
+            await callback_query.answer(f"Error: {e}", show_alert=True)
